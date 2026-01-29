@@ -4,7 +4,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { 
   LayoutDashboard, 
   Users, 
-  UserPlus, 
+  FolderOpen,
+  ClipboardList as RegisterIcon,
   Calendar, 
   BookOpen, 
   CheckSquare, 
@@ -22,7 +23,8 @@ import { cn } from '@/lib/utils';
 const navItems = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
   { title: 'Students', url: '/students', icon: Users },
-  { title: 'Register', url: '/register', icon: UserPlus },
+  { title: 'Sections', url: '/sections', icon: FolderOpen },
+  { title: 'Register', url: '/register', icon: RegisterIcon },
   { title: 'Virtual Audit', url: '/virtual-audit', icon: ClipboardList },
   { title: 'Schedule', url: '/schedule', icon: Calendar },
   { title: 'Lesson Plan', url: '/lesson-plan', icon: BookOpen },
