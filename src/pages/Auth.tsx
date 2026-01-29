@@ -182,6 +182,14 @@ export default function Auth() {
               </form>
             </TabsContent>
           </Tabs>
+          <div className="mt-4 text-center">
+            <a 
+              href="/admin-login" 
+              className="text-sm text-muted-foreground hover:text-primary"
+            >
+              Administrator? Sign in here →
+            </a>
+          </div>
         </CardContent>
       </Card>
     </div>
