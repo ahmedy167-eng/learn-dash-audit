@@ -163,6 +163,60 @@ export type Database = {
         }
         Relationships: []
       }
+      sections: {
+        Row: {
+          building: string | null
+          category: string | null
+          course: string | null
+          created_at: string
+          finish_class_time: string | null
+          id: string
+          name: string
+          notes: string | null
+          off_days: string[] | null
+          room: string | null
+          section_number: string | null
+          start_class_time: string | null
+          teaching_days: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          building?: string | null
+          category?: string | null
+          course?: string | null
+          created_at?: string
+          finish_class_time?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          off_days?: string[] | null
+          room?: string | null
+          section_number?: string | null
+          start_class_time?: string | null
+          teaching_days?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          building?: string | null
+          category?: string | null
+          course?: string | null
+          created_at?: string
+          finish_class_time?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          off_days?: string[] | null
+          room?: string | null
+          section_number?: string | null
+          start_class_time?: string | null
+          teaching_days?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       students: {
         Row: {
           absent_count: number | null
@@ -179,6 +233,7 @@ export type Database = {
           off_days: string[] | null
           present_count: number | null
           room: string | null
+          section_id: string | null
           section_number: string | null
           start_class_time: string | null
           student_id: string
@@ -201,6 +256,7 @@ export type Database = {
           off_days?: string[] | null
           present_count?: number | null
           room?: string | null
+          section_id?: string | null
           section_number?: string | null
           start_class_time?: string | null
           student_id: string
@@ -223,6 +279,7 @@ export type Database = {
           off_days?: string[] | null
           present_count?: number | null
           room?: string | null
+          section_id?: string | null
           section_number?: string | null
           start_class_time?: string | null
           student_id?: string
@@ -230,7 +287,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "students_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tasks: {
         Row: {

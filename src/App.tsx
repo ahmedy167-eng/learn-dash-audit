@@ -9,6 +9,8 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Students from "./pages/Students";
 import Register from "./pages/Register";
+import Sections from "./pages/Sections";
+import SectionForm from "./pages/SectionForm";
 import VirtualAudit from "./pages/VirtualAudit";
 import Schedule from "./pages/Schedule";
 import LessonPlan from "./pages/LessonPlan";
@@ -31,6 +33,9 @@ function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/students" element={<Students />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/sections" element={<Sections />} />
+              <Route path="/sections/new" element={<SectionForm />} />
+              <Route path="/sections/edit/:id" element={<SectionForm />} />
               <Route path="/virtual-audit" element={<VirtualAudit />} />
               <Route path="/schedule" element={<Schedule />} />
               <Route path="/lesson-plan" element={<LessonPlan />} />
