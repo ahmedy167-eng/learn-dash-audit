@@ -11,11 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { BookOpen, Plus, Loader2, Trash2, Pencil, Download, Search, CalendarIcon } from 'lucide-react';
+import { BookOpen, Plus, Loader2, Trash2, Pencil, Download, Search, CalendarIcon, Save, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType } from 'docx';
 import { saveAs } from 'file-saver';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { cn } from '@/lib/utils';
 
 const WEEKS = Array.from({ length: 15 }, (_, i) => `Week ${i + 1}`);
@@ -44,6 +46,10 @@ interface LessonPlan {
   updated_at: string;
 }
 
+interface ValidationErrors {
+  [key: string]: string;
+}
+
 export default function LessonPlanPage() {
   const { user } = useAuth();
   const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>([]);
@@ -53,6 +59,7 @@ export default function LessonPlanPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
 
   // Form state
   const [title, setTitle] = useState('');
@@ -118,11 +125,41 @@ export default function LessonPlanPage() {
     setFilteredPlans(filtered);
   };
 
+  const validateForm = (): boolean => {
+    const errors: ValidationErrors = {};
+
+    if (!title.trim()) errors.title = 'Title is required';
+    if (!course) errors.course = 'Please select a course';
+    if (!week) errors.week = 'Please select a week';
+    if (!sectionNumber.trim()) errors.sectionNumber = 'Section number is required';
+    if (!building.trim()) errors.building = 'Building is required';
+    if (!room.trim()) errors.room = 'Class room is required';
+    if (!lessonDate) errors.lessonDate = 'Please select a lesson date';
+    if (!lessonSkill.trim()) errors.lessonSkill = 'Lesson skill is required';
+    if (!aimMain.trim()) errors.aimMain = 'Main aim is required';
+    if (!aimSubsidiary.trim()) errors.aimSubsidiary = 'Subsidiary aim is required';
+    if (!objectives.trim()) errors.objectives = 'Objectives are required';
+    if (!leadInPresentation.trim()) errors.leadInPresentation = 'Lead-in & presentation is required';
+    if (!practiceExercises.trim()) errors.practiceExercises = 'Practice exercises are required';
+    if (!productiveActivities.trim()) errors.productiveActivities = 'Productive activities are required';
+    if (!reflection.trim()) errors.reflection = 'Reflection is required';
+
+    setValidationErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
+      // Show toast with first error
+      const firstError = Object.values(errors)[0];
+      toast.error(firstError);
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title) {
-      toast.error('Please enter a title');
+    if (!validateForm()) {
       return;
     }
 
@@ -157,14 +194,14 @@ export default function LessonPlanPage() {
           .eq('id', editingId);
 
         if (error) throw error;
-        toast.success('Lesson plan updated');
+        toast.success('Lesson plan saved successfully');
       } else {
         const { error } = await supabase
           .from('lesson_plans')
           .insert([planData]);
 
         if (error) throw error;
-        toast.success('Lesson plan created');
+        toast.success('Lesson plan saved successfully');
       }
 
       setIsDialogOpen(false);
@@ -196,6 +233,7 @@ export default function LessonPlanPage() {
     setProductiveActivities(plan.productive_activities || '');
     setReflection(plan.reflection || '');
     setContent(plan.content || '');
+    setValidationErrors({});
     setIsDialogOpen(true);
   };
 
@@ -216,93 +254,141 @@ export default function LessonPlanPage() {
   };
 
   const downloadWord = async (plan: LessonPlan) => {
-    const sections: Paragraph[] = [];
-
-    // Title
-    sections.push(
-      new Paragraph({
-        children: [new TextRun({ text: plan.title, bold: true, size: 32 })],
-        heading: HeadingLevel.HEADING_1,
-        spacing: { after: 200 },
-      })
-    );
-
-    // Info line (Course | Week)
-    const infoLine = [plan.course, plan.week].filter(Boolean).join(' | ');
-    if (infoLine) {
-      sections.push(
-        new Paragraph({
-          children: [new TextRun({ text: infoLine, italics: true, size: 24 })],
-          spacing: { after: 200 },
-        })
-      );
-    }
-
-    // Location info (Section | Building | Room)
-    const locationLine = [
-      plan.section_number && `Section: ${plan.section_number}`,
-      plan.building && `Building: ${plan.building}`,
-      plan.room && `Room: ${plan.room}`
-    ].filter(Boolean).join(' | ');
-    if (locationLine) {
-      sections.push(
-        new Paragraph({
-          children: [new TextRun({ text: locationLine, size: 22 })],
-          spacing: { after: 200 },
-        })
-      );
-    }
-
-    // Lesson Date
-    if (plan.lesson_date) {
-      sections.push(
-        new Paragraph({
-          children: [new TextRun({ text: `Lesson Date: ${format(parseISO(plan.lesson_date), 'd/M/yyyy')}`, size: 22 })],
-          spacing: { after: 200 },
-        })
-      );
-    }
-
-    // Created Date
-    sections.push(
-      new Paragraph({
-        children: [new TextRun({ text: `Created: ${format(parseISO(plan.created_at), 'MMMM d, yyyy')}`, color: '666666', size: 20 })],
-        spacing: { after: 400 },
-      })
-    );
-
-    const addSection = (title: string, content: string | null) => {
-      if (content) {
-        sections.push(
-          new Paragraph({
-            children: [new TextRun({ text: title, bold: true, size: 24 })],
-            heading: HeadingLevel.HEADING_2,
-            spacing: { before: 300, after: 100 },
-          })
-        );
-        sections.push(
-          new Paragraph({
-            children: [new TextRun({ text: content, size: 22 })],
-            spacing: { after: 200 },
-          })
-        );
-      }
+    const dateStr = plan.lesson_date ? format(parseISO(plan.lesson_date), 'd/M/yyyy') : 'N/A';
+    
+    // Create border style for tables
+    const tableBorder = {
+      style: BorderStyle.SINGLE,
+      size: 1,
+      color: '000000',
     };
 
-    addSection('Lesson Skill', plan.lesson_skill);
-    addSection('Lesson Aim - Main', plan.aim_main);
-    addSection('Lesson Aim - Subsidiary', plan.aim_subsidiary);
-    addSection('Learning Objectives', plan.objectives);
-    addSection('Lead-in & Presentation', plan.lead_in_presentation);
-    addSection('Practice Exercises', plan.practice_exercises);
-    addSection('Productive Activities', plan.productive_activities);
-    addSection('Reflection', plan.reflection);
-    addSection('Additional Content', plan.content);
+    const createTableCell = (text: string, isHeader: boolean = false, width?: number) => {
+      return new TableCell({
+        children: [
+          new Paragraph({
+            children: [
+              new TextRun({
+                text: text,
+                bold: isHeader,
+                size: 22,
+              }),
+            ],
+          }),
+        ],
+        width: width ? { size: width, type: WidthType.PERCENTAGE } : undefined,
+        borders: {
+          top: tableBorder,
+          bottom: tableBorder,
+          left: tableBorder,
+          right: tableBorder,
+        },
+      });
+    };
+
+    // Header section
+    const headerParagraph = new Paragraph({
+      children: [
+        new TextRun({
+          text: 'LESSON PLAN',
+          bold: true,
+          size: 36,
+        }),
+      ],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 200 },
+    });
+
+    const titleParagraph = new Paragraph({
+      children: [
+        new TextRun({
+          text: `${plan.title} - ${dateStr}`,
+          bold: true,
+          size: 28,
+        }),
+      ],
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 400 },
+    });
+
+    // Details table
+    const detailsTable = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [
+        new TableRow({
+          children: [
+            createTableCell('Course', true, 30),
+            createTableCell(plan.course || 'N/A', false, 70),
+          ],
+        }),
+        new TableRow({
+          children: [
+            createTableCell('Week', true, 30),
+            createTableCell(plan.week || 'N/A', false, 70),
+          ],
+        }),
+        new TableRow({
+          children: [
+            createTableCell('Section', true, 30),
+            createTableCell(plan.section_number || 'N/A', false, 70),
+          ],
+        }),
+        new TableRow({
+          children: [
+            createTableCell('Building', true, 30),
+            createTableCell(plan.building || 'N/A', false, 70),
+          ],
+        }),
+        new TableRow({
+          children: [
+            createTableCell('Room', true, 30),
+            createTableCell(plan.room || 'N/A', false, 70),
+          ],
+        }),
+        new TableRow({
+          children: [
+            createTableCell('Date', true, 30),
+            createTableCell(dateStr, false, 70),
+          ],
+        }),
+      ],
+    });
+
+    // Spacer
+    const spacer = new Paragraph({ spacing: { after: 300 } });
+
+    // Content table
+    const contentRows = [
+      { label: 'Lesson Skill', value: plan.lesson_skill },
+      { label: 'Aim (Main)', value: plan.aim_main },
+      { label: 'Aim (Subsidiary)', value: plan.aim_subsidiary },
+      { label: 'Objectives', value: plan.objectives },
+      { label: 'Lead-in & Presentation', value: plan.lead_in_presentation },
+      { label: 'Practice Exercises', value: plan.practice_exercises },
+      { label: 'Productive Activities', value: plan.productive_activities },
+      { label: 'Reflection', value: plan.reflection },
+    ];
+
+    if (plan.content) {
+      contentRows.push({ label: 'Additional Notes', value: plan.content });
+    }
+
+    const contentTable = new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: contentRows.map(row => 
+        new TableRow({
+          children: [
+            createTableCell(row.label, true, 25),
+            createTableCell(row.value || 'N/A', false, 75),
+          ],
+        })
+      ),
+    });
 
     const doc = new Document({
       sections: [{
         properties: {},
-        children: sections,
+        children: [headerParagraph, titleParagraph, detailsTable, spacer, contentTable],
       }],
     });
 
@@ -311,6 +397,81 @@ export default function LessonPlanPage() {
     const fileName = `${plan.title.replace(/[^a-z0-9]/gi, '_')}_${datePart}.docx`;
     saveAs(blob, fileName);
     toast.success('Word document downloaded');
+  };
+
+  const downloadPdf = (plan: LessonPlan) => {
+    const dateStr = plan.lesson_date ? format(parseISO(plan.lesson_date), 'd/M/yyyy') : 'N/A';
+    
+    const doc = new jsPDF();
+    
+    // Title
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('LESSON PLAN', doc.internal.pageSize.width / 2, 20, { align: 'center' });
+    
+    doc.setFontSize(14);
+    doc.text(`${plan.title} - ${dateStr}`, doc.internal.pageSize.width / 2, 30, { align: 'center' });
+
+    // Details table
+    const detailsData = [
+      ['Course', plan.course || 'N/A'],
+      ['Week', plan.week || 'N/A'],
+      ['Section', plan.section_number || 'N/A'],
+      ['Building', plan.building || 'N/A'],
+      ['Room', plan.room || 'N/A'],
+      ['Date', dateStr],
+    ];
+
+    autoTable(doc, {
+      startY: 40,
+      head: [['Field', 'Value']],
+      body: detailsData,
+      theme: 'grid',
+      headStyles: { fillColor: [66, 66, 66], textColor: 255, fontStyle: 'bold' },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 50 },
+        1: { cellWidth: 'auto' },
+      },
+      margin: { left: 14, right: 14 },
+    });
+
+    // Content table
+    const contentData = [
+      ['Lesson Skill', plan.lesson_skill || 'N/A'],
+      ['Aim (Main)', plan.aim_main || 'N/A'],
+      ['Aim (Subsidiary)', plan.aim_subsidiary || 'N/A'],
+      ['Objectives', plan.objectives || 'N/A'],
+      ['Lead-in & Presentation', plan.lead_in_presentation || 'N/A'],
+      ['Practice Exercises', plan.practice_exercises || 'N/A'],
+      ['Productive Activities', plan.productive_activities || 'N/A'],
+      ['Reflection', plan.reflection || 'N/A'],
+    ];
+
+    if (plan.content) {
+      contentData.push(['Additional Notes', plan.content]);
+    }
+
+    // Get Y position after first table
+    const finalY = (doc as any).lastAutoTable?.finalY || 100;
+
+    autoTable(doc, {
+      startY: finalY + 10,
+      head: [['Section', 'Content']],
+      body: contentData,
+      theme: 'grid',
+      headStyles: { fillColor: [66, 66, 66], textColor: 255, fontStyle: 'bold' },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 50 },
+        1: { cellWidth: 'auto' },
+      },
+      margin: { left: 14, right: 14 },
+      styles: { cellPadding: 3, fontSize: 10 },
+    });
+
+    const datePart = plan.lesson_date ? format(parseISO(plan.lesson_date), 'd-M-yyyy') : 'plan';
+    const fileName = `${plan.title.replace(/[^a-z0-9]/gi, '_')}_${datePart}.pdf`;
+    doc.save(fileName);
+    toast.success('PDF downloaded');
   };
 
   const resetForm = () => {
@@ -331,12 +492,15 @@ export default function LessonPlanPage() {
     setProductiveActivities('');
     setReflection('');
     setContent('');
+    setValidationErrors({});
   };
 
   const openNewDialog = () => {
     resetForm();
     setIsDialogOpen(true);
   };
+
+  const hasError = (field: string) => !!validationErrors[field];
 
   return (
     <DashboardLayout>
@@ -360,21 +524,26 @@ export default function LessonPlanPage() {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="title">Title *</Label>
+                  <Label htmlFor="title" className="flex items-center gap-1">
+                    Title <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="title"
                     placeholder="Enter lesson plan title"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    required
+                    className={cn(hasError('title') && 'border-destructive')}
                   />
+                  {hasError('title') && <p className="text-sm text-destructive">{validationErrors.title}</p>}
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Course</Label>
+                    <Label className="flex items-center gap-1">
+                      Course <span className="text-destructive">*</span>
+                    </Label>
                     <Select value={course} onValueChange={setCourse}>
-                      <SelectTrigger>
+                      <SelectTrigger className={cn(hasError('course') && 'border-destructive')}>
                         <SelectValue placeholder="Select course" />
                       </SelectTrigger>
                       <SelectContent>
@@ -383,11 +552,14 @@ export default function LessonPlanPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {hasError('course') && <p className="text-sm text-destructive">{validationErrors.course}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label>Week</Label>
+                    <Label className="flex items-center gap-1">
+                      Week <span className="text-destructive">*</span>
+                    </Label>
                     <Select value={week} onValueChange={setWeek}>
-                      <SelectTrigger>
+                      <SelectTrigger className={cn(hasError('week') && 'border-destructive')}>
                         <SelectValue placeholder="Select week" />
                       </SelectTrigger>
                       <SelectContent>
@@ -396,48 +568,64 @@ export default function LessonPlanPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                    {hasError('week') && <p className="text-sm text-destructive">{validationErrors.week}</p>}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="sectionNumber">Section Number</Label>
+                    <Label htmlFor="sectionNumber" className="flex items-center gap-1">
+                      Section Number <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="sectionNumber"
                       placeholder="e.g., 101"
                       value={sectionNumber}
                       onChange={(e) => setSectionNumber(e.target.value)}
+                      className={cn(hasError('sectionNumber') && 'border-destructive')}
                     />
+                    {hasError('sectionNumber') && <p className="text-sm text-destructive">{validationErrors.sectionNumber}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="building">Building</Label>
+                    <Label htmlFor="building" className="flex items-center gap-1">
+                      Building <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="building"
                       placeholder="e.g., B1"
                       value={building}
                       onChange={(e) => setBuilding(e.target.value)}
+                      className={cn(hasError('building') && 'border-destructive')}
                     />
+                    {hasError('building') && <p className="text-sm text-destructive">{validationErrors.building}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="room">Class Room</Label>
+                    <Label htmlFor="room" className="flex items-center gap-1">
+                      Class Room <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="room"
                       placeholder="e.g., 204"
                       value={room}
                       onChange={(e) => setRoom(e.target.value)}
+                      className={cn(hasError('room') && 'border-destructive')}
                     />
+                    {hasError('room') && <p className="text-sm text-destructive">{validationErrors.room}</p>}
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Lesson Date</Label>
+                  <Label className="flex items-center gap-1">
+                    Lesson Date <span className="text-destructive">*</span>
+                  </Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className={cn(
                           "w-full justify-start text-left font-normal",
-                          !lessonDate && "text-muted-foreground"
+                          !lessonDate && "text-muted-foreground",
+                          hasError('lessonDate') && 'border-destructive'
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
@@ -453,95 +641,128 @@ export default function LessonPlanPage() {
                       />
                     </PopoverContent>
                   </Popover>
+                  {hasError('lessonDate') && <p className="text-sm text-destructive">{validationErrors.lessonDate}</p>}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="lessonSkill">Lesson Skill (What concept are you teaching?)</Label>
+                  <Label htmlFor="lessonSkill" className="flex items-center gap-1">
+                    Lesson Skill <span className="text-destructive">*</span>
+                  </Label>
                   <Textarea
                     id="lessonSkill"
                     placeholder="Refer to the skill box in your textbook"
                     value={lessonSkill}
                     onChange={(e) => setLessonSkill(e.target.value)}
                     rows={2}
+                    className={cn(hasError('lessonSkill') && 'border-destructive')}
                   />
+                  {hasError('lessonSkill') && <p className="text-sm text-destructive">{validationErrors.lessonSkill}</p>}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="aimMain">Lesson Aim - Main</Label>
+                    <Label htmlFor="aimMain" className="flex items-center gap-1">
+                      Lesson Aim - Main <span className="text-destructive">*</span>
+                    </Label>
                     <Textarea
                       id="aimMain"
                       placeholder="Overall purpose for your lesson"
                       value={aimMain}
                       onChange={(e) => setAimMain(e.target.value)}
                       rows={2}
+                      className={cn(hasError('aimMain') && 'border-destructive')}
                     />
+                    {hasError('aimMain') && <p className="text-sm text-destructive">{validationErrors.aimMain}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="aimSubsidiary">Lesson Aim - Subsidiary</Label>
+                    <Label htmlFor="aimSubsidiary" className="flex items-center gap-1">
+                      Lesson Aim - Subsidiary <span className="text-destructive">*</span>
+                    </Label>
                     <Textarea
                       id="aimSubsidiary"
                       placeholder="Secondary aim"
                       value={aimSubsidiary}
                       onChange={(e) => setAimSubsidiary(e.target.value)}
                       rows={2}
+                      className={cn(hasError('aimSubsidiary') && 'border-destructive')}
                     />
+                    {hasError('aimSubsidiary') && <p className="text-sm text-destructive">{validationErrors.aimSubsidiary}</p>}
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="objectives">Lesson Objectives (By the end of this lesson, students will be able to:)</Label>
+                  <Label htmlFor="objectives" className="flex items-center gap-1">
+                    Lesson Objectives <span className="text-destructive">*</span>
+                  </Label>
                   <Textarea
                     id="objectives"
                     placeholder="Use specific and measurable HOTs action words"
                     value={objectives}
                     onChange={(e) => setObjectives(e.target.value)}
                     rows={3}
+                    className={cn(hasError('objectives') && 'border-destructive')}
                   />
+                  {hasError('objectives') && <p className="text-sm text-destructive">{validationErrors.objectives}</p>}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="leadInPresentation">Lead-in & Presentation</Label>
+                  <Label htmlFor="leadInPresentation" className="flex items-center gap-1">
+                    Lead-in & Presentation <span className="text-destructive">*</span>
+                  </Label>
                   <Textarea
                     id="leadInPresentation"
                     placeholder="How are you going to present the language point/skill?"
                     value={leadInPresentation}
                     onChange={(e) => setLeadInPresentation(e.target.value)}
                     rows={3}
+                    className={cn(hasError('leadInPresentation') && 'border-destructive')}
                   />
+                  {hasError('leadInPresentation') && <p className="text-sm text-destructive">{validationErrors.leadInPresentation}</p>}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="practiceExercises">Practice Exercises (Controlled and Semi-controlled)</Label>
+                  <Label htmlFor="practiceExercises" className="flex items-center gap-1">
+                    Practice Exercises <span className="text-destructive">*</span>
+                  </Label>
                   <Textarea
                     id="practiceExercises"
                     placeholder="What practice exercises are students going to do?"
                     value={practiceExercises}
                     onChange={(e) => setPracticeExercises(e.target.value)}
                     rows={3}
+                    className={cn(hasError('practiceExercises') && 'border-destructive')}
                   />
+                  {hasError('practiceExercises') && <p className="text-sm text-destructive">{validationErrors.practiceExercises}</p>}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="productiveActivities">Productive Activities</Label>
+                  <Label htmlFor="productiveActivities" className="flex items-center gap-1">
+                    Productive Activities <span className="text-destructive">*</span>
+                  </Label>
                   <Textarea
                     id="productiveActivities"
                     placeholder="What productive activities are students going to do?"
                     value={productiveActivities}
                     onChange={(e) => setProductiveActivities(e.target.value)}
                     rows={3}
+                    className={cn(hasError('productiveActivities') && 'border-destructive')}
                   />
+                  {hasError('productiveActivities') && <p className="text-sm text-destructive">{validationErrors.productiveActivities}</p>}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="reflection">Reflection (POS/NEG)</Label>
+                  <Label htmlFor="reflection" className="flex items-center gap-1">
+                    Reflection (POS/NEG) <span className="text-destructive">*</span>
+                  </Label>
                   <Textarea
                     id="reflection"
                     placeholder="Positive and negative reflections"
                     value={reflection}
                     onChange={(e) => setReflection(e.target.value)}
                     rows={3}
+                    className={cn(hasError('reflection') && 'border-destructive')}
                   />
+                  {hasError('reflection') && <p className="text-sm text-destructive">{validationErrors.reflection}</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -555,10 +776,17 @@ export default function LessonPlanPage() {
                   />
                 </div>
 
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {editingId ? 'Update Plan' : 'Create Plan'}
-                </Button>
+                {/* Sticky Save Button */}
+                <div className="sticky bottom-0 bg-background pt-4 pb-2 border-t border-border -mx-6 px-6">
+                  <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
+                    Save Lesson Plan
+                  </Button>
+                </div>
               </form>
             </DialogContent>
           </Dialog>
@@ -568,7 +796,7 @@ export default function LessonPlanPage() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search lesson plans by title, course, week, day, skill..."
+            placeholder="Search lesson plans by title, course, week, section, building, room..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -620,9 +848,6 @@ export default function LessonPlanPage() {
                       )}
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button variant="ghost" size="icon" onClick={() => downloadWord(plan)} title="Download Word">
-                        <Download className="h-4 w-4" />
-                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => editPlan(plan)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -654,15 +879,26 @@ export default function LessonPlanPage() {
                     <p className="text-xs text-muted-foreground">
                       Updated {format(parseISO(plan.updated_at), 'MMM d, yyyy')}
                     </p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => downloadWord(plan)}
-                      className="h-7 text-xs"
-                    >
-                      <Download className="mr-1 h-3 w-3" />
-                      Word
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => downloadPdf(plan)}
+                        className="h-7 text-xs"
+                      >
+                        <FileText className="mr-1 h-3 w-3" />
+                        PDF
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => downloadWord(plan)}
+                        className="h-7 text-xs"
+                      >
+                        <Download className="mr-1 h-3 w-3" />
+                        Word
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
