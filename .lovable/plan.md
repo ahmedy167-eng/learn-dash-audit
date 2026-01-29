@@ -1,108 +1,134 @@
 
 
-# Add Location Details and Date Picker to Lesson Plan Form
+# Enhance Lesson Plan with Save Button, Validation, and Document Downloads
 
 ## Overview
-This plan adds new fields to the lesson plan creation form and removes the day dropdown, replacing it with a calendar date picker.
+This plan addresses the reported issues with the lesson plan feature and adds new capabilities:
+
+1. Add a clear "Save" button that's always visible
+2. Fix data persistence so edited information is retained properly
+3. Fix Word document export to include all entered data
+4. Add required field validation (all fields must be filled)
+5. Add tables to the Word document for better formatting
+6. Add PDF download option alongside Word document
+
+---
+
+## Issues to Fix
+
+### Current Problems Identified
+1. The form has a submit button at the bottom labeled "Create Plan" or "Update Plan" - but users may not see it as a clear "Save" action
+2. Word document download uses `plan` data from the database record, not the current form state - if the data wasn't saved properly, the download shows nothing
+3. No validation requiring users to fill all fields before saving
+4. Word document uses simple paragraphs instead of structured tables
 
 ---
 
 ## What Will Change
 
-### Form Changes
-The "Create New Lesson Plan" dialog will be updated with:
+### 1. Save Button Improvements
+- Make the Save button more prominent and always visible
+- Add a sticky footer with the Save button at the bottom of the form
+- Clear labeling: "Save Lesson Plan" instead of "Create/Update Plan"
 
-1. **New Fields Added:**
-   - Section Number - Text input for the section identifier
-   - Building Number - Text input for the building location  
-   - Class Room - Text input for the room number/name
-   - Lesson Date - A calendar date picker (displayed in dd/MM/yyyy format like 29/1/2026)
+### 2. Required Field Validation
+All fields will be required before saving:
+- Title, Course, Week
+- Section Number, Building, Class Room
+- Lesson Date
+- Lesson Skill
+- Aim (Main and Subsidiary)
+- Objectives
+- Lead-in & Presentation
+- Practice Exercises
+- Productive Activities
+- Reflection
 
-2. **Removed:**
-   - Day dropdown (Sunday-Thursday selector)
+Show validation errors for any empty fields.
 
-3. **Existing Features (Already Working):**
-   - Word document download - Already implemented
-   - Search for previous lesson plans - Already implemented with search bar
+### 3. Word Document with Tables
+The exported Word document will have a professional format with tables:
 
-### Form Layout (After Changes)
 ```text
-+------------------------------------------+
-| Title *                                  |
-+------------------------------------------+
-| Course        | Week                     |
-+------------------------------------------+
-| Section Number | Building | Class Room   |
-+------------------------------------------+
-| Lesson Date [Calendar Picker]            |
-+------------------------------------------+
-| Lesson Skill                             |
-+------------------------------------------+
-| ... (remaining fields unchanged)         |
-+------------------------------------------+
++----------------------------------+
+|        LESSON PLAN               |
+|     [Title - Date]               |
++----------------------------------+
+
++---------------+------------------+
+| Course        | [Course Value]   |
++---------------+------------------+
+| Week          | [Week Value]     |
++---------------+------------------+
+| Section       | [Section Value]  |
++---------------+------------------+
+| Building      | [Building Value] |
++---------------+------------------+
+| Room          | [Room Value]     |
++---------------+------------------+
+| Date          | [Date Value]     |
++---------------+------------------+
+
++----------------------------------+
+| LESSON CONTENT                   |
++----------------------------------+
+| Lesson Skill: [Content]          |
+| Aim (Main): [Content]            |
+| Aim (Subsidiary): [Content]      |
+| Objectives: [Content]            |
+| Lead-in: [Content]               |
+| Practice: [Content]              |
+| Activities: [Content]            |
+| Reflection: [Content]            |
++----------------------------------+
 ```
 
-### Word Document Updates
-The downloaded Word document will include the new location and date information:
-- Section Number
-- Building  
-- Class Room
-- Lesson Date (formatted as dd/MM/yyyy)
+### 4. PDF Download Option
+Add a second download button for PDF format using jsPDF with tables.
 
-### Search Updates
-The search functionality will be extended to also search by:
-- Section number
-- Building
-- Room
+### 5. Dual Download Buttons on Cards
+Each lesson plan card will show:
+- "PDF" button - downloads as PDF with tables
+- "Word" button - downloads as Word doc with tables
 
 ---
 
 ## Technical Details
 
-### 1. Database Migration
-Add four new columns to the `lesson_plans` table:
+### File: `src/pages/LessonPlan.tsx`
 
-| Column | Type | Nullable | Description |
-|--------|------|----------|-------------|
-| `section_number` | text | Yes | Section identifier |
-| `building` | text | Yes | Building number/name |
-| `room` | text | Yes | Classroom number |
-| `lesson_date` | date | Yes | Specific lesson date |
+**1. Add Validation Function**
+Create a `validateForm()` function that checks all required fields and returns error messages.
 
-### 2. Update LessonPlan.tsx
+**2. Update handleSubmit**
+- Call `validateForm()` before saving
+- Show toast errors for each missing field
+- Prevent submission if validation fails
 
-**Import Changes:**
-- Add `Calendar` component
-- Add `Popover`, `PopoverContent`, `PopoverTrigger` components
-- Add `CalendarIcon` from lucide-react
+**3. Update downloadWord Function**
+Import `Table`, `TableRow`, `TableCell`, `WidthType` from docx library and create:
+- Header table with title and date
+- Details table with course, week, location info
+- Content table with lesson plan sections
 
-**New State Variables:**
-- `sectionNumber` - for section number input
-- `building` - for building number input
-- `room` - for class room input
-- `lessonDate` - for the selected date (Date | undefined)
+**4. Add downloadPdf Function**
+Using jsPDF with autoTable plugin:
+- Create professional PDF layout with tables
+- Include all lesson plan information
+- Format with proper styling
 
-**Form Structure Updates:**
-- Remove the Day dropdown Select component
-- Change Course/Week grid from 3 columns to 2 columns
-- Add new row with Section Number, Building, Room inputs (3 columns)
-- Add date picker using Popover + Calendar with format "dd/MM/yyyy"
+**5. Update Form UI**
+- Add `required` markers to all field labels
+- Make submit button more prominent with sticky positioning
+- Add validation feedback on blur for empty fields
 
-**Data Handling Updates:**
-- Include new fields in `planData` object when saving
-- Load new fields in `editPlan` function when editing
-- Clear new fields in `resetForm` function
-- Add new fields to Word document generation
+**6. Update Card Download Buttons**
+Replace single download button with two buttons:
+- PDF download button
+- Word download button
 
-**Search Updates:**
-- Add section_number, building, room to search filter
-
-### 3. Update Calendar Component
-Add `pointer-events-auto` class to ensure the calendar works correctly inside the dialog.
-
-### 4. Code Cleanup
-- Remove `DAYS` constant (line 20)
-- Remove `day` state variable and its usage in form
+**7. Dependencies**
+Need to install `jspdf-autotable` for PDF table support (jspdf is already installed).
 
 ---
 
@@ -110,25 +136,45 @@ Add `pointer-events-auto` class to ensure the calendar works correctly inside th
 
 | File | Changes |
 |------|---------|
-| Database Migration | Add columns: `section_number`, `building`, `room`, `lesson_date` |
-| `src/pages/LessonPlan.tsx` | Remove day dropdown, add new fields, update form layout |
-| `src/components/ui/calendar.tsx` | Add `pointer-events-auto` for dialog compatibility |
+| `package.json` | Add `jspdf-autotable` dependency |
+| `src/pages/LessonPlan.tsx` | Add validation, fix Word tables, add PDF download |
 
 ---
 
-## Visual Preview
+## Validation Rules
 
-After implementation, the form will look like:
+All fields will be required with user-friendly error messages:
 
-**Course/Week Row (2 columns):**
-- Course dropdown
-- Week dropdown
+| Field | Error Message |
+|-------|---------------|
+| Title | "Title is required" |
+| Course | "Please select a course" |
+| Week | "Please select a week" |
+| Section Number | "Section number is required" |
+| Building | "Building is required" |
+| Room | "Class room is required" |
+| Lesson Date | "Please select a lesson date" |
+| Lesson Skill | "Lesson skill is required" |
+| Aim (Main) | "Main aim is required" |
+| Aim (Subsidiary) | "Subsidiary aim is required" |
+| Objectives | "Objectives are required" |
+| Lead-in & Presentation | "Lead-in & presentation is required" |
+| Practice Exercises | "Practice exercises are required" |
+| Productive Activities | "Productive activities are required" |
+| Reflection | "Reflection is required" |
 
-**Location Row (3 columns):**
-- Section Number input
-- Building input
-- Class Room input
+---
 
-**Date Row:**
-- Date picker button showing selected date (e.g., "29/1/2026") or "Pick a date"
+## Download Format Examples
+
+### Word Document Structure
+- Professional header with title and date
+- Details table with course, location, and timing info
+- Content sections with clear headers and text
+- Proper spacing and formatting
+
+### PDF Document Structure
+- Similar layout to Word document
+- Tables for details and content sections
+- Professional styling with borders and shading
 
