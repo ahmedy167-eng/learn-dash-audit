@@ -1,105 +1,58 @@
 
-# Fix: Permission Toggles Not Working for Users Without Permission Records
+# Fix: Admin Cannot See New Users' Information
 
 ## The Problem
-When editing a user's permissions in the Admin panel, the feature toggles don't work because the user has no records in the `user_permissions` table. The current code only updates existing permission records - it cannot create new ones.
+When a new user signs up, the admin cannot see their information (name, email) in the Admin panel. The user list shows only the admin's own profile or appears empty.
 
-## Root Cause Analysis
-1. User `ahmedy167@gmail.com` has no entries in `user_permissions` table
-2. The dialog loads permissions and gets an empty array
-3. The switch components show "off" but toggling them only modifies the (empty) local state
-4. On save, the code tries to update non-existent records, so nothing happens
+## Root Cause
+The `profiles` table has Row Level Security (RLS) enabled, but the policies only allow users to view their own profile:
+
+```sql
+CREATE POLICY "Users can view their own profile" 
+ON public.profiles FOR SELECT 
+USING (auth.uid() = user_id);
+```
+
+There is **no RLS policy** allowing admins to view all profiles. When the Admin page queries the profiles table, it only returns the admin's own row.
+
+---
 
 ## The Solution
-Modify the `UserPermissionsDialog` to initialize default permission records for all features when loading a user who has none.
+Add an RLS policy to allow admins to view all profiles, similar to how the `user_roles` and `user_permissions` tables are configured.
 
 ---
 
 ## Technical Changes
 
-### File: `src/components/admin/UserPermissionsDialog.tsx`
+### Database Migration
 
-**Change 1: Initialize default permissions when user has none**
-
-Update `fetchUserPermissions` to create default permission objects for all features:
-
-```tsx
-const fetchUserPermissions = async () => {
-  if (!user) return;
-  
-  setLoading(true);
-  try {
-    const { data, error } = await supabase
-      .from('user_permissions')
-      .select('feature, enabled')
-      .eq('user_id', user.id);
-
-    if (error) throw error;
-    
-    // Create a map of existing permissions
-    const existingPerms = new Map(
-      (data || []).map(p => [p.feature, p.enabled])
-    );
-    
-    // Initialize all features with existing or default values
-    const allPermissions = FEATURES.map(f => ({
-      feature: f.key,
-      enabled: existingPerms.get(f.key) ?? false,
-    }));
-    
-    setPermissions(allPermissions);
-    setIsAdmin(user.role === 'admin');
-  } catch (error) {
-    console.error('Error fetching permissions:', error);
-    toast.error('Failed to load permissions');
-  } finally {
-    setLoading(false);
-  }
-};
-```
-
-**Change 2: Use upsert instead of update when saving**
-
-Update `handleSave` to insert or update permissions:
-
-```tsx
-// Save all permissions using upsert
-const { error } = await supabase
-  .from('user_permissions')
-  .upsert(
-    permissions.map(perm => ({
-      user_id: user.id,
-      feature: perm.feature,
-      enabled: perm.enabled,
-    })),
-    { onConflict: 'user_id,feature' }
-  );
-```
-
-**Change 3: Add unique constraint for upsert**
-
-A database migration is needed to add a unique constraint on `(user_id, feature)` for the upsert to work:
+Add a new RLS policy to the `profiles` table:
 
 ```sql
-ALTER TABLE user_permissions 
-ADD CONSTRAINT user_permissions_user_id_feature_key 
-UNIQUE (user_id, feature);
+-- Allow admins to view all profiles
+CREATE POLICY "Admins can view all profiles"
+ON public.profiles
+FOR SELECT
+USING (public.has_role(auth.uid(), 'admin'));
 ```
+
+This uses the existing `has_role()` security definer function that's already in place for the `user_roles` and `user_permissions` tables.
 
 ---
 
 ## Result After Fix
+
 | Before | After |
 |--------|-------|
-| Toggles don't respond for new users | All toggles work immediately |
-| Empty permissions cause silent failures | Default permissions initialized for all features |
-| Admin changes not saved | Upsert creates or updates records correctly |
+| Admin sees only their own profile | Admin sees all user profiles |
+| User count shows 1 | User count shows actual total |
+| New signups invisible to admin | New users appear immediately |
 
 ---
 
 ## Testing Steps
-1. Open Admin panel
-2. Click Edit on any user
-3. Toggle feature switches - they should respond
-4. Save changes
-5. Reopen the user - changes should persist
+1. Sign in as admin
+2. Go to Admin panel
+3. Verify all users are now visible with their names and emails
+4. Sign up a new test user
+5. Refresh Admin panel - new user should appear in the list
