@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, Pencil, Trash2, Users, Loader2, UserCheck, Clock, UserX } from 'lucide-react';
+import { Search, Plus, Pencil, Trash2, Users, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -350,37 +350,22 @@ export default function Students() {
                       <TableCell>{student.section_number || '-'}</TableCell>
                       <TableCell>{student.course || '-'}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-green-600 hover:text-green-700 hover:bg-green-50"
-                            onClick={() => updateAttendance(student.id, 'present')}
-                            title="Mark Present"
-                          >
-                            <UserCheck className="h-4 w-4" />
-                            <span className="ml-1 text-xs">{student.present_count || 0}</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
-                            onClick={() => updateAttendance(student.id, 'late')}
-                            title="Mark Late"
-                          >
-                            <Clock className="h-4 w-4" />
-                            <span className="ml-1 text-xs">{student.late_count || 0}</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => updateAttendance(student.id, 'absent')}
-                            title="Mark Absent"
-                          >
-                            <UserX className="h-4 w-4" />
-                            <span className="ml-1 text-xs">{student.absent_count || 0}</span>
-                          </Button>
+                        <Select
+                          onValueChange={(value) => updateAttendance(student.id, value as 'present' | 'late' | 'absent')}
+                        >
+                          <SelectTrigger className="w-[120px] h-8">
+                            <SelectValue placeholder="Mark..." />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background">
+                            <SelectItem value="present">Present</SelectItem>
+                            <SelectItem value="late">Late</SelectItem>
+                            <SelectItem value="absent">Absent</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <div className="flex gap-2 mt-1 text-xs text-muted-foreground">
+                          <span className="text-green-600">P: {student.present_count || 0}</span>
+                          <span className="text-yellow-600">L: {student.late_count || 0}</span>
+                          <span className="text-red-600">A: {student.absent_count || 0}</span>
                         </div>
                       </TableCell>
                       <TableCell>
