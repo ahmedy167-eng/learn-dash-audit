@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CheckSquare, Plus, Loader2, Trash2, CalendarIcon } from 'lucide-react';
+import { CheckSquare, Plus, Loader2, Trash2, CalendarIcon, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO, isToday, isPast, isThisWeek } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -39,6 +39,7 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -79,29 +80,56 @@ export default function TasksPage() {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .insert([{
-          user_id: user?.id,
-          title,
-          description: description || null,
-          priority,
-          category,
-          due_date: dueDate ? format(dueDate, 'yyyy-MM-dd') : null,
-        }]);
+      if (editingTask) {
+        const { error } = await supabase
+          .from('tasks')
+          .update({
+            title,
+            description: description || null,
+            priority,
+            category,
+            due_date: dueDate ? format(dueDate, 'yyyy-MM-dd') : null,
+          })
+          .eq('id', editingTask.id);
 
-      if (error) throw error;
+        if (error) throw error;
+        toast.success('Task updated successfully');
+      } else {
+        const { error } = await supabase
+          .from('tasks')
+          .insert([{
+            user_id: user?.id,
+            title,
+            description: description || null,
+            priority,
+            category,
+            due_date: dueDate ? format(dueDate, 'yyyy-MM-dd') : null,
+          }]);
 
-      toast.success('Task created successfully');
+        if (error) throw error;
+        toast.success('Task created successfully');
+      }
+
       setIsDialogOpen(false);
+      setEditingTask(null);
       resetForm();
       fetchTasks();
     } catch (error: any) {
-      console.error('Error creating task:', error);
-      toast.error(error.message || 'Failed to create task');
+      console.error('Error saving task:', error);
+      toast.error(error.message || 'Failed to save task');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const openEditDialog = (task: Task) => {
+    setEditingTask(task);
+    setTitle(task.title);
+    setDescription(task.description || '');
+    setPriority(task.priority);
+    setCategory(task.category);
+    setDueDate(task.due_date ? parseISO(task.due_date) : undefined);
+    setIsDialogOpen(true);
   };
 
   const toggleComplete = async (task: Task) => {
@@ -144,6 +172,14 @@ export default function TasksPage() {
     setPriority('medium');
     setCategory('personal');
     setDueDate(undefined);
+    setEditingTask(null);
+  };
+
+  const handleDialogChange = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) {
+      resetForm();
+    }
   };
 
   const getPriorityColor = (priority: string) => {
@@ -168,42 +204,42 @@ export default function TasksPage() {
       "flex items-center justify-between p-4 bg-accent/50 rounded-lg group",
       task.is_completed && "opacity-60"
     )}>
-      <div className="flex items-center gap-3 flex-1">
-        <input
-          type="checkbox"
-          checked={task.is_completed}
-          onChange={() => toggleComplete(task)}
-          className="h-5 w-5 rounded border-border cursor-pointer"
-        />
-        <div className="flex-1">
-          <p className={cn(
-            "font-medium",
-            task.is_completed && "line-through text-muted-foreground"
-          )}>
-            {task.title}
+      <div className="flex-1">
+        <p className={cn(
+          "font-medium",
+          task.is_completed && "line-through text-muted-foreground"
+        )}>
+          {task.title}
+        </p>
+        {task.description && (
+          <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
+            {task.description}
           </p>
-          {task.description && (
-            <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
-              {task.description}
-            </p>
+        )}
+        <div className="flex items-center gap-2 mt-2">
+          {task.due_date && (
+            <span className={cn(
+              "text-xs",
+              isPast(parseISO(task.due_date)) && !isToday(parseISO(task.due_date)) && !task.is_completed
+                ? "text-destructive"
+                : "text-muted-foreground"
+            )}>
+              {format(parseISO(task.due_date), 'MMM d, yyyy')}
+            </span>
           )}
-          <div className="flex items-center gap-2 mt-2">
-            {task.due_date && (
-              <span className={cn(
-                "text-xs",
-                isPast(parseISO(task.due_date)) && !isToday(parseISO(task.due_date)) && !task.is_completed
-                  ? "text-destructive"
-                  : "text-muted-foreground"
-              )}>
-                {format(parseISO(task.due_date), 'MMM d, yyyy')}
-              </span>
-            )}
-          </div>
         </div>
       </div>
       <div className="flex items-center gap-2">
         <Badge variant="outline">{task.category}</Badge>
         <Badge variant={getPriorityColor(task.priority)}>{task.priority}</Badge>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => openEditDialog(task)}
+          className="opacity-0 group-hover:opacity-100"
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
         <Button
           variant="ghost"
           size="icon"
@@ -225,7 +261,7 @@ export default function TasksPage() {
             <h1 className="text-2xl font-bold text-foreground">Tasks</h1>
             <p className="text-muted-foreground">Manage your tasks and to-dos</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="mr-2 h-4 w-4" />
@@ -234,7 +270,7 @@ export default function TasksPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create New Task</DialogTitle>
+                <DialogTitle>{editingTask ? 'Edit Task' : 'Create New Task'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4 mt-4">
                 <div className="space-y-2">
@@ -317,7 +353,7 @@ export default function TasksPage() {
 
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Create Task
+                  {editingTask ? 'Update Task' : 'Create Task'}
                 </Button>
               </form>
             </DialogContent>
