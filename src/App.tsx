@@ -27,10 +27,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <PermissionsProvider>
-          <TooltipProvider>
-            <Sonner />
-            <BrowserRouter>
+        <TooltipProvider>
+          <Sonner />
+          <BrowserRouter>
+            <PermissionsProvider>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
@@ -49,9 +49,9 @@ function App() {
                 <Route path="/off-days" element={<OffDays />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </BrowserRouter>
-          </TooltipProvider>
-        </PermissionsProvider>
+            </PermissionsProvider>
+          </BrowserRouter>
+        </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
