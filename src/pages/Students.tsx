@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Plus, Pencil, Trash2, Users } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Search, Plus, Pencil, Trash2, Users, Loader2, UserCheck, Clock, UserX } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -25,16 +29,36 @@ interface Student {
   id: string;
   full_name: string;
   student_id: string;
-  email: string | null;
-  phone_number: string | null;
-  enrollment_date: string | null;
+  section_number: string | null;
+  category: string | null;
+  course: string | null;
+  class: string | null;
+  room: string | null;
+  building: string | null;
+  present_count: number;
+  late_count: number;
+  absent_count: number;
   created_at: string;
 }
 
+const CATEGORIES = ['Regular', 'Intensive', 'Evening', 'Weekend'];
+const SECTIONS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
 export default function Students() {
+  const { user } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Form state for new student dialog
+  const [formName, setFormName] = useState('');
+  const [formStudentId, setFormStudentId] = useState('');
+  const [formClass, setFormClass] = useState('');
+  const [formSection, setFormSection] = useState('');
+  const [formCourse, setFormCourse] = useState('');
+  const [formCategory, setFormCategory] = useState('Regular');
 
   useEffect(() => {
     fetchStudents();
@@ -57,6 +81,55 @@ export default function Students() {
     }
   };
 
+  const handleAddStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formName.trim() || !formStudentId.trim()) {
+      toast.error('Student name and ID are required');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const { error } = await supabase
+        .from('students')
+        .insert([{
+          user_id: user?.id,
+          full_name: formName.trim(),
+          student_id: formStudentId.trim(),
+          class: formClass.trim() || null,
+          section_number: formSection || null,
+          course: formCourse.trim() || null,
+          category: formCategory,
+          present_count: 0,
+          late_count: 0,
+          absent_count: 0,
+        }]);
+
+      if (error) throw error;
+
+      toast.success('Student added successfully');
+      setIsDialogOpen(false);
+      resetForm();
+      fetchStudents();
+    } catch (error: any) {
+      console.error('Error adding student:', error);
+      toast.error(error.message || 'Failed to add student');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const resetForm = () => {
+    setFormName('');
+    setFormStudentId('');
+    setFormClass('');
+    setFormSection('');
+    setFormCourse('');
+    setFormCategory('Regular');
+  };
+
   const deleteStudent = async (id: string) => {
     try {
       const { error } = await supabase
@@ -74,6 +147,41 @@ export default function Students() {
     }
   };
 
+  const updateAttendance = async (id: string, type: 'present' | 'late' | 'absent') => {
+    const student = students.find(s => s.id === id);
+    if (!student) return;
+
+    try {
+      const updates: Record<string, number> = {};
+      if (type === 'present') {
+        updates.present_count = (student.present_count || 0) + 1;
+      } else if (type === 'late') {
+        updates.late_count = (student.late_count || 0) + 1;
+      } else if (type === 'absent') {
+        updates.absent_count = (student.absent_count || 0) + 1;
+      }
+
+      const { error } = await supabase
+        .from('students')
+        .update(updates)
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      toast.success(`Marked as ${type}`);
+      fetchStudents();
+    } catch (error) {
+      console.error('Error updating attendance:', error);
+      toast.error('Failed to update attendance');
+    }
+  };
+
+  const calculateAbsencePercentage = (student: Student) => {
+    // 2 late = 1 absent, each total absent = 0.25%
+    const totalAbsents = (student.absent_count || 0) + Math.floor((student.late_count || 0) / 2);
+    return (totalAbsents * 0.25).toFixed(2);
+  };
+
   const filteredStudents = students.filter(student =>
     student.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     student.student_id.toLowerCase().includes(searchQuery.toLowerCase())
@@ -86,14 +194,105 @@ export default function Students() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Students</h1>
-            <p className="text-muted-foreground">Manage your enrolled students</p>
+            <p className="text-muted-foreground">Manage your students and track attendance</p>
           </div>
-          <Link to="/register">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Student
-            </Button>
-          </Link>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Student
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Student</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAddStudent} className="space-y-4 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="studentName">Student Name</Label>
+                    <Input
+                      id="studentName"
+                      placeholder="Enter full name"
+                      value={formName}
+                      onChange={(e) => setFormName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="studentId">Student ID</Label>
+                    <Input
+                      id="studentId"
+                      placeholder="Enter student ID"
+                      value={formStudentId}
+                      onChange={(e) => setFormStudentId(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="class">Class</Label>
+                    <Input
+                      id="class"
+                      placeholder="e.g., Grade 10"
+                      value={formClass}
+                      onChange={(e) => setFormClass(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Section</Label>
+                    <Select value={formSection} onValueChange={setFormSection}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select section" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SECTIONS.map((sec) => (
+                          <SelectItem key={sec} value={sec}>{sec}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="course">Course</Label>
+                    <Input
+                      id="course"
+                      placeholder="e.g., Computer Science"
+                      value={formCourse}
+                      onChange={(e) => setFormCourse(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select value={formCategory} onValueChange={setFormCategory}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map((cat) => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Add Student
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Search */}
@@ -125,16 +324,8 @@ export default function Students() {
                 <Users className="mx-auto h-12 w-12 text-muted-foreground" />
                 <h3 className="mt-4 text-lg font-semibold">No students found</h3>
                 <p className="text-muted-foreground">
-                  {searchQuery ? 'Try a different search term' : 'Start by registering your first student'}
+                  {searchQuery ? 'Try a different search term' : 'Start by adding your first student'}
                 </p>
-                {!searchQuery && (
-                  <Link to="/register">
-                    <Button className="mt-4">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Register Student
-                    </Button>
-                  </Link>
-                )}
               </div>
             ) : (
               <Table>
@@ -142,9 +333,11 @@ export default function Students() {
                   <TableRow>
                     <TableHead>Full Name</TableHead>
                     <TableHead>Student ID</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Enrollment Date</TableHead>
+                    <TableHead>Class</TableHead>
+                    <TableHead>Section</TableHead>
+                    <TableHead>Course</TableHead>
+                    <TableHead>Attendance</TableHead>
+                    <TableHead>Absence %</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -153,13 +346,47 @@ export default function Students() {
                     <TableRow key={student.id}>
                       <TableCell className="font-medium">{student.full_name}</TableCell>
                       <TableCell>{student.student_id}</TableCell>
-                      <TableCell>{student.email || '-'}</TableCell>
-                      <TableCell>{student.phone_number || '-'}</TableCell>
+                      <TableCell>{student.class || '-'}</TableCell>
+                      <TableCell>{student.section_number || '-'}</TableCell>
+                      <TableCell>{student.course || '-'}</TableCell>
                       <TableCell>
-                        {student.enrollment_date 
-                          ? format(parseISO(student.enrollment_date), 'MMM d, yyyy')
-                          : '-'
-                        }
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-green-600 hover:text-green-700 hover:bg-green-50"
+                            onClick={() => updateAttendance(student.id, 'present')}
+                            title="Mark Present"
+                          >
+                            <UserCheck className="h-4 w-4" />
+                            <span className="ml-1 text-xs">{student.present_count || 0}</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50"
+                            onClick={() => updateAttendance(student.id, 'late')}
+                            title="Mark Late"
+                          >
+                            <Clock className="h-4 w-4" />
+                            <span className="ml-1 text-xs">{student.late_count || 0}</span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => updateAttendance(student.id, 'absent')}
+                            title="Mark Absent"
+                          >
+                            <UserX className="h-4 w-4" />
+                            <span className="ml-1 text-xs">{student.absent_count || 0}</span>
+                          </Button>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={parseFloat(calculateAbsencePercentage(student)) >= 1 ? "destructive" : "secondary"}>
+                          {calculateAbsencePercentage(student)}%
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">

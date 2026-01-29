@@ -165,35 +165,68 @@ export type Database = {
       }
       students: {
         Row: {
+          absent_count: number | null
+          building: string | null
+          category: string | null
+          class: string | null
+          course: string | null
           created_at: string
-          email: string | null
-          enrollment_date: string | null
+          finish_class_time: string | null
           full_name: string
           id: string
-          phone_number: string | null
+          late_count: number | null
+          notes: string | null
+          off_days: string[] | null
+          present_count: number | null
+          room: string | null
+          section_number: string | null
+          start_class_time: string | null
           student_id: string
+          teaching_days: string[] | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          absent_count?: number | null
+          building?: string | null
+          category?: string | null
+          class?: string | null
+          course?: string | null
           created_at?: string
-          email?: string | null
-          enrollment_date?: string | null
+          finish_class_time?: string | null
           full_name: string
           id?: string
-          phone_number?: string | null
+          late_count?: number | null
+          notes?: string | null
+          off_days?: string[] | null
+          present_count?: number | null
+          room?: string | null
+          section_number?: string | null
+          start_class_time?: string | null
           student_id: string
+          teaching_days?: string[] | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          absent_count?: number | null
+          building?: string | null
+          category?: string | null
+          class?: string | null
+          course?: string | null
           created_at?: string
-          email?: string | null
-          enrollment_date?: string | null
+          finish_class_time?: string | null
           full_name?: string
           id?: string
-          phone_number?: string | null
+          late_count?: number | null
+          notes?: string | null
+          off_days?: string[] | null
+          present_count?: number | null
+          room?: string | null
+          section_number?: string | null
+          start_class_time?: string | null
           student_id?: string
+          teaching_days?: string[] | null
           updated_at?: string
           user_id?: string
         }
