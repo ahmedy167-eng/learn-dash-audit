@@ -19,6 +19,7 @@ export type Database = {
           content: string | null
           course: string | null
           created_at: string
+          day: string | null
           id: string
           objectives: string | null
           schedule_id: string | null
@@ -31,6 +32,7 @@ export type Database = {
           content?: string | null
           course?: string | null
           created_at?: string
+          day?: string | null
           id?: string
           objectives?: string | null
           schedule_id?: string | null
@@ -43,6 +45,7 @@ export type Database = {
           content?: string | null
           course?: string | null
           created_at?: string
+          day?: string | null
           id?: string
           objectives?: string | null
           schedule_id?: string | null
