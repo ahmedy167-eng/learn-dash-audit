@@ -16,12 +16,19 @@ export type Database = {
     Tables: {
       lesson_plans: {
         Row: {
+          aim_main: string | null
+          aim_subsidiary: string | null
           content: string | null
           course: string | null
           created_at: string
           day: string | null
           id: string
+          lead_in_presentation: string | null
+          lesson_skill: string | null
           objectives: string | null
+          practice_exercises: string | null
+          productive_activities: string | null
+          reflection: string | null
           schedule_id: string | null
           title: string
           updated_at: string
@@ -29,12 +36,19 @@ export type Database = {
           week: string | null
         }
         Insert: {
+          aim_main?: string | null
+          aim_subsidiary?: string | null
           content?: string | null
           course?: string | null
           created_at?: string
           day?: string | null
           id?: string
+          lead_in_presentation?: string | null
+          lesson_skill?: string | null
           objectives?: string | null
+          practice_exercises?: string | null
+          productive_activities?: string | null
+          reflection?: string | null
           schedule_id?: string | null
           title: string
           updated_at?: string
@@ -42,12 +56,19 @@ export type Database = {
           week?: string | null
         }
         Update: {
+          aim_main?: string | null
+          aim_subsidiary?: string | null
           content?: string | null
           course?: string | null
           created_at?: string
           day?: string | null
           id?: string
+          lead_in_presentation?: string | null
+          lesson_skill?: string | null
           objectives?: string | null
+          practice_exercises?: string | null
+          productive_activities?: string | null
+          reflection?: string | null
           schedule_id?: string | null
           title?: string
           updated_at?: string
