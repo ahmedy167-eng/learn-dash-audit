@@ -304,7 +304,7 @@ export default function Register() {
                 <Label>Teaching Days</Label>
                 <div className="flex flex-wrap gap-2">
                   {DAYS_OF_WEEK.map((day) => (
-                    <div
+                    <label
                       key={day}
                       className={cn(
                         "flex items-center gap-2 px-3 py-2 border rounded-md cursor-pointer transition-colors",
@@ -312,7 +312,6 @@ export default function Register() {
                           ? "bg-primary text-primary-foreground border-primary" 
                           : "bg-background hover:bg-accent"
                       )}
-                      onClick={() => toggleDay(day)}
                     >
                       <Checkbox 
                         checked={teachingDays.includes(day)}
@@ -322,7 +321,7 @@ export default function Register() {
                         )}
                       />
                       <span className="text-sm font-medium">{day}</span>
-                    </div>
+                    </label>
                   ))}
                 </div>
               </div>
