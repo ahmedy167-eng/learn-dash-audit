@@ -1,134 +1,157 @@
 
 
-# Enhance Lesson Plan with Save Button, Validation, and Document Downloads
+# Enhance Virtual Audit with Downloads, Search, and Cover Class Option
 
 ## Overview
-This plan addresses the reported issues with the lesson plan feature and adds new capabilities:
+This plan enhances the Virtual Audit page with the following features:
 
-1. Add a clear "Save" button that's always visible
-2. Fix data persistence so edited information is retained properly
-3. Fix Word document export to include all entered data
-4. Add required field validation (all fields must be filled)
-5. Add tables to the Word document for better formatting
-6. Add PDF download option alongside Word document
-
----
-
-## Issues to Fix
-
-### Current Problems Identified
-1. The form has a submit button at the bottom labeled "Create Plan" or "Update Plan" - but users may not see it as a clear "Save" action
-2. Word document download uses `plan` data from the database record, not the current form state - if the data wasn't saved properly, the download shows nothing
-3. No validation requiring users to fill all fields before saving
-4. Word document uses simple paragraphs instead of structured tables
+1. Add search functionality to filter previous audits
+2. Add Save button to the audit history section (for editing existing audits)
+3. Add PDF and Word document download options with professional tables
+4. Add a new "Cover Class Virtual Audit" option as a separate form
 
 ---
 
 ## What Will Change
 
-### 1. Save Button Improvements
-- Make the Save button more prominent and always visible
-- Add a sticky footer with the Save button at the bottom of the form
-- Clear labeling: "Save Lesson Plan" instead of "Create/Update Plan"
+### 1. Audit History Enhancements
 
-### 2. Required Field Validation
-All fields will be required before saving:
-- Title, Course, Week
-- Section Number, Building, Class Room
-- Lesson Date
-- Lesson Skill
-- Aim (Main and Subsidiary)
-- Objectives
-- Lead-in & Presentation
-- Practice Exercises
-- Productive Activities
-- Reflection
+**Search Bar:**
+- Add a search input above the audit history table
+- Filter audits by teacher name, campus, course, section number, week, or ELSD ID
 
-Show validation errors for any empty fields.
+**Download Buttons:**
+- Add PDF and Word download buttons for each audit record
+- Both formats will include professional tables with all audit information
 
-### 3. Word Document with Tables
-The exported Word document will have a professional format with tables:
+**Edit/Save Capability:**
+- Each audit row will have an Edit button
+- Clicking Edit opens the form with the audit data pre-filled
+- A prominent "Save Changes" button allows updating the audit
 
+### 2. Document Exports with Tables
+
+**Word Document Structure:**
 ```text
 +----------------------------------+
-|        LESSON PLAN               |
-|     [Title - Date]               |
+|       VIRTUAL AUDIT RECORD       |
+|        [Date of Teaching]        |
 +----------------------------------+
 
-+---------------+------------------+
-| Course        | [Course Value]   |
-+---------------+------------------+
-| Week          | [Week Value]     |
-+---------------+------------------+
-| Section       | [Section Value]  |
-+---------------+------------------+
-| Building      | [Building Value] |
-+---------------+------------------+
-| Room          | [Room Value]     |
-+---------------+------------------+
-| Date          | [Date Value]     |
-+---------------+------------------+
-
-+----------------------------------+
-| LESSON CONTENT                   |
-+----------------------------------+
-| Lesson Skill: [Content]          |
-| Aim (Main): [Content]            |
-| Aim (Subsidiary): [Content]      |
-| Objectives: [Content]            |
-| Lead-in: [Content]               |
-| Practice: [Content]              |
-| Activities: [Content]            |
-| Reflection: [Content]            |
-+----------------------------------+
++------------------+---------------+
+| Teacher Name     | [Value]       |
++------------------+---------------+
+| ELSD ID          | [Value]       |
++------------------+---------------+
+| Campus           | [Value]       |
++------------------+---------------+
+| Section Number   | [Value]       |
++------------------+---------------+
+| Week             | [Value]       |
++------------------+---------------+
+| Date of Teaching | [Value]       |
++------------------+---------------+
+| Teaching Mode    | [Value]       |
++------------------+---------------+
+| Course           | [Value]       |
++------------------+---------------+
+| Book             | [Value]       |
++------------------+---------------+
+| Unit             | [Value]       |
++------------------+---------------+
+| Page             | [Value]       |
++------------------+---------------+
+| No. of Students  | [Value]       |
++------------------+---------------+
+| Comments         | [Value]       |
++------------------+---------------+
 ```
 
-### 4. PDF Download Option
-Add a second download button for PDF format using jsPDF with tables.
+**PDF Document:**
+- Same table structure as Word document
+- Professional styling with headers and grid borders
 
-### 5. Dual Download Buttons on Cards
-Each lesson plan card will show:
-- "PDF" button - downloads as PDF with tables
-- "Word" button - downloads as Word doc with tables
+### 3. Cover Class Virtual Audit
+
+A new toggle at the top of the page will allow users to choose between:
+- **Virtual Audit** (current form)
+- **Cover Class Virtual Audit** (new form with similar fields)
+
+**Database:**
+- New table: `cover_class_audits` with fields:
+  - id, user_id, teacher_name, elsd_id
+  - original_teacher_name (who was being covered)
+  - campus, section_number, week
+  - date_of_teaching, teaching_mode
+  - course, book, unit, page
+  - number_of_students, comments
+  - created_at, updated_at
+
+**Cover Class Form:**
+- Similar fields as Virtual Audit
+- Additional field: "Original Teacher Name" (the teacher being covered)
+- Separate history tab showing only cover class audits
 
 ---
 
 ## Technical Details
 
-### File: `src/pages/LessonPlan.tsx`
+### Database Migration
+Create new table `cover_class_audits`:
 
-**1. Add Validation Function**
-Create a `validateForm()` function that checks all required fields and returns error messages.
+| Column | Type | Required | Description |
+|--------|------|----------|-------------|
+| id | uuid | Yes | Primary key |
+| user_id | uuid | Yes | Foreign key to auth.users |
+| teacher_name | text | Yes | Cover teacher's name |
+| original_teacher_name | text | Yes | Teacher being covered |
+| elsd_id | text | Yes | ELSD identifier |
+| campus | text | Yes | Campus location |
+| section_number | text | Yes | Section number |
+| week | text | Yes | Week number |
+| date_of_teaching | date | Yes | Teaching date |
+| teaching_mode | text | Yes | Face to Face / Virtual |
+| course | text | Yes | Course code |
+| book | text | Yes | Book name |
+| unit | text | Yes | Unit number |
+| page | text | No | Page number |
+| number_of_students | integer | No | Student count |
+| comments | text | No | Additional comments |
+| created_at | timestamp | Yes | Record creation time |
+| updated_at | timestamp | Yes | Last update time |
 
-**2. Update handleSubmit**
-- Call `validateForm()` before saving
-- Show toast errors for each missing field
-- Prevent submission if validation fails
+### File Changes: `src/pages/VirtualAudit.tsx`
 
-**3. Update downloadWord Function**
-Import `Table`, `TableRow`, `TableCell`, `WidthType` from docx library and create:
-- Header table with title and date
-- Details table with course, week, location info
-- Content table with lesson plan sections
+**New Imports:**
+- Add `Document`, `Packer`, `Paragraph`, `TextRun`, `Table`, `TableRow`, `TableCell`, `WidthType`, `BorderStyle`, `AlignmentType` from docx
+- Add `saveAs` from file-saver
+- Add `jsPDF` from jspdf
+- Add `autoTable` from jspdf-autotable
+- Add `Search`, `Pencil`, `FileText`, `Download` icons
 
-**4. Add downloadPdf Function**
-Using jsPDF with autoTable plugin:
-- Create professional PDF layout with tables
-- Include all lesson plan information
-- Format with proper styling
+**New State Variables:**
+- `searchQuery` - for filtering audits
+- `filteredAudits` - filtered list based on search
+- `editingId` - ID of audit being edited (null for new)
+- `auditType` - 'virtual' | 'cover' to toggle between forms
+- `coverAudits` - array of cover class audits
+- `originalTeacherName` - additional field for cover class form
 
-**5. Update Form UI**
-- Add `required` markers to all field labels
-- Make submit button more prominent with sticky positioning
-- Add validation feedback on blur for empty fields
+**New Functions:**
+1. `filterAudits()` - Filter audits based on search query
+2. `downloadAuditWord(audit)` - Generate Word document with tables
+3. `downloadAuditPdf(audit)` - Generate PDF document with tables
+4. `editAudit(audit)` - Load audit data into form for editing
+5. `handleUpdateAudit()` - Update existing audit record
+6. `fetchCoverAudits()` - Fetch cover class audits
+7. `handleCoverSubmit()` - Submit new cover class audit
 
-**6. Update Card Download Buttons**
-Replace single download button with two buttons:
-- PDF download button
-- Word download button
-
-**7. Dependencies**
-Need to install `jspdf-autotable` for PDF table support (jspdf is already installed).
+**UI Changes:**
+1. Add toggle buttons at top: "Virtual Audit" | "Cover Class Audit"
+2. Add search bar in Audit History tab
+3. Add Edit, PDF, Word buttons to each table row
+4. Update form with Save/Update button logic
+5. Create separate tabs for cover class history
 
 ---
 
@@ -136,45 +159,53 @@ Need to install `jspdf-autotable` for PDF table support (jspdf is already instal
 
 | File | Changes |
 |------|---------|
-| `package.json` | Add `jspdf-autotable` dependency |
-| `src/pages/LessonPlan.tsx` | Add validation, fix Word tables, add PDF download |
+| Database Migration | Create `cover_class_audits` table with RLS policies |
+| `src/pages/VirtualAudit.tsx` | Add search, downloads, edit, and cover class functionality |
+| `src/integrations/supabase/types.ts` | Auto-updated after migration |
 
 ---
 
-## Validation Rules
+## UI Layout Preview
 
-All fields will be required with user-friendly error messages:
+**Top Section (Toggle):**
+```text
++--------------------------------------------------+
+| [Virtual Audit] [Cover Class Virtual Audit]      |
++--------------------------------------------------+
+```
 
-| Field | Error Message |
-|-------|---------------|
-| Title | "Title is required" |
-| Course | "Please select a course" |
-| Week | "Please select a week" |
-| Section Number | "Section number is required" |
-| Building | "Building is required" |
-| Room | "Class room is required" |
-| Lesson Date | "Please select a lesson date" |
-| Lesson Skill | "Lesson skill is required" |
-| Aim (Main) | "Main aim is required" |
-| Aim (Subsidiary) | "Subsidiary aim is required" |
-| Objectives | "Objectives are required" |
-| Lead-in & Presentation | "Lead-in & presentation is required" |
-| Practice Exercises | "Practice exercises are required" |
-| Productive Activities | "Productive activities are required" |
-| Reflection | "Reflection is required" |
+**Audit History Tab:**
+```text
++--------------------------------------------------+
+| Search: [________________________] 🔍            |
++--------------------------------------------------+
+| Date    | Teacher | Campus | Course | Actions    |
+|---------|---------|--------|--------|------------|
+| Jan 29  | Name    | Olaysha| ENGL101| ✏️ PDF Word|
+| Jan 28  | Name    | Diriyah| ENGL102| ✏️ PDF Word|
++--------------------------------------------------+
+```
 
 ---
 
-## Download Format Examples
+## Search Functionality
 
-### Word Document Structure
-- Professional header with title and date
-- Details table with course, location, and timing info
-- Content sections with clear headers and text
-- Proper spacing and formatting
+The search will filter audits by matching any of these fields:
+- Teacher name
+- ELSD ID  
+- Campus
+- Section number
+- Course
+- Week
+- Book
+- Comments
 
-### PDF Document Structure
-- Similar layout to Word document
-- Tables for details and content sections
-- Professional styling with borders and shading
+---
+
+## Cover Class Audit Fields
+
+Same as Virtual Audit, plus:
+- **Original Teacher Name** - The teacher whose class is being covered
+
+This allows tracking who covered which class and provides complete audit trail for cover classes separately from regular virtual audits.
 
