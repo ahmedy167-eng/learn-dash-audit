@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions, FeatureKey } from '@/hooks/usePermissions';
 import { 
   LayoutDashboard, 
   Users, 
@@ -15,26 +16,41 @@ import {
   ChevronRight,
   LogOut,
   HelpCircle,
-  GraduationCap
+  GraduationCap,
+  Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-const navItems = [
+interface NavItem {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  permission?: FeatureKey;
+}
+
+const navItems: NavItem[] = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
-  { title: 'Students', url: '/students', icon: Users },
-  { title: 'Sections', url: '/sections', icon: FolderOpen },
-  { title: 'Register', url: '/register', icon: RegisterIcon },
-  { title: 'Virtual Audit', url: '/virtual-audit', icon: ClipboardList },
-  { title: 'Schedule', url: '/schedule', icon: Calendar },
-  { title: 'Lesson Plan', url: '/lesson-plan', icon: BookOpen },
-  { title: 'Tasks', url: '/tasks', icon: CheckSquare },
-  { title: 'Off Days', url: '/off-days', icon: CalendarOff },
+  { title: 'Students', url: '/students', icon: Users, permission: 'students' },
+  { title: 'Sections', url: '/sections', icon: FolderOpen, permission: 'sections' },
+  { title: 'Register', url: '/register', icon: RegisterIcon, permission: 'register' },
+  { title: 'Virtual Audit', url: '/virtual-audit', icon: ClipboardList, permission: 'virtual_audit' },
+  { title: 'Schedule', url: '/schedule', icon: Calendar, permission: 'schedule' },
+  { title: 'Lesson Plan', url: '/lesson-plan', icon: BookOpen, permission: 'lesson_plan' },
+  { title: 'Tasks', url: '/tasks', icon: CheckSquare, permission: 'tasks' },
+  { title: 'Off Days', url: '/off-days', icon: CalendarOff, permission: 'off_days' },
 ];
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const { signOut } = useAuth();
+  const { hasPermission, isAdmin, loading: permLoading } = usePermissions();
+
+  // Filter nav items based on permissions
+  const visibleNavItems = navItems.filter(item => {
+    if (!item.permission) return true; // Dashboard is always visible
+    return hasPermission(item.permission);
+  });
 
   return (
     <aside 
@@ -75,7 +91,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <NavLink
             key={item.title}
             to={item.url}
@@ -89,6 +105,21 @@ export function Sidebar() {
             {!collapsed && <span>{item.title}</span>}
           </NavLink>
         ))}
+        
+        {/* Admin link - only visible to admins */}
+        {isAdmin && (
+          <NavLink
+            to="/admin"
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+              collapsed && "justify-center px-2"
+            )}
+            activeClassName="bg-accent text-accent-foreground font-medium"
+          >
+            <Shield className="h-5 w-5 flex-shrink-0" />
+            {!collapsed && <span>Admin</span>}
+          </NavLink>
+        )}
       </nav>
 
       {/* Help section */}
