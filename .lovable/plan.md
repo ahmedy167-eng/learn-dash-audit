@@ -1,59 +1,61 @@
 
+# Fix: Admin Features Not Visible on Login
 
-# Add Visible Admin Login Link
+## The Problem
+When you sign in as an admin, the sidebar shows limited features because it renders before your role and permissions are loaded from the database. The UI checks `isAdmin` too early (while it's still `false` during loading).
 
-## Overview
-Add a clearly visible link from the regular login page to the admin login page so administrators can easily find the admin portal.
+## The Solution
+Update the Sidebar to wait for permissions to fully load before filtering navigation items. During loading, show all items (or a skeleton) to prevent the "flash" of limited navigation.
 
 ---
 
-## Current State
-- The admin login page exists at `/admin-login`
-- There's no link pointing to it from the `/auth` page or landing page
-- Users have to know the URL to access it
+## What Will Change
 
-## Proposed Changes
+### Sidebar Behavior (Before vs After)
 
-### Add a link on the Auth page
-Add a small text link at the bottom of the login form:
-
-```text
-+----------------------------------+
-|      EduPortal Login             |
-|  [Sign In]  [Sign Up]            |
-|                                  |
-|  Email: [____________]           |
-|  Password: [____________]        |
-|                                  |
-|  [        Sign In        ]       |
-|                                  |
-|  Administrator? Sign in here →   |  ← New link
-+----------------------------------+
-```
+| Before | After |
+|--------|-------|
+| Shows limited nav items immediately | Waits for permissions to load |
+| Admin link hidden on first render | Admin link shows correctly after load |
+| Confusing UX for admins | Smooth experience with correct access |
 
 ---
 
 ## Technical Changes
 
-### File: `src/pages/Auth.tsx`
+### File: `src/components/layout/Sidebar.tsx`
 
-Add a link below the sign-in form that points to `/admin-login`:
+Update the component to check `loading` state before filtering nav items:
 
 ```tsx
-<div className="mt-4 text-center">
-  <a 
-    href="/admin-login" 
-    className="text-sm text-muted-foreground hover:text-primary"
-  >
-    Administrator? Sign in here →
-  </a>
-</div>
+// Current behavior - filters before data loads
+const visibleNavItems = navItems.filter(item => {
+  if (!item.permission) return true;
+  return hasPermission(item.permission);
+});
+
+// New behavior - show all items while loading
+const visibleNavItems = navItems.filter(item => {
+  if (!item.permission) return true;
+  if (permLoading) return true; // Show all while loading
+  return hasPermission(item.permission);
+});
 ```
 
-This will be placed after the closing `</Tabs>` component but before the closing `</CardContent>`.
+Also update the Admin link section:
+
+```tsx
+// Current - hides admin link while loading
+{isAdmin && (...)}
+
+// New - shows admin link if loading OR confirmed admin
+{(permLoading || isAdmin) && (...)}
+```
 
 ---
 
 ## Result
-Users will see a subtle "Administrator? Sign in here" link at the bottom of the login card, making it easy to find the admin portal without cluttering the main login UI.
-
+- Admins will see all navigation items immediately after login
+- No "flash" of limited access
+- Features are properly filtered once permissions load
+- Regular users will see items briefly during load, then correct filtered view
