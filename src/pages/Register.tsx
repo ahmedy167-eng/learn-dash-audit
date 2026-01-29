@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Users, Loader2, Plus, Pencil, Trash2, ClipboardList, Search } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Users, Loader2, Plus, Pencil, Trash2, ClipboardList, Search, MessageSquare, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -41,6 +42,7 @@ interface Student {
   present_count: number;
   late_count: number;
   absent_count: number;
+  notes: string | null;
 }
 
 export default function Register() {
@@ -61,6 +63,10 @@ export default function Register() {
   const [formName, setFormName] = useState('');
   const [formStudentId, setFormStudentId] = useState('');
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  
+  // Comments editing state
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
 
   useEffect(() => {
     fetchSections();
@@ -96,7 +102,7 @@ export default function Register() {
     try {
       const { data, error } = await supabase
         .from('students')
-        .select('id, full_name, student_id, section_id, present_count, late_count, absent_count')
+        .select('id, full_name, student_id, section_id, present_count, late_count, absent_count, notes')
         .eq('section_id', sectionId)
         .order('full_name');
 
@@ -235,6 +241,37 @@ export default function Register() {
   const calculateAbsencePercentage = (student: Student) => {
     const totalAbsents = (student.absent_count || 0) + Math.floor((student.late_count || 0) / 2);
     return (totalAbsents * 0.25).toFixed(2);
+  };
+
+  const startEditingComment = (student: Student) => {
+    setEditingCommentId(student.id);
+    setEditingCommentText(student.notes || '');
+  };
+
+  const cancelEditingComment = () => {
+    setEditingCommentId(null);
+    setEditingCommentText('');
+  };
+
+  const saveComment = async (studentId: string) => {
+    try {
+      const { error } = await supabase
+        .from('students')
+        .update({ notes: editingCommentText.trim() || null })
+        .eq('id', studentId);
+
+      if (error) throw error;
+      
+      toast.success('Comment saved');
+      setEditingCommentId(null);
+      setEditingCommentText('');
+      if (selectedSectionId) {
+        fetchStudentsForSection(selectedSectionId);
+      }
+    } catch (error) {
+      console.error('Error saving comment:', error);
+      toast.error('Failed to save comment');
+    }
   };
 
   const selectedSection = sections.find(s => s.id === selectedSectionId);
@@ -400,6 +437,7 @@ export default function Register() {
                       <TableHead>Student ID</TableHead>
                       <TableHead>Attendance</TableHead>
                       <TableHead>Absence %</TableHead>
+                      <TableHead>Comments</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -432,6 +470,41 @@ export default function Register() {
                           <Badge variant={parseFloat(calculateAbsencePercentage(student)) >= 1 ? "destructive" : "secondary"}>
                             {calculateAbsencePercentage(student)}%
                           </Badge>
+                        </TableCell>
+                        <TableCell className="max-w-[200px]">
+                          {editingCommentId === student.id ? (
+                            <div className="flex items-center gap-1">
+                              <Input
+                                value={editingCommentText}
+                                onChange={(e) => setEditingCommentText(e.target.value)}
+                                placeholder="Add comment..."
+                                className="h-8 text-sm"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') saveComment(student.id);
+                                  if (e.key === 'Escape') cancelEditingComment();
+                                }}
+                              />
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => saveComment(student.id)}>
+                                <Check className="h-4 w-4 text-green-600" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={cancelEditingComment}>
+                                <X className="h-4 w-4 text-red-600" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div 
+                              className="flex items-center gap-2 cursor-pointer group"
+                              onClick={() => startEditingComment(student)}
+                            >
+                              {student.notes ? (
+                                <span className="text-sm truncate">{student.notes}</span>
+                              ) : (
+                                <span className="text-sm text-muted-foreground italic">Add comment...</span>
+                              )}
+                              <MessageSquare className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
