@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      cover_class_audits: {
+        Row: {
+          book: string
+          campus: string
+          comments: string | null
+          course: string
+          created_at: string
+          date_of_teaching: string
+          elsd_id: string
+          id: string
+          number_of_students: number | null
+          original_teacher_name: string
+          page: string | null
+          section_number: string
+          teacher_name: string
+          teaching_mode: string
+          unit: string
+          updated_at: string
+          user_id: string
+          week: string
+        }
+        Insert: {
+          book: string
+          campus: string
+          comments?: string | null
+          course: string
+          created_at?: string
+          date_of_teaching: string
+          elsd_id: string
+          id?: string
+          number_of_students?: number | null
+          original_teacher_name: string
+          page?: string | null
+          section_number: string
+          teacher_name: string
+          teaching_mode: string
+          unit: string
+          updated_at?: string
+          user_id: string
+          week: string
+        }
+        Update: {
+          book?: string
+          campus?: string
+          comments?: string | null
+          course?: string
+          created_at?: string
+          date_of_teaching?: string
+          elsd_id?: string
+          id?: string
+          number_of_students?: number | null
+          original_teacher_name?: string
+          page?: string | null
+          section_number?: string
+          teacher_name?: string
+          teaching_mode?: string
+          unit?: string
+          updated_at?: string
+          user_id?: string
+          week?: string
+        }
+        Relationships: []
+      }
       lesson_plans: {
         Row: {
           aim_main: string | null
