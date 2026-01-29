@@ -1,125 +1,134 @@
 
 
-# Education Portal System - Implementation Plan
+# Add Location Details and Date Picker to Lesson Plan Form
 
 ## Overview
-A comprehensive teaching management portal for administrators and teachers to manage students, schedules, tasks, and conduct virtual audits. The system will feature a dashboard backend with authentication for secure access.
+This plan adds new fields to the lesson plan creation form and removes the day dropdown, replacing it with a calendar date picker.
 
 ---
 
-## Core Features
+## What Will Change
 
-### 1. Authentication System
-- **Login/Signup Page** - Email and password authentication for admins/teachers
-- **Protected Routes** - All pages require authentication to access
-- **Session Management** - Persistent login sessions with secure logout
+### Form Changes
+The "Create New Lesson Plan" dialog will be updated with:
 
----
+1. **New Fields Added:**
+   - Section Number - Text input for the section identifier
+   - Building Number - Text input for the building location  
+   - Class Room - Text input for the room number/name
+   - Lesson Date - A calendar date picker (displayed in dd/MM/yyyy format like 29/1/2026)
 
-### 2. Dashboard (Home)
-- **Summary Cards** displaying key metrics:
-  - Total Students (enrolled count)
-  - Active Classes
-  - Pending Tasks (with overdue indicator)
-  - Today's Tasks
-- **Overdue Tasks Section** - List of urgent tasks with priority badges (High, Class) and due dates
-- **Tasks Section** - Filterable by Today, This Week, and Completed tabs
-- **Quick Actions** - "New Task" button for fast task creation
+2. **Removed:**
+   - Day dropdown (Sunday-Thursday selector)
 
----
+3. **Existing Features (Already Working):**
+   - Word document download - Already implemented
+   - Search for previous lesson plans - Already implemented with search bar
 
-### 3. Student Management
-- **Students List Page** - View all registered students in a table/card format
-- **Student Registration Page** - Form to capture:
-  - Full Name
-  - Student ID
-  - Email
-  - Phone Number
-  - Enrollment Date
-- **Search & Filter** - Find students quickly by name or ID
-- **Edit/Delete** - Manage existing student records
+### Form Layout (After Changes)
+```text
++------------------------------------------+
+| Title *                                  |
++------------------------------------------+
+| Course        | Week                     |
++------------------------------------------+
+| Section Number | Building | Class Room   |
++------------------------------------------+
+| Lesson Date [Calendar Picker]            |
++------------------------------------------+
+| Lesson Skill                             |
++------------------------------------------+
+| ... (remaining fields unchanged)         |
++------------------------------------------+
+```
 
----
+### Word Document Updates
+The downloaded Word document will include the new location and date information:
+- Section Number
+- Building  
+- Class Room
+- Lesson Date (formatted as dd/MM/yyyy)
 
-### 4. Virtual Audit Module
-A detailed form to log teaching observations with the following fields:
-- **Teacher's Name** (text input)
-- **ELSD ID** (text input)
-- **Campus** (dropdown: Olaysha Female, Diriyah Female, Diriyah Male)
-- **Section Number** (text input)
-- **Week** (dropdown: Week 1 through Week 15)
-- **Date of Teaching** (date picker)
-- **Teaching Mode** (dropdown: Face to Face, Virtual)
-- **Course** (dropdown: ENGL 101-116)
-- **Book** (dropdown: Q:Skills series, CPM series, etc.)
-- **Unit** (dropdown: Unit 1-15)
-- **Page** (text input)
-- **Number of Students** (number input)
-- **Comments** (text area)
-- **Audit History** - View and filter past audits
+### Search Updates
+The search functionality will be extended to also search by:
+- Section number
+- Building
+- Room
 
 ---
 
-### 5. Schedule Management
-- **Weekly/Monthly Calendar View** - Visual schedule display
-- **Add/Edit Classes** - Schedule recurring or one-time classes
-- **Class Details** - Course, time, room, teacher assignment
+## Technical Details
+
+### 1. Database Migration
+Add four new columns to the `lesson_plans` table:
+
+| Column | Type | Nullable | Description |
+|--------|------|----------|-------------|
+| `section_number` | text | Yes | Section identifier |
+| `building` | text | Yes | Building number/name |
+| `room` | text | Yes | Classroom number |
+| `lesson_date` | date | Yes | Specific lesson date |
+
+### 2. Update LessonPlan.tsx
+
+**Import Changes:**
+- Add `Calendar` component
+- Add `Popover`, `PopoverContent`, `PopoverTrigger` components
+- Add `CalendarIcon` from lucide-react
+
+**New State Variables:**
+- `sectionNumber` - for section number input
+- `building` - for building number input
+- `room` - for class room input
+- `lessonDate` - for the selected date (Date | undefined)
+
+**Form Structure Updates:**
+- Remove the Day dropdown Select component
+- Change Course/Week grid from 3 columns to 2 columns
+- Add new row with Section Number, Building, Room inputs (3 columns)
+- Add date picker using Popover + Calendar with format "dd/MM/yyyy"
+
+**Data Handling Updates:**
+- Include new fields in `planData` object when saving
+- Load new fields in `editPlan` function when editing
+- Clear new fields in `resetForm` function
+- Add new fields to Word document generation
+
+**Search Updates:**
+- Add section_number, building, room to search filter
+
+### 3. Update Calendar Component
+Add `pointer-events-auto` class to ensure the calendar works correctly inside the dialog.
+
+### 4. Code Cleanup
+- Remove `DAYS` constant (line 20)
+- Remove `day` state variable and its usage in form
 
 ---
 
-### 6. Lesson Plan Module
-- **Create Lesson Plans** - Weekly or by course
-- **Attach to Schedules** - Link plans to specific class sessions
-- **View/Edit History** - Track lesson plan changes
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| Database Migration | Add columns: `section_number`, `building`, `room`, `lesson_date` |
+| `src/pages/LessonPlan.tsx` | Remove day dropdown, add new fields, update form layout |
+| `src/components/ui/calendar.tsx` | Add `pointer-events-auto` for dialog compatibility |
 
 ---
 
-### 7. Tasks Management
-- **Create Tasks** - Title, description, priority, due date, category
-- **Task Categories** - Class-related, Administrative, Personal
-- **Priority Levels** - High, Medium, Low with visual badges
-- **Mark Complete** - Check off finished tasks
-- **Filter Views** - Today, This Week, Completed, All Tasks
+## Visual Preview
 
----
+After implementation, the form will look like:
 
-### 8. Off Days / Leave Management
-- **Request Off Days** - Submit leave requests with dates and reason
-- **View Calendar** - See scheduled off days
-- **Track History** - Past leave records
+**Course/Week Row (2 columns):**
+- Course dropdown
+- Week dropdown
 
----
+**Location Row (3 columns):**
+- Section Number input
+- Building input
+- Class Room input
 
-## User Interface Design
-
-### Navigation Sidebar
-Clean, collapsible sidebar matching the reference design with:
-- Portal branding at top
-- Navigation items with icons (Dashboard, Students, Register, Schedule, Lesson Plan, Tasks, Off Days)
-- Active state highlighting
-- "Need help?" quick tips section at bottom
-
-### Design Style
-- Professional, clean aesthetic with white background
-- Colored accent cards for dashboard metrics (orange, teal, green, purple)
-- Consistent card-based layouts
-- Responsive design for desktop use
-
----
-
-## Database (Backend with Supabase)
-Secure data storage for:
-- User accounts (teachers/admins)
-- Student records
-- Virtual audit logs
-- Schedules and lesson plans
-- Tasks
-- Off day requests
-
-All data protected with proper authentication and access controls.
-
----
-
-## Summary
-This education portal will provide a complete solution for managing students, tracking teaching activities through virtual audits, organizing schedules and lesson plans, and staying on top of tasks - all through a clean, intuitive dashboard interface.
+**Date Row:**
+- Date picker button showing selected date (e.g., "29/1/2026") or "Pick a date"
 
