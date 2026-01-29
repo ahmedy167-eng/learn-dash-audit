@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { UserPermissionsDialog } from '@/components/admin/UserPermissionsDialog';
-import { RefreshCw, Shield, Users, Settings } from 'lucide-react';
+import { UserDetailsDialog } from '@/components/admin/UserDetailsDialog';
+import { RefreshCw, Shield, Users, Settings, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface UserWithRole {
@@ -16,6 +17,9 @@ interface UserWithRole {
   email: string;
   full_name: string | null;
   role: 'admin' | 'user';
+  sectionsCount: number;
+  studentsCount: number;
+  auditsCount: number;
 }
 
 export default function Admin() {
@@ -23,32 +27,51 @@ export default function Admin() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [permDialogOpen, setPermDialogOpen] = useState(false);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // Fetch profiles and roles
-      const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('user_id, email, full_name');
+      // Fetch profiles, roles, and counts in parallel
+      const [profilesRes, rolesRes, sectionsRes, studentsRes, auditsRes] = await Promise.all([
+        supabase.from('profiles').select('user_id, email, full_name'),
+        supabase.from('user_roles').select('user_id, role'),
+        supabase.from('sections').select('user_id'),
+        supabase.from('students').select('user_id'),
+        supabase.from('virtual_audits').select('user_id'),
+      ]);
 
-      if (profilesError) throw profilesError;
+      if (profilesRes.error) throw profilesRes.error;
+      if (rolesRes.error) throw rolesRes.error;
 
-      const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id, role');
+      // Count records per user
+      const sectionCounts = (sectionsRes.data || []).reduce((acc, s) => {
+        acc[s.user_id] = (acc[s.user_id] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
 
-      if (rolesError) throw rolesError;
+      const studentCounts = (studentsRes.data || []).reduce((acc, s) => {
+        acc[s.user_id] = (acc[s.user_id] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const auditCounts = (auditsRes.data || []).reduce((acc, a) => {
+        acc[a.user_id] = (acc[a.user_id] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
 
       // Combine data
-      const usersWithRoles: UserWithRole[] = (profiles || []).map(profile => {
-        const userRole = roles?.find(r => r.user_id === profile.user_id);
+      const usersWithRoles: UserWithRole[] = (profilesRes.data || []).map(profile => {
+        const userRole = rolesRes.data?.find(r => r.user_id === profile.user_id);
         return {
           id: profile.user_id,
           email: profile.email || '',
           full_name: profile.full_name,
           role: (userRole?.role as 'admin' | 'user') || 'user',
+          sectionsCount: sectionCounts[profile.user_id] || 0,
+          studentsCount: studentCounts[profile.user_id] || 0,
+          auditsCount: auditCounts[profile.user_id] || 0,
         };
       });
 
@@ -69,7 +92,12 @@ export default function Admin() {
 
   const handleEditUser = (user: UserWithRole) => {
     setSelectedUser(user);
-    setDialogOpen(true);
+    setPermDialogOpen(true);
+  };
+
+  const handleViewUser = (user: UserWithRole) => {
+    setSelectedUser(user);
+    setDetailsDialogOpen(true);
   };
 
   // Redirect non-admins
@@ -144,19 +172,22 @@ export default function Admin() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
+                  <TableHead className="text-center">Sections</TableHead>
+                  <TableHead className="text-center">Students</TableHead>
+                  <TableHead className="text-center">Audits</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Loading users...
                     </TableCell>
                   </TableRow>
                 ) : users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       No users found
                     </TableCell>
                   </TableRow>
@@ -172,7 +203,18 @@ export default function Admin() {
                           {user.role === 'admin' ? 'Admin' : 'User'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-center">{user.sectionsCount}</TableCell>
+                      <TableCell className="text-center">{user.studentsCount}</TableCell>
+                      <TableCell className="text-center">{user.auditsCount}</TableCell>
+                      <TableCell className="text-right space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewUser(user)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          View
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -192,9 +234,15 @@ export default function Admin() {
 
       <UserPermissionsDialog
         user={selectedUser}
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        open={permDialogOpen}
+        onOpenChange={setPermDialogOpen}
         onUpdate={fetchUsers}
+      />
+
+      <UserDetailsDialog
+        user={selectedUser}
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
       />
     </DashboardLayout>
   );
