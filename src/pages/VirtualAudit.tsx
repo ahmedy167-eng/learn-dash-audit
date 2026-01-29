@@ -84,9 +84,10 @@ export default function VirtualAudit() {
   // Audit type toggle
   const [auditType, setAuditType] = useState<AuditType>('virtual');
   
-  // Search and edit state
+  // Search, edit, and tab state
   const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('new');
 
   // Form state
   const [teacherName, setTeacherName] = useState('');
@@ -272,8 +273,7 @@ export default function VirtualAudit() {
     }
     
     // Switch to form tab
-    const tabTrigger = document.querySelector('[data-state="inactive"][value="new"]') as HTMLElement;
-    tabTrigger?.click();
+    setActiveTab('new');
   };
 
   const resetForm = () => {
@@ -752,7 +752,7 @@ export default function VirtualAudit() {
           </Button>
         </div>
 
-        <Tabs defaultValue="new">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="new">
               {editingId ? 'Edit Audit' : 'New Audit'}
