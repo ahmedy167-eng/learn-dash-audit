@@ -9,15 +9,17 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { BookOpen, Plus, Loader2, Trash2, Pencil, Download, Search } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { BookOpen, Plus, Loader2, Trash2, Pencil, Download, Search, CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { saveAs } from 'file-saver';
+import { cn } from '@/lib/utils';
 
 const WEEKS = Array.from({ length: 15 }, (_, i) => `Week ${i + 1}`);
 const COURSES = Array.from({ length: 16 }, (_, i) => `ENGL ${101 + i}`);
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
 
 interface LessonPlan {
   id: string;
@@ -25,6 +27,10 @@ interface LessonPlan {
   course: string | null;
   week: string | null;
   day: string | null;
+  section_number: string | null;
+  building: string | null;
+  room: string | null;
+  lesson_date: string | null;
   objectives: string | null;
   lesson_skill: string | null;
   aim_main: string | null;
@@ -52,7 +58,10 @@ export default function LessonPlanPage() {
   const [title, setTitle] = useState('');
   const [course, setCourse] = useState('');
   const [week, setWeek] = useState('');
-  const [day, setDay] = useState('');
+  const [sectionNumber, setSectionNumber] = useState('');
+  const [building, setBuilding] = useState('');
+  const [room, setRoom] = useState('');
+  const [lessonDate, setLessonDate] = useState<Date | undefined>(undefined);
   const [lessonSkill, setLessonSkill] = useState('');
   const [aimMain, setAimMain] = useState('');
   const [aimSubsidiary, setAimSubsidiary] = useState('');
@@ -100,7 +109,9 @@ export default function LessonPlanPage() {
       plan.title.toLowerCase().includes(query) ||
       plan.course?.toLowerCase().includes(query) ||
       plan.week?.toLowerCase().includes(query) ||
-      plan.day?.toLowerCase().includes(query) ||
+      plan.section_number?.toLowerCase().includes(query) ||
+      plan.building?.toLowerCase().includes(query) ||
+      plan.room?.toLowerCase().includes(query) ||
       plan.objectives?.toLowerCase().includes(query) ||
       plan.lesson_skill?.toLowerCase().includes(query)
     );
@@ -122,7 +133,11 @@ export default function LessonPlanPage() {
         title,
         course: course || null,
         week: week || null,
-        day: day || null,
+        day: null,
+        section_number: sectionNumber || null,
+        building: building || null,
+        room: room || null,
+        lesson_date: lessonDate ? format(lessonDate, 'yyyy-MM-dd') : null,
         lesson_skill: lessonSkill || null,
         aim_main: aimMain || null,
         aim_subsidiary: aimSubsidiary || null,
@@ -168,7 +183,10 @@ export default function LessonPlanPage() {
     setTitle(plan.title);
     setCourse(plan.course || '');
     setWeek(plan.week || '');
-    setDay(plan.day || '');
+    setSectionNumber(plan.section_number || '');
+    setBuilding(plan.building || '');
+    setRoom(plan.room || '');
+    setLessonDate(plan.lesson_date ? parseISO(plan.lesson_date) : undefined);
     setLessonSkill(plan.lesson_skill || '');
     setAimMain(plan.aim_main || '');
     setAimSubsidiary(plan.aim_subsidiary || '');
@@ -209,8 +227,8 @@ export default function LessonPlanPage() {
       })
     );
 
-    // Info line
-    const infoLine = [plan.course, plan.week, plan.day].filter(Boolean).join(' | ');
+    // Info line (Course | Week)
+    const infoLine = [plan.course, plan.week].filter(Boolean).join(' | ');
     if (infoLine) {
       sections.push(
         new Paragraph({
@@ -220,7 +238,32 @@ export default function LessonPlanPage() {
       );
     }
 
-    // Date
+    // Location info (Section | Building | Room)
+    const locationLine = [
+      plan.section_number && `Section: ${plan.section_number}`,
+      plan.building && `Building: ${plan.building}`,
+      plan.room && `Room: ${plan.room}`
+    ].filter(Boolean).join(' | ');
+    if (locationLine) {
+      sections.push(
+        new Paragraph({
+          children: [new TextRun({ text: locationLine, size: 22 })],
+          spacing: { after: 200 },
+        })
+      );
+    }
+
+    // Lesson Date
+    if (plan.lesson_date) {
+      sections.push(
+        new Paragraph({
+          children: [new TextRun({ text: `Lesson Date: ${format(parseISO(plan.lesson_date), 'd/M/yyyy')}`, size: 22 })],
+          spacing: { after: 200 },
+        })
+      );
+    }
+
+    // Created Date
     sections.push(
       new Paragraph({
         children: [new TextRun({ text: `Created: ${format(parseISO(plan.created_at), 'MMMM d, yyyy')}`, color: '666666', size: 20 })],
@@ -264,7 +307,8 @@ export default function LessonPlanPage() {
     });
 
     const blob = await Packer.toBlob(doc);
-    const fileName = `${plan.title.replace(/[^a-z0-9]/gi, '_')}_${plan.day || 'plan'}.docx`;
+    const datePart = plan.lesson_date ? format(parseISO(plan.lesson_date), 'd-M-yyyy') : 'plan';
+    const fileName = `${plan.title.replace(/[^a-z0-9]/gi, '_')}_${datePart}.docx`;
     saveAs(blob, fileName);
     toast.success('Word document downloaded');
   };
@@ -274,7 +318,10 @@ export default function LessonPlanPage() {
     setTitle('');
     setCourse('');
     setWeek('');
-    setDay('');
+    setSectionNumber('');
+    setBuilding('');
+    setRoom('');
+    setLessonDate(undefined);
     setLessonSkill('');
     setAimMain('');
     setAimSubsidiary('');
@@ -323,7 +370,7 @@ export default function LessonPlanPage() {
                   />
                 </div>
                 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Course</Label>
                     <Select value={course} onValueChange={setCourse}>
@@ -350,19 +397,62 @@ export default function LessonPlanPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label>Day</Label>
-                    <Select value={day} onValueChange={setDay}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select day" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {DAYS.map((d) => (
-                          <SelectItem key={d} value={d}>{d}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="sectionNumber">Section Number</Label>
+                    <Input
+                      id="sectionNumber"
+                      placeholder="e.g., 101"
+                      value={sectionNumber}
+                      onChange={(e) => setSectionNumber(e.target.value)}
+                    />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="building">Building</Label>
+                    <Input
+                      id="building"
+                      placeholder="e.g., B1"
+                      value={building}
+                      onChange={(e) => setBuilding(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="room">Class Room</Label>
+                    <Input
+                      id="room"
+                      placeholder="e.g., 204"
+                      value={room}
+                      onChange={(e) => setRoom(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Lesson Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !lessonDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {lessonDate ? format(lessonDate, "d/M/yyyy") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={lessonDate}
+                        onSelect={setLessonDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
                 <div className="space-y-2">
@@ -519,8 +609,15 @@ export default function LessonPlanPage() {
                       <CardDescription className="mt-1">
                         {plan.course && <span className="mr-2">{plan.course}</span>}
                         {plan.week && <span>• {plan.week}</span>}
-                        {plan.day && <span className="ml-2 text-primary font-medium">• {plan.day}</span>}
+                        {plan.lesson_date && <span className="ml-2 text-primary font-medium">• {format(parseISO(plan.lesson_date), 'd/M/yyyy')}</span>}
                       </CardDescription>
+                      {(plan.section_number || plan.building || plan.room) && (
+                        <CardDescription className="mt-1 text-xs">
+                          {plan.section_number && <span>Sec {plan.section_number}</span>}
+                          {plan.building && <span className="ml-2">• Bldg {plan.building}</span>}
+                          {plan.room && <span className="ml-2">• Rm {plan.room}</span>}
+                        </CardDescription>
+                      )}
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button variant="ghost" size="icon" onClick={() => downloadWord(plan)} title="Download Word">
