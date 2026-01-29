@@ -61,7 +61,19 @@ export function UserPermissionsDialog({ user, open, onOpenChange, onUpdate }: Us
         .eq('user_id', user.id);
 
       if (error) throw error;
-      setPermissions(data || []);
+      
+      // Create a map of existing permissions
+      const existingPerms = new Map(
+        (data || []).map(p => [p.feature, p.enabled])
+      );
+      
+      // Initialize all features with existing or default values
+      const allPermissions = FEATURES.map(f => ({
+        feature: f.key,
+        enabled: existingPerms.get(f.key) ?? false,
+      }));
+      
+      setPermissions(allPermissions);
       setIsAdmin(user.role === 'admin');
     } catch (error) {
       console.error('Error fetching permissions:', error);
@@ -84,26 +96,29 @@ export function UserPermissionsDialog({ user, open, onOpenChange, onUpdate }: Us
     
     setSaving(true);
     try {
-      // Update permissions
-      for (const perm of permissions) {
-        const { error } = await supabase
-          .from('user_permissions')
-          .update({ enabled: perm.enabled })
-          .eq('user_id', user.id)
-          .eq('feature', perm.feature);
-        
-        if (error) throw error;
-      }
+      // Save all permissions using upsert
+      const { error } = await supabase
+        .from('user_permissions')
+        .upsert(
+          permissions.map(perm => ({
+            user_id: user.id,
+            feature: perm.feature,
+            enabled: perm.enabled,
+          })),
+          { onConflict: 'user_id,feature' }
+        );
+      
+      if (error) throw error;
 
       // Update role if changed
       if (isAdmin !== (user.role === 'admin')) {
         const newRole = isAdmin ? 'admin' : 'user';
-        const { error } = await supabase
+        const { error: roleError } = await supabase
           .from('user_roles')
           .update({ role: newRole })
           .eq('user_id', user.id);
         
-        if (error) throw error;
+        if (roleError) throw roleError;
       }
 
       toast.success('Permissions updated successfully');
