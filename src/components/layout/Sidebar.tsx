@@ -46,9 +46,10 @@ export function Sidebar() {
   const { signOut } = useAuth();
   const { hasPermission, isAdmin, loading: permLoading } = usePermissions();
 
-  // Filter nav items based on permissions
+  // Filter nav items based on permissions - show all while loading
   const visibleNavItems = navItems.filter(item => {
     if (!item.permission) return true; // Dashboard is always visible
+    if (permLoading) return true; // Show all items while loading to prevent flash
     return hasPermission(item.permission);
   });
 
@@ -106,8 +107,8 @@ export function Sidebar() {
           </NavLink>
         ))}
         
-        {/* Admin link - only visible to admins */}
-        {isAdmin && (
+        {/* Admin link - visible while loading or if confirmed admin */}
+        {(permLoading || isAdmin) && (
           <NavLink
             to="/admin"
             className={cn(
