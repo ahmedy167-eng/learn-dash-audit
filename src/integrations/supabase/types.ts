@@ -18,18 +18,22 @@ export type Database = {
         Row: {
           aim_main: string | null
           aim_subsidiary: string | null
+          building: string | null
           content: string | null
           course: string | null
           created_at: string
           day: string | null
           id: string
           lead_in_presentation: string | null
+          lesson_date: string | null
           lesson_skill: string | null
           objectives: string | null
           practice_exercises: string | null
           productive_activities: string | null
           reflection: string | null
+          room: string | null
           schedule_id: string | null
+          section_number: string | null
           title: string
           updated_at: string
           user_id: string
@@ -38,18 +42,22 @@ export type Database = {
         Insert: {
           aim_main?: string | null
           aim_subsidiary?: string | null
+          building?: string | null
           content?: string | null
           course?: string | null
           created_at?: string
           day?: string | null
           id?: string
           lead_in_presentation?: string | null
+          lesson_date?: string | null
           lesson_skill?: string | null
           objectives?: string | null
           practice_exercises?: string | null
           productive_activities?: string | null
           reflection?: string | null
+          room?: string | null
           schedule_id?: string | null
+          section_number?: string | null
           title: string
           updated_at?: string
           user_id: string
@@ -58,18 +66,22 @@ export type Database = {
         Update: {
           aim_main?: string | null
           aim_subsidiary?: string | null
+          building?: string | null
           content?: string | null
           course?: string | null
           created_at?: string
           day?: string | null
           id?: string
           lead_in_presentation?: string | null
+          lesson_date?: string | null
           lesson_skill?: string | null
           objectives?: string | null
           practice_exercises?: string | null
           productive_activities?: string | null
           reflection?: string | null
+          room?: string | null
           schedule_id?: string | null
+          section_number?: string | null
           title?: string
           updated_at?: string
           user_id?: string
