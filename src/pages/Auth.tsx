@@ -313,10 +313,16 @@ export default function Auth() {
               </form>
             </TabsContent>
           </Tabs>
-          <div className="mt-4 text-center">
+          <div className="mt-4 space-y-2 text-center">
+            <a 
+              href="/student-login" 
+              className="block text-sm text-muted-foreground hover:text-primary"
+            >
+              Student? Login here →
+            </a>
             <a 
               href="/admin-login" 
-              className="text-sm text-muted-foreground hover:text-primary"
+              className="block text-sm text-muted-foreground hover:text-primary"
             >
               Administrator? Sign in here →
             </a>
