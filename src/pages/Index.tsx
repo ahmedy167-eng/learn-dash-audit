@@ -40,10 +40,15 @@ const Index = () => {
             </div>
             <span className="text-xl font-bold text-foreground">EduPortal</span>
           </div>
-          <Button onClick={() => navigate('/auth')}>
-            Sign In
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => navigate('/student-login')}>
+              Student Login
+            </Button>
+            <Button onClick={() => navigate('/auth')}>
+              Sign In
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -59,13 +64,16 @@ const Index = () => {
             A comprehensive portal for teachers and administrators to manage students, 
             track teaching activities, and stay organized with schedules and tasks.
           </p>
-          <div className="flex gap-4 justify-center">
+          <div className="flex gap-4 justify-center flex-wrap">
             <Button size="lg" onClick={() => navigate('/auth')}>
               Get Started
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             <Button size="lg" variant="outline" onClick={() => navigate('/auth')}>
               Sign In
+            </Button>
+            <Button size="lg" variant="secondary" onClick={() => navigate('/student-login')}>
+              Student Portal
             </Button>
           </div>
         </section>
