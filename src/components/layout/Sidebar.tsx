@@ -39,6 +39,9 @@ const navItems: NavItem[] = [
   { title: 'Lesson Plan', url: '/lesson-plan', icon: BookOpen, permission: 'lesson_plan' },
   { title: 'Tasks', url: '/tasks', icon: CheckSquare, permission: 'tasks' },
   { title: 'Off Days', url: '/off-days', icon: CalendarOff, permission: 'off_days' },
+  { title: 'Quizzes', url: '/quizzes', icon: ClipboardList },
+  { title: 'LMS Management', url: '/lms-management', icon: BookOpen },
+  { title: 'CA Projects', url: '/ca-projects', icon: FolderOpen },
 ];
 
 export function Sidebar() {
