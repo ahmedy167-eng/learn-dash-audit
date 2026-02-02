@@ -29,6 +29,7 @@ interface Student {
   id: string;
   full_name: string;
   student_id: string;
+  section_id: string | null;
   section_number: string | null;
   category: string | null;
   course: string | null;
@@ -41,12 +42,19 @@ interface Student {
   created_at: string;
 }
 
+interface Section {
+  id: string;
+  name: string;
+  section_number: string | null;
+  course: string | null;
+}
+
 const CATEGORIES = ['Regular', 'Intensive', 'Evening', 'Weekend'];
-const SECTIONS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 export default function Students() {
   const { user } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -56,13 +64,28 @@ export default function Students() {
   const [formName, setFormName] = useState('');
   const [formStudentId, setFormStudentId] = useState('');
   const [formClass, setFormClass] = useState('');
-  const [formSection, setFormSection] = useState('');
+  const [formSectionId, setFormSectionId] = useState('');
   const [formCourse, setFormCourse] = useState('');
   const [formCategory, setFormCategory] = useState('Regular');
 
   useEffect(() => {
     fetchStudents();
+    fetchSections();
   }, []);
+
+  const fetchSections = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('sections')
+        .select('id, name, section_number, course')
+        .order('name');
+
+      if (error) throw error;
+      setSections(data || []);
+    } catch (error) {
+      console.error('Error fetching sections:', error);
+    }
+  };
 
   const fetchStudents = async () => {
     try {
@@ -91,6 +114,9 @@ export default function Students() {
 
     setIsSubmitting(true);
 
+    // Find the selected section to get section_number and course
+    const selectedSection = sections.find(s => s.id === formSectionId);
+
     try {
       const { error } = await supabase
         .from('students')
@@ -99,8 +125,9 @@ export default function Students() {
           full_name: formName.trim(),
           student_id: formStudentId.trim(),
           class: formClass.trim() || null,
-          section_number: formSection || null,
-          course: formCourse.trim() || null,
+          section_id: formSectionId || null,
+          section_number: selectedSection?.section_number || null,
+          course: selectedSection?.course || formCourse.trim() || null,
           category: formCategory,
           present_count: 0,
           late_count: 0,
@@ -125,7 +152,7 @@ export default function Students() {
     setFormName('');
     setFormStudentId('');
     setFormClass('');
-    setFormSection('');
+    setFormSectionId('');
     setFormCourse('');
     setFormCategory('Regular');
   };
@@ -243,13 +270,15 @@ export default function Students() {
                   </div>
                   <div className="space-y-2">
                     <Label>Section</Label>
-                    <Select value={formSection} onValueChange={setFormSection}>
+                    <Select value={formSectionId} onValueChange={setFormSectionId}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select section" />
                       </SelectTrigger>
                       <SelectContent>
-                        {SECTIONS.map((sec) => (
-                          <SelectItem key={sec} value={sec}>{sec}</SelectItem>
+                        {sections.map((section) => (
+                          <SelectItem key={section.id} value={section.id}>
+                            {section.name} {section.section_number && `(${section.section_number})`}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
