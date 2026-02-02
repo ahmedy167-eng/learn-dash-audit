@@ -5,18 +5,25 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FolderOpen, Download, FileText, Loader2, CheckCircle, MessageSquare, Eye } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { FolderOpen, Download, FileText, Loader2, CheckCircle, MessageSquare, Eye, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { saveAs } from 'file-saver';
+import { format, differenceInDays } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 
 interface CAProject {
   id: string;
   title: string;
   description: string | null;
   pdf_url: string | null;
+  deadline_ideas: string | null;
+  deadline_first_draft: string | null;
+  deadline_second_draft: string | null;
+  deadline_final_draft: string | null;
 }
 
 interface CASubmission {
@@ -39,10 +46,14 @@ const StudentCAProjects = () => {
   const { student } = useStudentAuth();
   const [projects, setProjects] = useState<CAProject[]>([]);
   const [submissions, setSubmissions] = useState<Record<string, CASubmission[]>>({});
-  const [selectedProject, setSelectedProject] = useState<CAProject | null>(null);
   const [currentContent, setCurrentContent] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  
+  // Success dialog state
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false);
+  const [lastSubmittedStage, setLastSubmittedStage] = useState<string | null>(null);
+  const [lastSubmittedProject, setLastSubmittedProject] = useState<CAProject | null>(null);
 
   useEffect(() => {
     fetchProjects();
@@ -127,7 +138,7 @@ const StudentCAProjects = () => {
     }
   };
 
-  const handleSubmitStage = async (projectId: string, stage: string) => {
+  const handleSubmitStage = async (project: CAProject, stage: string) => {
     if (!student || !currentContent[stage]) {
       toast.error('Please enter your content before submitting');
       return;
@@ -136,7 +147,7 @@ const StudentCAProjects = () => {
     setSubmitting(true);
 
     // Check if submission already exists
-    const existingSubmission = submissions[projectId]?.find(s => s.stage === stage);
+    const existingSubmission = submissions[project.id]?.find(s => s.stage === stage);
 
     if (existingSubmission) {
       // Update existing
@@ -156,7 +167,7 @@ const StudentCAProjects = () => {
       const { error } = await supabase
         .from('ca_submissions')
         .insert({
-          project_id: projectId,
+          project_id: project.id,
           student_id: student.id,
           stage,
           content: currentContent[stage],
@@ -165,7 +176,10 @@ const StudentCAProjects = () => {
       if (error) {
         toast.error('Failed to submit');
       } else {
-        toast.success('Submitted successfully');
+        // Show success dialog
+        setLastSubmittedStage(stage);
+        setLastSubmittedProject(project);
+        setSuccessDialogOpen(true);
         fetchProjects();
       }
     }
@@ -175,6 +189,43 @@ const StudentCAProjects = () => {
 
   const getStageSubmission = (projectId: string, stage: string) => {
     return submissions[projectId]?.find(s => s.stage === stage);
+  };
+
+  const getStageDeadline = (project: CAProject, stage: string): string | null => {
+    switch (stage) {
+      case 'ideas': return project.deadline_ideas;
+      case 'first_draft': return project.deadline_first_draft;
+      case 'second_draft': return project.deadline_second_draft;
+      case 'final_draft': return project.deadline_final_draft;
+      default: return null;
+    }
+  };
+
+  const getNextStage = (current: string | null): string | null => {
+    if (!current) return null;
+    const order = ['ideas', 'first_draft', 'second_draft', 'final_draft'];
+    const idx = order.indexOf(current);
+    return idx < order.length - 1 ? order[idx + 1] : null;
+  };
+
+  const getStageLabel = (stage: string | null): string => {
+    if (!stage) return '';
+    return stages.find(s => s.value === stage)?.label || stage;
+  };
+
+  const getDeadlineStatus = (deadline: string | null) => {
+    if (!deadline) return null;
+    const deadlineDate = new Date(deadline);
+    const now = new Date();
+    const daysRemaining = differenceInDays(deadlineDate, now);
+
+    if (daysRemaining < 0) {
+      return { text: 'Overdue', className: 'text-red-500' };
+    } else if (daysRemaining <= 3) {
+      return { text: format(deadlineDate, 'MMM d'), className: 'text-yellow-500' };
+    } else {
+      return { text: format(deadlineDate, 'MMM d'), className: 'text-muted-foreground' };
+    }
   };
 
   if (loading) {
@@ -244,11 +295,22 @@ const StudentCAProjects = () => {
                     <TabsList className="grid w-full grid-cols-4">
                       {stages.map((stage) => {
                         const submission = getStageSubmission(project.id, stage.value);
+                        const deadline = getStageDeadline(project, stage.value);
+                        const deadlineStatus = getDeadlineStatus(deadline);
+                        
                         return (
-                          <TabsTrigger key={stage.value} value={stage.value} className="relative">
-                            {stage.label}
-                            {submission && (
-                              <CheckCircle className="absolute -top-1 -right-1 h-3 w-3 text-green-500" />
+                          <TabsTrigger key={stage.value} value={stage.value} className="relative flex flex-col gap-0.5 py-2">
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs sm:text-sm">{stage.label.split(' ')[0]}</span>
+                              {submission && (
+                                <CheckCircle className="h-3 w-3 text-green-500" />
+                              )}
+                            </div>
+                            {deadlineStatus && (
+                              <span className={cn("text-[10px] flex items-center gap-0.5", deadlineStatus.className)}>
+                                <Calendar className="h-2.5 w-2.5" />
+                                {deadlineStatus.text}
+                              </span>
                             )}
                           </TabsTrigger>
                         );
@@ -257,16 +319,31 @@ const StudentCAProjects = () => {
 
                     {stages.map((stage) => {
                       const submission = getStageSubmission(project.id, stage.value);
+                      const deadline = getStageDeadline(project, stage.value);
+                      const deadlineStatus = getDeadlineStatus(deadline);
                       
                       return (
                         <TabsContent key={stage.value} value={stage.value} className="space-y-4 mt-4">
+                          {deadline && (
+                            <div className={cn(
+                              "flex items-center gap-2 text-sm p-2 rounded-lg",
+                              deadlineStatus?.className === 'text-red-500' ? 'bg-red-500/10' : 
+                              deadlineStatus?.className === 'text-yellow-500' ? 'bg-yellow-500/10' : 'bg-muted/50'
+                            )}>
+                              <Calendar className="h-4 w-4" />
+                              <span>
+                                Deadline: <strong>{format(new Date(deadline), 'PPP')}</strong>
+                                {deadlineStatus?.className === 'text-red-500' && ' (Overdue)'}
+                              </span>
+                            </div>
+                          )}
+                          
                           <div className="space-y-2">
                             <Label>{stage.label}</Label>
-                            <Textarea
-                              placeholder={`Enter your ${stage.label.toLowerCase()} here...`}
+                            <RichTextEditor
                               value={currentContent[stage.value] ?? submission?.content ?? ''}
-                              onChange={(e) => setCurrentContent(prev => ({ ...prev, [stage.value]: e.target.value }))}
-                              rows={6}
+                              onChange={(value) => setCurrentContent(prev => ({ ...prev, [stage.value]: value }))}
+                              placeholder={`Enter your ${stage.label.toLowerCase()} here...`}
                             />
                           </div>
 
@@ -288,7 +365,7 @@ const StudentCAProjects = () => {
                               </Badge>
                             )}
                             <Button 
-                              onClick={() => handleSubmitStage(project.id, stage.value)}
+                              onClick={() => handleSubmitStage(project, stage.value)}
                               disabled={submitting}
                               className="ml-auto"
                             >
@@ -310,6 +387,43 @@ const StudentCAProjects = () => {
             ))}
           </div>
         )}
+
+        {/* Success Dialog */}
+        <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
+          <DialogContent className="text-center sm:max-w-md">
+            <div className="flex flex-col items-center py-4">
+              <div className="bg-green-100 p-4 rounded-full mb-4">
+                <CheckCircle className="h-12 w-12 text-green-600" />
+              </div>
+              <DialogTitle className="text-2xl mb-2">Well Done! 🎉</DialogTitle>
+              <DialogDescription className="text-base">
+                You've successfully submitted your {getStageLabel(lastSubmittedStage)}.
+              </DialogDescription>
+              
+              {lastSubmittedStage && getNextStage(lastSubmittedStage) && lastSubmittedProject && (
+                <div className="mt-4 p-4 bg-primary/10 rounded-lg w-full">
+                  <p className="font-medium">
+                    Your next step: <span className="text-primary">{getStageLabel(getNextStage(lastSubmittedStage))}</span>
+                  </p>
+                  {getStageDeadline(lastSubmittedProject, getNextStage(lastSubmittedStage)!) && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Due by: {format(new Date(getStageDeadline(lastSubmittedProject, getNextStage(lastSubmittedStage)!)!), 'PPP')}
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              {lastSubmittedStage === 'final_draft' && (
+                <p className="mt-4 text-lg font-bold text-green-600">
+                  Congratulations! You've completed all stages! 🏆
+                </p>
+              )}
+            </div>
+            <Button onClick={() => setSuccessDialogOpen(false)} className="w-full">
+              Continue
+            </Button>
+          </DialogContent>
+        </Dialog>
       </div>
     </StudentLayout>
   );
