@@ -11,8 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Trash2, Edit, FolderOpen, Upload, Download, Loader2, MessageSquare, FileText } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Plus, Trash2, Edit, FolderOpen, Upload, Download, Loader2, MessageSquare, FileText, CalendarIcon, CheckCircle, Clock, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import { format, differenceInDays } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface Section {
   id: string;
@@ -27,6 +32,10 @@ interface CAProject {
   description: string | null;
   pdf_url: string | null;
   created_at: string;
+  deadline_ideas: string | null;
+  deadline_first_draft: string | null;
+  deadline_second_draft: string | null;
+  deadline_final_draft: string | null;
   sections?: Section;
 }
 
@@ -39,9 +48,16 @@ interface CASubmission {
   feedback: string | null;
   submitted_at: string;
   students?: {
+    id: string;
     full_name: string;
     student_id: string;
   };
+}
+
+interface Student {
+  id: string;
+  full_name: string;
+  student_id: string;
 }
 
 const stages = [
@@ -57,6 +73,7 @@ const CAProjects = () => {
   const [projects, setProjects] = useState<CAProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<CAProject | null>(null);
   const [submissions, setSubmissions] = useState<CASubmission[]>([]);
+  const [sectionStudents, setSectionStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingProjectId, setUploadingProjectId] = useState<string | null>(null);
   const [uploadTargetProjectId, setUploadTargetProjectId] = useState<string | null>(null);
@@ -68,6 +85,10 @@ const CAProjects = () => {
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formSectionId, setFormSectionId] = useState('');
+  const [formDeadlineIdeas, setFormDeadlineIdeas] = useState<Date | undefined>();
+  const [formDeadlineFirstDraft, setFormDeadlineFirstDraft] = useState<Date | undefined>();
+  const [formDeadlineSecondDraft, setFormDeadlineSecondDraft] = useState<Date | undefined>();
+  const [formDeadlineFinalDraft, setFormDeadlineFinalDraft] = useState<Date | undefined>();
   const [editingProject, setEditingProject] = useState<CAProject | null>(null);
   
   // Feedback states
@@ -106,7 +127,7 @@ const CAProjects = () => {
   const fetchSubmissions = async (projectId: string) => {
     const { data, error } = await supabase
       .from('ca_submissions')
-      .select('*, students(full_name, student_id)')
+      .select('*, students(id, full_name, student_id)')
       .eq('project_id', projectId)
       .order('submitted_at', { ascending: false });
 
@@ -114,6 +135,20 @@ const CAProjects = () => {
       toast.error('Failed to load submissions');
     } else {
       setSubmissions(data || []);
+    }
+  };
+
+  const fetchSectionStudents = async (sectionId: string) => {
+    const { data, error } = await supabase
+      .from('students')
+      .select('id, full_name, student_id')
+      .eq('section_id', sectionId)
+      .order('full_name');
+
+    if (error) {
+      console.error('Failed to load section students:', error);
+    } else {
+      setSectionStudents(data || []);
     }
   };
 
@@ -130,6 +165,10 @@ const CAProjects = () => {
         section_id: formSectionId,
         title: formTitle.trim(),
         description: formDescription.trim() || null,
+        deadline_ideas: formDeadlineIdeas?.toISOString() || null,
+        deadline_first_draft: formDeadlineFirstDraft?.toISOString() || null,
+        deadline_second_draft: formDeadlineSecondDraft?.toISOString() || null,
+        deadline_final_draft: formDeadlineFinalDraft?.toISOString() || null,
       });
 
     if (error) {
@@ -154,6 +193,10 @@ const CAProjects = () => {
         section_id: formSectionId,
         title: formTitle.trim(),
         description: formDescription.trim() || null,
+        deadline_ideas: formDeadlineIdeas?.toISOString() || null,
+        deadline_first_draft: formDeadlineFirstDraft?.toISOString() || null,
+        deadline_second_draft: formDeadlineSecondDraft?.toISOString() || null,
+        deadline_final_draft: formDeadlineFinalDraft?.toISOString() || null,
       })
       .eq('id', editingProject.id);
 
@@ -182,6 +225,7 @@ const CAProjects = () => {
       if (selectedProject?.id === projectId) {
         setSelectedProject(null);
         setSubmissions([]);
+        setSectionStudents([]);
       }
       fetchData();
     }
@@ -255,6 +299,10 @@ const CAProjects = () => {
     setFormTitle('');
     setFormDescription('');
     setFormSectionId('');
+    setFormDeadlineIdeas(undefined);
+    setFormDeadlineFirstDraft(undefined);
+    setFormDeadlineSecondDraft(undefined);
+    setFormDeadlineFinalDraft(undefined);
     setEditingProject(null);
   };
 
@@ -263,18 +311,62 @@ const CAProjects = () => {
     setFormTitle(project.title);
     setFormDescription(project.description || '');
     setFormSectionId(project.section_id);
+    setFormDeadlineIdeas(project.deadline_ideas ? new Date(project.deadline_ideas) : undefined);
+    setFormDeadlineFirstDraft(project.deadline_first_draft ? new Date(project.deadline_first_draft) : undefined);
+    setFormDeadlineSecondDraft(project.deadline_second_draft ? new Date(project.deadline_second_draft) : undefined);
+    setFormDeadlineFinalDraft(project.deadline_final_draft ? new Date(project.deadline_final_draft) : undefined);
     setDialogOpen(true);
   };
 
   const selectProject = (project: CAProject) => {
     setSelectedProject(project);
     fetchSubmissions(project.id);
+    fetchSectionStudents(project.section_id);
   };
 
   const openFeedback = (submission: CASubmission) => {
     setSelectedSubmission(submission);
     setFeedbackText(submission.feedback || '');
     setFeedbackDialogOpen(true);
+  };
+
+  const getDeadlineStatus = (deadline: string | null) => {
+    if (!deadline) return null;
+    const deadlineDate = new Date(deadline);
+    const now = new Date();
+    const daysRemaining = differenceInDays(deadlineDate, now);
+
+    if (daysRemaining < 0) {
+      return { text: 'Overdue', className: 'text-red-500 bg-red-500/10' };
+    } else if (daysRemaining <= 3) {
+      return { text: `${daysRemaining}d left`, className: 'text-yellow-500 bg-yellow-500/10' };
+    } else {
+      return { text: format(deadlineDate, 'MMM d'), className: 'text-muted-foreground bg-muted' };
+    }
+  };
+
+  const getUniqueStudents = (): Student[] => {
+    const studentMap = new Map<string, Student>();
+    
+    // Add students who have submitted
+    submissions.forEach(sub => {
+      if (sub.students && !studentMap.has(sub.students.id)) {
+        studentMap.set(sub.students.id, {
+          id: sub.students.id,
+          full_name: sub.students.full_name,
+          student_id: sub.students.student_id,
+        });
+      }
+    });
+    
+    // Add all section students
+    sectionStudents.forEach(student => {
+      if (!studentMap.has(student.id)) {
+        studentMap.set(student.id, student);
+      }
+    });
+    
+    return Array.from(studentMap.values()).sort((a, b) => a.full_name.localeCompare(b.full_name));
   };
 
   if (loading) {
@@ -302,11 +394,11 @@ const CAProjects = () => {
                 Create Project
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingProject ? 'Edit Project' : 'Create Project'}</DialogTitle>
                 <DialogDescription>
-                  {editingProject ? 'Update project details' : 'Create a new CA project'}
+                  {editingProject ? 'Update project details and deadlines' : 'Create a new CA project with stage deadlines'}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-4">
@@ -333,6 +425,80 @@ const CAProjects = () => {
                   <Label>Description</Label>
                   <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="Project description" />
                 </div>
+                
+                {/* Stage Deadlines */}
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2">
+                    <CalendarIcon className="h-4 w-4" />
+                    Stage Deadlines
+                  </Label>
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Ideas Deadline */}
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Ideas & Description</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formDeadlineIdeas && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formDeadlineIdeas ? format(formDeadlineIdeas, "PPP") : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={formDeadlineIdeas} onSelect={setFormDeadlineIdeas} initialFocus className="pointer-events-auto" />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    
+                    {/* First Draft Deadline */}
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">First Draft</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formDeadlineFirstDraft && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formDeadlineFirstDraft ? format(formDeadlineFirstDraft, "PPP") : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={formDeadlineFirstDraft} onSelect={setFormDeadlineFirstDraft} initialFocus className="pointer-events-auto" />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    
+                    {/* Second Draft Deadline */}
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Second Draft</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formDeadlineSecondDraft && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formDeadlineSecondDraft ? format(formDeadlineSecondDraft, "PPP") : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={formDeadlineSecondDraft} onSelect={setFormDeadlineSecondDraft} initialFocus className="pointer-events-auto" />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    
+                    {/* Final Draft Deadline */}
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Final Draft</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formDeadlineFinalDraft && "text-muted-foreground")}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formDeadlineFinalDraft ? format(formDeadlineFinalDraft, "PPP") : "Pick a date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={formDeadlineFinalDraft} onSelect={setFormDeadlineFinalDraft} initialFocus className="pointer-events-auto" />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                </div>
+                
                 <Button onClick={editingProject ? handleUpdateProject : handleCreateProject} className="w-full">
                   {editingProject ? 'Update Project' : 'Create Project'}
                 </Button>
@@ -389,6 +555,26 @@ const CAProjects = () => {
                   </CardHeader>
                   <CardContent>
                     {project.description && <p className="text-sm text-muted-foreground mb-3">{project.description}</p>}
+                    
+                    {/* Deadline badges */}
+                    {(project.deadline_ideas || project.deadline_first_draft || project.deadline_second_draft || project.deadline_final_draft) && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {stages.map(stage => {
+                          const deadline = stage.value === 'ideas' ? project.deadline_ideas :
+                            stage.value === 'first_draft' ? project.deadline_first_draft :
+                            stage.value === 'second_draft' ? project.deadline_second_draft :
+                            project.deadline_final_draft;
+                          const status = getDeadlineStatus(deadline);
+                          if (!status) return null;
+                          return (
+                            <Badge key={stage.value} variant="outline" className={cn("text-xs", status.className)}>
+                              {stage.label.split(' ')[0]}: {status.text}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
+                    
                     <div className="flex gap-2 flex-wrap">
                       <Button 
                         variant="outline" 
@@ -435,72 +621,146 @@ const CAProjects = () => {
                   <p className="text-muted-foreground">Select a project to view submissions</p>
                 </CardContent>
               </Card>
-            ) : submissions.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No submissions yet</p>
-                </CardContent>
-              </Card>
             ) : (
-              <Tabs defaultValue="ideas" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
-                  {stages.map((stage) => (
-                    <TabsTrigger key={stage.value} value={stage.value}>
-                      {stage.label.split(' ')[0]}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
+              <>
+                {/* Student Progress Overview */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Student Progress Overview
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {getUniqueStudents().length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">No students in this section</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="min-w-[120px]">Student</TableHead>
+                              <TableHead className="min-w-[80px]">ID</TableHead>
+                              {stages.map(s => (
+                                <TableHead key={s.value} className="text-center min-w-[60px]">
+                                  {s.label.split(' ')[0]}
+                                </TableHead>
+                              ))}
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {getUniqueStudents().map(student => (
+                              <TableRow key={student.id}>
+                                <TableCell className="font-medium text-sm">{student.full_name}</TableCell>
+                                <TableCell className="text-sm text-muted-foreground">{student.student_id}</TableCell>
+                                {stages.map(s => {
+                                  const sub = submissions.find(sub => 
+                                    sub.student_id === student.id && sub.stage === s.value
+                                  );
+                                  return (
+                                    <TableCell key={s.value} className="text-center">
+                                      {sub ? (
+                                        sub.feedback ? 
+                                          <CheckCircle className="h-4 w-4 text-green-500 mx-auto" /> : 
+                                          <Clock className="h-4 w-4 text-yellow-500 mx-auto" />
+                                      ) : (
+                                        <span className="text-muted-foreground">—</span>
+                                      )}
+                                    </TableCell>
+                                  );
+                                })}
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                    <div className="flex gap-4 mt-3 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3 text-green-500" /> Reviewed
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-yellow-500" /> Pending Review
+                      </div>
+                      <div className="flex items-center gap-1">
+                        — Not Submitted
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                {stages.map((stage) => {
-                  const stageSubmissions = submissions.filter(s => s.stage === stage.value);
-                  
-                  return (
-                    <TabsContent key={stage.value} value={stage.value} className="space-y-4 mt-4">
-                      {stageSubmissions.length === 0 ? (
-                        <Card>
-                          <CardContent className="py-8 text-center text-muted-foreground">
-                            No submissions for {stage.label}
-                          </CardContent>
-                        </Card>
-                      ) : (
-                        stageSubmissions.map((submission) => (
-                          <Card key={submission.id}>
-                            <CardHeader className="pb-2">
-                              <div className="flex items-start justify-between">
-                                <div>
-                                  <CardTitle className="text-base">{submission.students?.full_name}</CardTitle>
-                                  <CardDescription>ID: {submission.students?.student_id}</CardDescription>
-                                </div>
-                                <Badge variant={submission.feedback ? 'default' : 'secondary'}>
-                                  {submission.feedback ? 'Reviewed' : 'Pending'}
-                                </Badge>
-                              </div>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                              {submission.content && (
-                                <div className="bg-muted/50 p-3 rounded text-sm">
-                                  <p className="whitespace-pre-wrap">{submission.content}</p>
-                                </div>
-                              )}
-                              {submission.feedback && (
-                                <div className="bg-primary/5 p-3 rounded text-sm border border-primary/20">
-                                  <p className="font-medium mb-1 text-primary">Your Feedback:</p>
-                                  <p>{submission.feedback}</p>
-                                </div>
-                              )}
-                              <Button variant="outline" size="sm" onClick={() => openFeedback(submission)}>
-                                <MessageSquare className="h-4 w-4 mr-2" />
-                                {submission.feedback ? 'Edit Feedback' : 'Add Feedback'}
-                              </Button>
-                            </CardContent>
-                          </Card>
-                        ))
-                      )}
-                    </TabsContent>
-                  );
-                })}
-              </Tabs>
+                {/* Submissions by Stage */}
+                {submissions.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">No submissions yet</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Tabs defaultValue="ideas" className="w-full">
+                    <TabsList className="grid w-full grid-cols-4">
+                      {stages.map((stage) => (
+                        <TabsTrigger key={stage.value} value={stage.value}>
+                          {stage.label.split(' ')[0]}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+
+                    {stages.map((stage) => {
+                      const stageSubmissions = submissions.filter(s => s.stage === stage.value);
+                      
+                      return (
+                        <TabsContent key={stage.value} value={stage.value} className="space-y-4 mt-4">
+                          {stageSubmissions.length === 0 ? (
+                            <Card>
+                              <CardContent className="py-8 text-center text-muted-foreground">
+                                No submissions for {stage.label}
+                              </CardContent>
+                            </Card>
+                          ) : (
+                            stageSubmissions.map((submission) => (
+                              <Card key={submission.id}>
+                                <CardHeader className="pb-2">
+                                  <div className="flex items-start justify-between">
+                                    <div>
+                                      <CardTitle className="text-base">{submission.students?.full_name}</CardTitle>
+                                      <CardDescription>ID: {submission.students?.student_id}</CardDescription>
+                                    </div>
+                                    <Badge variant={submission.feedback ? 'default' : 'secondary'}>
+                                      {submission.feedback ? 'Reviewed' : 'Pending'}
+                                    </Badge>
+                                  </div>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                  {submission.content && (
+                                    <div className="bg-muted/50 p-3 rounded text-sm">
+                                      <div 
+                                        className="prose prose-sm max-w-none"
+                                        dangerouslySetInnerHTML={{ __html: submission.content }}
+                                      />
+                                    </div>
+                                  )}
+                                  {submission.feedback && (
+                                    <div className="bg-primary/5 p-3 rounded text-sm border border-primary/20">
+                                      <p className="font-medium mb-1 text-primary">Your Feedback:</p>
+                                      <p>{submission.feedback}</p>
+                                    </div>
+                                  )}
+                                  <Button variant="outline" size="sm" onClick={() => openFeedback(submission)}>
+                                    <MessageSquare className="h-4 w-4 mr-2" />
+                                    {submission.feedback ? 'Edit Feedback' : 'Add Feedback'}
+                                  </Button>
+                                </CardContent>
+                              </Card>
+                            ))
+                          )}
+                        </TabsContent>
+                      );
+                    })}
+                  </Tabs>
+                )}
+              </>
             )}
           </div>
         </div>

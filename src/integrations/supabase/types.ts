@@ -17,6 +17,10 @@ export type Database = {
       ca_projects: {
         Row: {
           created_at: string
+          deadline_final_draft: string | null
+          deadline_first_draft: string | null
+          deadline_ideas: string | null
+          deadline_second_draft: string | null
           description: string | null
           id: string
           pdf_url: string | null
@@ -27,6 +31,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          deadline_final_draft?: string | null
+          deadline_first_draft?: string | null
+          deadline_ideas?: string | null
+          deadline_second_draft?: string | null
           description?: string | null
           id?: string
           pdf_url?: string | null
@@ -37,6 +45,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          deadline_final_draft?: string | null
+          deadline_first_draft?: string | null
+          deadline_ideas?: string | null
+          deadline_second_draft?: string | null
           description?: string | null
           id?: string
           pdf_url?: string | null
