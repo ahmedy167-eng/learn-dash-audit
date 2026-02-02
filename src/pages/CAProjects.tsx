@@ -58,7 +58,8 @@ const CAProjects = () => {
   const [selectedProject, setSelectedProject] = useState<CAProject | null>(null);
   const [submissions, setSubmissions] = useState<CASubmission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  const [uploadingProjectId, setUploadingProjectId] = useState<string | null>(null);
+  const [uploadTargetProjectId, setUploadTargetProjectId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -186,14 +187,19 @@ const CAProjects = () => {
     }
   };
 
-  const handleUploadPDF = async (projectId: string, file: File) => {
+  const handleUploadPDF = async (file: File) => {
+    if (!uploadTargetProjectId) {
+      toast.error('No project selected for upload');
+      return;
+    }
+
     if (!file.type.includes('pdf')) {
       toast.error('Please upload a PDF file');
       return;
     }
 
-    setUploading(true);
-    const fileName = `${projectId}/${Date.now()}-${file.name}`;
+    setUploadingProjectId(uploadTargetProjectId);
+    const fileName = `${uploadTargetProjectId}/${Date.now()}-${file.name}`;
 
     const { data, error: uploadError } = await supabase.storage
       .from('ca-project-pdfs')
@@ -201,7 +207,7 @@ const CAProjects = () => {
 
     if (uploadError) {
       toast.error('Failed to upload PDF');
-      setUploading(false);
+      setUploadingProjectId(null);
       return;
     }
 
@@ -212,7 +218,7 @@ const CAProjects = () => {
     const { error: updateError } = await supabase
       .from('ca_projects')
       .update({ pdf_url: urlData.publicUrl })
-      .eq('id', projectId);
+      .eq('id', uploadTargetProjectId);
 
     if (updateError) {
       toast.error('Failed to save PDF URL');
@@ -220,7 +226,8 @@ const CAProjects = () => {
       toast.success('PDF uploaded successfully! Students can now download it.');
       fetchData();
     }
-    setUploading(false);
+    setUploadingProjectId(null);
+    setUploadTargetProjectId(null);
   };
 
   const handleProvideFeedback = async () => {
@@ -334,6 +341,19 @@ const CAProjects = () => {
           </Dialog>
         </div>
 
+        {/* Single hidden file input at page level */}
+        <input
+          type="file"
+          accept=".pdf"
+          ref={fileInputRef}
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleUploadPDF(file);
+            e.target.value = '';
+          }}
+        />
+
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Project List */}
           <div className="space-y-4">
@@ -370,24 +390,17 @@ const CAProjects = () => {
                   <CardContent>
                     {project.description && <p className="text-sm text-muted-foreground mb-3">{project.description}</p>}
                     <div className="flex gap-2 flex-wrap">
-                      <input
-                        type="file"
-                        accept=".pdf"
-                        ref={fileInputRef}
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleUploadPDF(project.id, file);
-                          e.target.value = '';
-                        }}
-                      />
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
-                        disabled={uploading}
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          setUploadTargetProjectId(project.id);
+                          fileInputRef.current?.click(); 
+                        }}
+                        disabled={uploadingProjectId === project.id}
                       >
-                        {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+                        {uploadingProjectId === project.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
                         Upload PDF
                       </Button>
                       {project.pdf_url && (
