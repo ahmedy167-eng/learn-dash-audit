@@ -47,6 +47,31 @@ const StudentCAProjects = () => {
     fetchProjects();
   }, [student]);
 
+  // Realtime subscription for live updates when admin uploads PDFs
+  useEffect(() => {
+    if (!student?.section_id) return;
+
+    const channel = supabase
+      .channel('ca-projects-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ca_projects',
+          filter: `section_id=eq.${student.section_id}`
+        },
+        () => {
+          fetchProjects();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [student?.section_id]);
+
   const fetchProjects = async () => {
     if (!student?.section_id) {
       setLoading(false);
@@ -171,18 +196,28 @@ const StudentCAProjects = () => {
             {projects.map((project) => (
               <Card key={project.id}>
                 <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle>{project.title}</CardTitle>
+                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <CardTitle>{project.title}</CardTitle>
+                        {project.pdf_url && (
+                          <Badge className="bg-green-500 hover:bg-green-600">
+                            <FileText className="mr-1 h-3 w-3" />
+                            PDF Available
+                          </Badge>
+                        )}
+                      </div>
                       {project.description && (
                         <CardDescription className="mt-1">{project.description}</CardDescription>
                       )}
                     </div>
-                    {project.pdf_url && (
-                      <Button variant="outline" onClick={() => handleDownloadPDF(project.pdf_url!)}>
+                    {project.pdf_url ? (
+                      <Button onClick={() => handleDownloadPDF(project.pdf_url!)}>
                         <Download className="mr-2 h-4 w-4" />
                         Download PDF
                       </Button>
+                    ) : (
+                      <Badge variant="secondary">No PDF yet</Badge>
                     )}
                   </div>
                 </CardHeader>
