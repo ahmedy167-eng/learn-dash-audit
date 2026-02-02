@@ -217,7 +217,7 @@ const CAProjects = () => {
     if (updateError) {
       toast.error('Failed to save PDF URL');
     } else {
-      toast.success('PDF uploaded successfully');
+      toast.success('PDF uploaded successfully! Students can now download it.');
       fetchData();
     }
     setUploading(false);
