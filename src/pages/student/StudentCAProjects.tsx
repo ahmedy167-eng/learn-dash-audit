@@ -292,25 +292,19 @@ const StudentCAProjects = () => {
                 </CardHeader>
                 <CardContent>
                   <Tabs defaultValue="ideas" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className="grid w-full grid-cols-4 h-auto p-1.5 gap-1">
                       {stages.map((stage) => {
                         const submission = getStageSubmission(project.id, stage.value);
-                        const deadline = getStageDeadline(project, stage.value);
-                        const deadlineStatus = getDeadlineStatus(deadline);
                         
                         return (
-                          <TabsTrigger key={stage.value} value={stage.value} className="relative flex flex-col gap-0.5 py-2">
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs sm:text-sm">{stage.label.split(' ')[0]}</span>
-                              {submission && (
-                                <CheckCircle className="h-3 w-3 text-green-500" />
-                              )}
-                            </div>
-                            {deadlineStatus && (
-                              <span className={cn("text-[10px] flex items-center gap-0.5", deadlineStatus.className)}>
-                                <Calendar className="h-2.5 w-2.5" />
-                                {deadlineStatus.text}
-                              </span>
+                          <TabsTrigger 
+                            key={stage.value} 
+                            value={stage.value} 
+                            className="flex items-center gap-1.5 px-3 py-2.5"
+                          >
+                            <span className="text-xs sm:text-sm font-medium">{stage.label.split(' ')[0]}</span>
+                            {submission && (
+                              <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
                             )}
                           </TabsTrigger>
                         );
