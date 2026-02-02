@@ -22,6 +22,12 @@ interface Student {
   section_number: string | null;
 }
 
+interface Section {
+  id: string;
+  name: string;
+  section_number: string | null;
+}
+
 interface LMSProgress {
   id: string;
   student_id: string;
@@ -37,9 +43,11 @@ interface LMSProgress {
 const LMSManagement = () => {
   const { user } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
   const [progress, setProgress] = useState<LMSProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [filterSectionId, setFilterSectionId] = useState('all');
   
   // Form states
   const [formStudentId, setFormStudentId] = useState('');
@@ -54,6 +62,14 @@ const LMSManagement = () => {
 
   const fetchData = async () => {
     if (!user) return;
+
+    // Fetch sections for filter
+    const { data: sectionsData } = await supabase
+      .from('sections')
+      .select('id, name, section_number')
+      .eq('user_id', user.id)
+      .order('name');
+    setSections(sectionsData || []);
 
     // Fetch students
     const { data: studentsData } = await supabase
@@ -76,6 +92,11 @@ const LMSManagement = () => {
     }
     setLoading(false);
   };
+
+  // Filter students by section
+  const filteredStudents = filterSectionId === 'all'
+    ? students
+    : students.filter(s => s.section_id === filterSectionId);
 
   const handleCreate = async () => {
     if (!user || !formStudentId || !formUnitName.trim()) {
@@ -194,6 +215,24 @@ const LMSManagement = () => {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-4">
+                {!editingProgress && (
+                  <div className="space-y-2">
+                    <Label>Filter by Section</Label>
+                    <Select value={filterSectionId} onValueChange={setFilterSectionId}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Sections</SelectItem>
+                        {sections.map((section) => (
+                          <SelectItem key={section.id} value={section.id}>
+                            {section.name} {section.section_number && `(${section.section_number})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Student *</Label>
                   <Select value={formStudentId} onValueChange={setFormStudentId} disabled={!!editingProgress}>
@@ -201,7 +240,7 @@ const LMSManagement = () => {
                       <SelectValue placeholder="Select a student" />
                     </SelectTrigger>
                     <SelectContent>
-                      {students.map((student) => (
+                      {filteredStudents.map((student) => (
                         <SelectItem key={student.id} value={student.id}>
                           {student.full_name} ({student.student_id})
                         </SelectItem>
