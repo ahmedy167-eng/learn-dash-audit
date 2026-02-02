@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FolderOpen, Download, FileText, Loader2, CheckCircle, MessageSquare } from 'lucide-react';
+import { FolderOpen, Download, FileText, Loader2, CheckCircle, MessageSquare, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import { saveAs } from 'file-saver';
 
 interface CAProject {
   id: string;
@@ -111,8 +112,19 @@ const StudentCAProjects = () => {
     setLoading(false);
   };
 
-  const handleDownloadPDF = (pdfUrl: string) => {
+  const handleViewPDF = (pdfUrl: string) => {
     window.open(pdfUrl, '_blank');
+  };
+
+  const handleDownloadPDF = async (pdfUrl: string, title: string) => {
+    try {
+      const response = await fetch(pdfUrl);
+      const blob = await response.blob();
+      const sanitizedTitle = title.replace(/[^a-z0-9]/gi, '_');
+      saveAs(blob, `CA_Project_${sanitizedTitle}.pdf`);
+    } catch (error) {
+      toast.error('Failed to download PDF');
+    }
   };
 
   const handleSubmitStage = async (projectId: string, stage: string) => {
@@ -212,10 +224,16 @@ const StudentCAProjects = () => {
                       )}
                     </div>
                     {project.pdf_url ? (
-                      <Button onClick={() => handleDownloadPDF(project.pdf_url!)}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Download PDF
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => handleViewPDF(project.pdf_url!)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View PDF
+                        </Button>
+                        <Button onClick={() => handleDownloadPDF(project.pdf_url!, project.title)}>
+                          <Download className="mr-2 h-4 w-4" />
+                          Download PDF
+                        </Button>
+                      </div>
                     ) : (
                       <Badge variant="secondary">No PDF yet</Badge>
                     )}
