@@ -1,11 +1,16 @@
+import { useState } from 'react';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
 import { StudentLayout } from '@/components/student/StudentLayout';
+import { NoticesPanel } from '@/components/student/NoticesPanel';
+import { MessageAdminDialog } from '@/components/student/MessageAdminDialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ClipboardList, BookOpen, FolderOpen, User } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ClipboardList, BookOpen, FolderOpen, User, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const StudentPortal = () => {
   const { student } = useStudentAuth();
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
 
   const sections = [
     {
@@ -35,13 +40,19 @@ const StudentPortal = () => {
     <StudentLayout>
       <div className="p-6 md:p-8">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            Welcome, {student?.full_name}!
-          </h1>
-          <p className="text-muted-foreground">
-            Access your quizzes, track your progress, and manage your projects.
-          </p>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              Welcome, {student?.full_name}!
+            </h1>
+            <p className="text-muted-foreground">
+              Access your quizzes, track your progress, and manage your projects.
+            </p>
+          </div>
+          <Button onClick={() => setMessageDialogOpen(true)}>
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Message Admin
+          </Button>
         </div>
 
         {/* Student Info Card */}
@@ -75,6 +86,11 @@ const StudentPortal = () => {
           </CardContent>
         </Card>
 
+        {/* Notices Panel */}
+        <div className="mb-8">
+          <NoticesPanel />
+        </div>
+
         {/* Quick Access Sections */}
         <h2 className="text-xl font-semibold mb-4">Quick Access</h2>
         <div className="grid gap-4 md:grid-cols-3">
@@ -95,6 +111,11 @@ const StudentPortal = () => {
           ))}
         </div>
       </div>
+
+      <MessageAdminDialog 
+        open={messageDialogOpen} 
+        onOpenChange={setMessageDialogOpen} 
+      />
     </StudentLayout>
   );
 };

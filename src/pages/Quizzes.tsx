@@ -11,7 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Edit, ClipboardList, Loader2 } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { Plus, Trash2, Edit, ClipboardList, Loader2, CheckCircle, HelpCircle, BookOpen, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Section {
@@ -76,14 +78,12 @@ const Quizzes = () => {
   const fetchData = async () => {
     if (!user) return;
 
-    // Fetch sections
     const { data: sectionsData } = await supabase
       .from('sections')
       .select('id, name, section_number')
       .eq('user_id', user.id);
     setSections(sectionsData || []);
 
-    // Fetch quizzes
     const { data: quizzesData, error } = await supabase
       .from('quizzes')
       .select('*, sections(id, name, section_number)')
@@ -315,27 +315,34 @@ const Quizzes = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-6 md:p-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Quizzes</h1>
+      <div className="p-6 md:p-8 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <ClipboardList className="h-6 w-6 text-primary" />
+              </div>
+              Quizzes
+            </h1>
             <p className="text-muted-foreground">Create and manage quizzes for your students</p>
           </div>
+          
           <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
+              <Button size="lg" className="shadow-sm">
+                <Plus className="mr-2 h-5 w-5" />
                 Create Quiz
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>{editingQuiz ? 'Edit Quiz' : 'Create Quiz'}</DialogTitle>
+                <DialogTitle>{editingQuiz ? 'Edit Quiz' : 'Create New Quiz'}</DialogTitle>
                 <DialogDescription>
                   {editingQuiz ? 'Update quiz details' : 'Add a new quiz for your students'}
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 mt-4">
+              <div className="space-y-4 pt-4">
                 <div className="space-y-2">
                   <Label>Section *</Label>
                   <Select value={formSectionId} onValueChange={setFormSectionId}>
@@ -353,15 +360,18 @@ const Quizzes = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Title *</Label>
-                  <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="Quiz title" />
+                  <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="Enter quiz title" />
                 </div>
                 <div className="space-y-2">
                   <Label>Description</Label>
-                  <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="Optional description" />
+                  <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="Optional description" rows={3} />
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg">
+                  <div className="space-y-0.5">
+                    <Label>Active Status</Label>
+                    <p className="text-xs text-muted-foreground">Visible to students</p>
+                  </div>
                   <Switch checked={formIsActive} onCheckedChange={setFormIsActive} />
-                  <Label>Active (visible to students)</Label>
                 </div>
                 <Button onClick={editingQuiz ? handleUpdateQuiz : handleCreateQuiz} className="w-full">
                   {editingQuiz ? 'Update Quiz' : 'Create Quiz'}
@@ -371,59 +381,149 @@ const Quizzes = () => {
           </Dialog>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Quiz List */}
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold">Your Quizzes</h2>
-            {quizzes.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No quizzes yet</p>
-                  <p className="text-sm text-muted-foreground">Create your first quiz to get started</p>
-                </CardContent>
-              </Card>
-            ) : (
-              quizzes.map((quiz) => (
-                <Card 
-                  key={quiz.id} 
-                  className={`cursor-pointer transition-colors ${selectedQuiz?.id === quiz.id ? 'border-primary' : 'hover:border-primary/50'}`}
-                  onClick={() => selectQuiz(quiz)}
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{quiz.title}</CardTitle>
-                        <CardDescription>
-                          {quiz.sections?.name} {quiz.sections?.section_number && `(${quiz.sections.section_number})`}
-                        </CardDescription>
-                      </div>
-                      <Badge variant={quiz.is_active ? 'default' : 'secondary'}>
-                        {quiz.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
+        {/* Stats Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-500/10 rounded-lg">
+                  <ClipboardList className="h-5 w-5 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{quizzes.length}</p>
+                  <p className="text-xs text-muted-foreground">Total Quizzes</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-500/10 rounded-lg">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{quizzes.filter(q => q.is_active).length}</p>
+                  <p className="text-xs text-muted-foreground">Active</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-500/10 rounded-lg">
+                  <HelpCircle className="h-5 w-5 text-purple-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{questions.length}</p>
+                  <p className="text-xs text-muted-foreground">Questions</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-500/10 rounded-lg">
+                  <Users className="h-5 w-5 text-orange-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{sections.length}</p>
+                  <p className="text-xs text-muted-foreground">Sections</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid gap-6 lg:grid-cols-5">
+          {/* Quiz List - Left Panel */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Your Quizzes</h2>
+              <Badge variant="secondary">{quizzes.length} total</Badge>
+            </div>
+            
+            <ScrollArea className="h-[600px] pr-4">
+              {quizzes.length === 0 ? (
+                <Card className="border-dashed">
+                  <CardContent className="flex flex-col items-center justify-center py-16">
+                    <div className="p-4 bg-muted rounded-full mb-4">
+                      <ClipboardList className="h-8 w-8 text-muted-foreground" />
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    {quiz.description && <p className="text-sm text-muted-foreground mb-3">{quiz.description}</p>}
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openEditQuiz(quiz); }}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleDeleteQuiz(quiz.id); }}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
+                    <p className="font-medium text-muted-foreground">No quizzes yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">Create your first quiz to get started</p>
                   </CardContent>
                 </Card>
-              ))
-            )}
+              ) : (
+                <div className="space-y-3">
+                  {quizzes.map((quiz) => (
+                    <Card 
+                      key={quiz.id} 
+                      className={`cursor-pointer transition-all hover:shadow-md ${
+                        selectedQuiz?.id === quiz.id 
+                          ? 'border-primary bg-primary/5 shadow-sm' 
+                          : 'hover:border-primary/50'
+                      }`}
+                      onClick={() => selectQuiz(quiz)}
+                    >
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-1 min-w-0">
+                            <CardTitle className="text-base truncate">{quiz.title}</CardTitle>
+                            <CardDescription className="text-xs">
+                              <span className="flex items-center gap-1">
+                                <BookOpen className="h-3 w-3" />
+                                {quiz.sections?.name}
+                              </span>
+                            </CardDescription>
+                          </div>
+                          <Badge 
+                            variant={quiz.is_active ? 'default' : 'secondary'}
+                            className={quiz.is_active ? 'bg-green-500/10 text-green-600 border-green-200' : ''}
+                          >
+                            {quiz.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        {quiz.description && (
+                          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{quiz.description}</p>
+                        )}
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="flex-1"
+                            onClick={(e) => { e.stopPropagation(); openEditQuiz(quiz); }}
+                          >
+                            <Edit className="h-3.5 w-3.5 mr-1" />
+                            Edit
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={(e) => { e.stopPropagation(); handleDeleteQuiz(quiz.id); }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
           </div>
 
-          {/* Questions Section */}
-          <div className="space-y-4">
+          {/* Questions Panel - Right Side */}
+          <div className="lg:col-span-3 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">
-                {selectedQuiz ? `Questions: ${selectedQuiz.title}` : 'Select a Quiz'}
+                {selectedQuiz ? selectedQuiz.title : 'Select a Quiz'}
               </h2>
               {selectedQuiz && (
                 <Dialog open={questionDialogOpen} onOpenChange={(open) => { setQuestionDialogOpen(open); if (!open) resetQuestionForm(); }}>
@@ -435,16 +535,16 @@ const Quizzes = () => {
                   </DialogTrigger>
                   <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle>{editingQuestion ? 'Edit Question' : 'Add Question'}</DialogTitle>
+                      <DialogTitle>{editingQuestion ? 'Edit Question' : 'Add New Question'}</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-4 mt-4">
+                    <div className="space-y-4 pt-4">
                       <div className="space-y-2">
                         <Label>Reading Passage (Optional)</Label>
                         <Textarea value={readingPassage} onChange={(e) => setReadingPassage(e.target.value)} placeholder="Enter reading comprehension passage..." rows={4} />
                       </div>
                       <div className="space-y-2">
                         <Label>Question *</Label>
-                        <Textarea value={questionText} onChange={(e) => setQuestionText(e.target.value)} placeholder="Enter the question..." />
+                        <Textarea value={questionText} onChange={(e) => setQuestionText(e.target.value)} placeholder="Enter the question..." rows={2} />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
@@ -487,56 +587,98 @@ const Quizzes = () => {
               )}
             </div>
 
-            {!selectedQuiz ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">Select a quiz to manage questions</p>
-                </CardContent>
-              </Card>
-            ) : questions.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No questions yet</p>
-                  <p className="text-sm text-muted-foreground">Add your first question</p>
-                </CardContent>
-              </Card>
-            ) : (
-              questions.map((question, index) => (
-                <Card key={question.id}>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-base">Question {index + 1}</CardTitle>
-                      <Badge>Answer: {question.correct_answer}</Badge>
+            <ScrollArea className="h-[600px] pr-4">
+              {!selectedQuiz ? (
+                <Card className="border-dashed">
+                  <CardContent className="flex flex-col items-center justify-center py-20">
+                    <div className="p-4 bg-muted rounded-full mb-4">
+                      <HelpCircle className="h-8 w-8 text-muted-foreground" />
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {question.reading_passage && (
-                      <div className="bg-muted/50 p-3 rounded text-sm mb-2">
-                        <p className="font-medium mb-1">Reading Passage:</p>
-                        <p className="line-clamp-2">{question.reading_passage}</p>
-                      </div>
-                    )}
-                    <p className="font-medium">{question.question_text}</p>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <p>A. {question.option_a}</p>
-                      <p>B. {question.option_b}</p>
-                      <p>C. {question.option_c}</p>
-                      <p>D. {question.option_d}</p>
-                    </div>
-                    <div className="flex gap-2 mt-3">
-                      <Button variant="outline" size="sm" onClick={() => openEditQuestion(question)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDeleteQuestion(question.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
+                    <p className="font-medium text-muted-foreground">No quiz selected</p>
+                    <p className="text-sm text-muted-foreground mt-1">Select a quiz from the left to manage questions</p>
                   </CardContent>
                 </Card>
-              ))
-            )}
+              ) : questions.length === 0 ? (
+                <Card className="border-dashed">
+                  <CardContent className="flex flex-col items-center justify-center py-20">
+                    <div className="p-4 bg-muted rounded-full mb-4">
+                      <Plus className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <p className="font-medium text-muted-foreground">No questions yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">Add your first question to this quiz</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {questions.map((question, index) => (
+                    <Card key={question.id} className="overflow-hidden">
+                      <CardHeader className="pb-3 bg-muted/30">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-semibold text-sm">
+                              {index + 1}
+                            </div>
+                            <span className="font-medium">Question {index + 1}</span>
+                          </div>
+                          <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-200">
+                            Answer: {question.correct_answer}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-4 space-y-4">
+                        {question.reading_passage && (
+                          <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                            <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-2">📖 Reading Passage</p>
+                            <p className="text-sm line-clamp-3">{question.reading_passage}</p>
+                          </div>
+                        )}
+                        
+                        <p className="font-medium text-foreground">{question.question_text}</p>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {['A', 'B', 'C', 'D'].map((option) => {
+                            const optionValue = question[`option_${option.toLowerCase()}` as keyof QuizQuestion] as string;
+                            const isCorrect = question.correct_answer === option;
+                            return (
+                              <div 
+                                key={option}
+                                className={`p-3 rounded-lg border text-sm ${
+                                  isCorrect 
+                                    ? 'bg-green-500/10 border-green-300 dark:border-green-700' 
+                                    : 'bg-muted/30 border-border'
+                                }`}
+                              >
+                                <span className="font-semibold mr-2">{option}.</span>
+                                {optionValue}
+                                {isCorrect && <CheckCircle className="inline-block ml-2 h-4 w-4 text-green-500" />}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        
+                        <Separator />
+                        
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => openEditQuestion(question)}>
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteQuestion(question.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
           </div>
         </div>
       </div>
