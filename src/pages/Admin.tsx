@@ -9,7 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { UserPermissionsDialog } from '@/components/admin/UserPermissionsDialog';
 import { UserDetailsDialog } from '@/components/admin/UserDetailsDialog';
-import { RefreshCw, Shield, Users, Settings, Eye } from 'lucide-react';
+import { OnlineUsersPanel } from '@/components/admin/OnlineUsersPanel';
+import { ActivityFeed } from '@/components/admin/ActivityFeed';
+import { MessageInbox } from '@/components/admin/MessageInbox';
+import { SessionAnalytics } from '@/components/admin/SessionAnalytics';
+import { StudentManagement } from '@/components/admin/StudentManagement';
+import { RefreshCw, Shield, Users, Settings, Eye, GraduationCap, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface UserWithRole {
@@ -29,17 +34,20 @@ export default function Admin() {
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
   const [permDialogOpen, setPermDialogOpen] = useState(false);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [studentCount, setStudentCount] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
       // Fetch profiles, roles, and counts in parallel
-      const [profilesRes, rolesRes, sectionsRes, studentsRes, auditsRes] = await Promise.all([
+      const [profilesRes, rolesRes, sectionsRes, studentsRes, auditsRes, messagesRes] = await Promise.all([
         supabase.from('profiles').select('user_id, email, full_name'),
         supabase.from('user_roles').select('user_id, role'),
         supabase.from('sections').select('user_id'),
         supabase.from('students').select('user_id'),
         supabase.from('virtual_audits').select('user_id'),
+        supabase.from('messages').select('id').eq('recipient_type', 'admin').eq('is_read', false),
       ]);
 
       if (profilesRes.error) throw profilesRes.error;
@@ -76,6 +84,8 @@ export default function Admin() {
       });
 
       setUsers(usersWithRoles);
+      setStudentCount(studentsRes.data?.length || 0);
+      setUnreadMessages(messagesRes.data?.length || 0);
     } catch (error) {
       console.error('Error fetching users:', error);
       toast.error('Failed to load users');
@@ -114,7 +124,7 @@ export default function Admin() {
               <Shield className="h-6 w-6 text-primary" />
               Admin Dashboard
             </h1>
-            <p className="text-muted-foreground">Manage users and their permissions</p>
+            <p className="text-muted-foreground">Monitor activity, manage users, and view analytics</p>
           </div>
           <Button variant="outline" onClick={fetchUsers} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -123,7 +133,7 @@ export default function Admin() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -155,7 +165,39 @@ export default function Admin() {
               </div>
             </CardContent>
           </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Students</CardTitle>
+              <GraduationCap className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{studentCount}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Unread Messages</CardTitle>
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{unreadMessages}</div>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Activity & Analytics Grid */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          <OnlineUsersPanel />
+          <ActivityFeed />
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <MessageInbox />
+          <SessionAnalytics />
+        </div>
+
+        {/* Student Management */}
+        <StudentManagement />
 
         {/* Users Table */}
         <Card>

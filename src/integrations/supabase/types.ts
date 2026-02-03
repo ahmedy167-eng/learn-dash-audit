@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          student_id: string | null
+          user_id: string | null
+          user_type: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          student_id?: string | null
+          user_id?: string | null
+          user_type: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          student_id?: string | null
+          user_id?: string | null
+          user_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ca_projects: {
         Row: {
           created_at: string
@@ -296,6 +340,66 @@ export type Database = {
           {
             foreignKeyName: "lms_progress_student_id_fkey"
             columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_read: boolean | null
+          read_at: string | null
+          recipient_student_id: string | null
+          recipient_type: string
+          recipient_user_id: string | null
+          sender_student_id: string | null
+          sender_type: string
+          sender_user_id: string | null
+          subject: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          read_at?: string | null
+          recipient_student_id?: string | null
+          recipient_type: string
+          recipient_user_id?: string | null
+          sender_student_id?: string | null
+          sender_type: string
+          sender_user_id?: string | null
+          subject?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          read_at?: string | null
+          recipient_student_id?: string | null
+          recipient_type?: string
+          recipient_user_id?: string | null
+          sender_student_id?: string | null
+          sender_type?: string
+          sender_user_id?: string | null
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_recipient_student_id_fkey"
+            columns: ["recipient_student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_sender_student_id_fkey"
+            columns: ["sender_student_id"]
             isOneToOne: false
             referencedRelation: "students"
             referencedColumns: ["id"]
@@ -591,6 +695,50 @@ export type Database = {
         }
         Relationships: []
       }
+      student_notices: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_read: boolean | null
+          notice_type: string
+          posted_by: string
+          read_at: string | null
+          student_id: string
+          title: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          notice_type: string
+          posted_by: string
+          read_at?: string | null
+          student_id: string
+          title: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean | null
+          notice_type?: string
+          posted_by?: string
+          read_at?: string | null
+          student_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_notices_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       students: {
         Row: {
           absent_count: number | null
@@ -602,6 +750,7 @@ export type Database = {
           finish_class_time: string | null
           full_name: string
           id: string
+          is_active: boolean | null
           late_count: number | null
           notes: string | null
           off_days: string[] | null
@@ -625,6 +774,7 @@ export type Database = {
           finish_class_time?: string | null
           full_name: string
           id?: string
+          is_active?: boolean | null
           late_count?: number | null
           notes?: string | null
           off_days?: string[] | null
@@ -648,6 +798,7 @@ export type Database = {
           finish_class_time?: string | null
           full_name?: string
           id?: string
+          is_active?: boolean | null
           late_count?: number | null
           notes?: string | null
           off_days?: string[] | null
@@ -763,6 +914,50 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_sessions: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          login_at: string
+          logout_at: string | null
+          session_duration_minutes: number | null
+          student_id: string | null
+          user_id: string | null
+          user_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          login_at?: string
+          logout_at?: string | null
+          session_duration_minutes?: number | null
+          student_id?: string | null
+          user_id?: string | null
+          user_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          login_at?: string
+          logout_at?: string | null
+          session_duration_minutes?: number | null
+          student_id?: string | null
+          user_id?: string | null
+          user_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_sessions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       virtual_audits: {
         Row: {

@@ -12,9 +12,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Users, Loader2, Plus, Pencil, Trash2, ClipboardList, Search, MessageSquare, Download, Upload, FileSpreadsheet } from 'lucide-react';
+import { Users, Loader2, Plus, Pencil, Trash2, ClipboardList, Search, MessageSquare, Download, Upload, FileSpreadsheet, Filter, Bell } from 'lucide-react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { WeekCalendar } from '@/components/register/WeekCalendar';
+import { AdvancedSearchFilters } from '@/components/register/AdvancedSearchFilters';
+import { PostNoticeDialog } from '@/components/register/PostNoticeDialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +36,7 @@ interface Section {
   section_number: string | null;
   course: string | null;
   category: string | null;
+  teaching_days: string[] | null;
 }
 
 interface Student {
@@ -75,6 +79,13 @@ export default function Register() {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Advanced search and notice dialogs
+  const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
+  const [noticeDialogOpen, setNoticeDialogOpen] = useState(false);
+  const [noticeStudent, setNoticeStudent] = useState<Student | null>(null);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date>(new Date());
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
+
   useEffect(() => {
     fetchSections();
   }, []);
@@ -91,7 +102,7 @@ export default function Register() {
     try {
       const { data, error } = await supabase
         .from('sections')
-        .select('id, name, section_number, course, category')
+        .select('id, name, section_number, course, category, teaching_days')
         .order('name');
 
       if (error) throw error;
@@ -103,6 +114,23 @@ export default function Register() {
       setLoading(false);
     }
   };
+
+  // Fetch all students for advanced search
+  const fetchAllStudents = async () => {
+    try {
+      const { data } = await supabase
+        .from('students')
+        .select('id, full_name, student_id, section_id, section_number, course, present_count, late_count, absent_count, notes')
+        .order('full_name');
+      setAllStudents(data || []);
+    } catch (error) {
+      console.error('Error fetching all students:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllStudents();
+  }, []);
 
   const fetchStudentsForSection = async (sectionId: string) => {
     setStudentsLoading(true);
@@ -401,6 +429,23 @@ export default function Register() {
           </div>
           <Button variant="outline" onClick={() => navigate('/sections')}>
             Manage Sections
+          </Button>
+        </div>
+
+        {/* Week Calendar */}
+        {selectedSection && (
+          <WeekCalendar 
+            teachingDays={selectedSection.teaching_days || []}
+            selectedDate={selectedCalendarDate}
+            onDateSelect={setSelectedCalendarDate}
+          />
+        )}
+
+        {/* Advanced Search Button */}
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setAdvancedSearchOpen(true)}>
+            <Filter className="mr-2 h-4 w-4" />
+            Advanced Search
           </Button>
         </div>
 
@@ -738,6 +783,33 @@ export default function Register() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Advanced Search Dialog */}
+        <AdvancedSearchFilters
+          open={advancedSearchOpen}
+          onOpenChange={setAdvancedSearchOpen}
+          students={allStudents as any}
+          sections={sections}
+          onViewStudent={(student) => {
+            const section = sections.find(s => s.id === student.section_id);
+            if (section) {
+              handleSectionChange(section.id);
+            }
+            setAdvancedSearchOpen(false);
+          }}
+          onPostNotice={(student) => {
+            setNoticeStudent(student as any);
+            setNoticeDialogOpen(true);
+            setAdvancedSearchOpen(false);
+          }}
+        />
+
+        {/* Post Notice Dialog */}
+        <PostNoticeDialog
+          open={noticeDialogOpen}
+          onOpenChange={setNoticeDialogOpen}
+          student={noticeStudent}
+        />
       </div>
     </DashboardLayout>
   );
