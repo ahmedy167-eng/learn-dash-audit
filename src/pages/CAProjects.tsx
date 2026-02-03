@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Plus, Trash2, Edit, FolderOpen, Upload, Download, Loader2, MessageSquare, FileText, CalendarIcon, CheckCircle, Clock, Users } from 'lucide-react';
+import { Plus, Trash2, Edit, FolderOpen, Upload, Download, Loader2, MessageSquare, FileText, CalendarIcon, CheckCircle, Clock, Users, Search, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -94,6 +94,11 @@ const CAProjects = () => {
   // Feedback states
   const [selectedSubmission, setSelectedSubmission] = useState<CASubmission | null>(null);
   const [feedbackText, setFeedbackText] = useState('');
+
+  // Progress dialog states
+  const [progressDialogOpen, setProgressDialogOpen] = useState(false);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [selectedStudentProgress, setSelectedStudentProgress] = useState<Student | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -369,6 +374,17 @@ const CAProjects = () => {
     return Array.from(studentMap.values()).sort((a, b) => a.full_name.localeCompare(b.full_name));
   };
 
+  const getFilteredStudents = () => {
+    const students = getUniqueStudents();
+    if (!studentSearch.trim()) return students;
+    
+    const search = studentSearch.toLowerCase().trim();
+    return students.filter(s => 
+      s.full_name.toLowerCase().includes(search) ||
+      s.student_id.toLowerCase().includes(search)
+    );
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -623,71 +639,147 @@ const CAProjects = () => {
               </Card>
             ) : (
               <>
-                {/* Student Progress Overview */}
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Student Progress Overview
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {getUniqueStudents().length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">No students in this section</p>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="min-w-[120px]">Student</TableHead>
-                              <TableHead className="min-w-[80px]">ID</TableHead>
-                              {stages.map(s => (
-                                <TableHead key={s.value} className="text-center min-w-[60px]">
-                                  {s.label.split(' ')[0]}
-                                </TableHead>
-                              ))}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {getUniqueStudents().map(student => (
-                              <TableRow key={student.id}>
-                                <TableCell className="font-medium text-sm">{student.full_name}</TableCell>
-                                <TableCell className="text-sm text-muted-foreground">{student.student_id}</TableCell>
-                                {stages.map(s => {
-                                  const sub = submissions.find(sub => 
-                                    sub.student_id === student.id && sub.stage === s.value
-                                  );
-                                  return (
-                                    <TableCell key={s.value} className="text-center">
-                                      {sub ? (
-                                        sub.feedback ? 
-                                          <CheckCircle className="h-4 w-4 text-green-500 mx-auto" /> : 
-                                          <Clock className="h-4 w-4 text-yellow-500 mx-auto" />
-                                      ) : (
-                                        <span className="text-muted-foreground">—</span>
-                                      )}
-                                    </TableCell>
-                                  );
-                                })}
-                              </TableRow>
+                {/* Student Progress Overview - Trigger Button */}
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-between h-auto py-4 px-6 border-2 border-dashed hover:border-primary hover:bg-primary/5 transition-all group"
+                  onClick={() => setProgressDialogOpen(true)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                      <Users className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-semibold text-foreground">Student Progress Overview</p>
+                      <p className="text-sm text-muted-foreground">{getUniqueStudents().length} students enrolled</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                </Button>
+
+                {/* Student Progress Overview Dialog */}
+                <Dialog open={progressDialogOpen} onOpenChange={setProgressDialogOpen}>
+                  <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2 text-xl">
+                        <Users className="h-5 w-5 text-primary" />
+                        Student Progress Overview
+                      </DialogTitle>
+                      <DialogDescription>
+                        Track submission status for {selectedProject?.title}
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    {/* Search Bar */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search by name or student ID..."
+                        value={studentSearch}
+                        onChange={(e) => setStudentSearch(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    
+                    {/* Progress Table */}
+                    <div className="flex-1 overflow-y-auto border rounded-lg">
+                      <Table>
+                        <TableHeader className="sticky top-0 bg-background">
+                          <TableRow>
+                            <TableHead className="min-w-[200px]">Student</TableHead>
+                            <TableHead className="min-w-[100px]">ID</TableHead>
+                            {stages.map(s => (
+                              <TableHead key={s.value} className="text-center min-w-[80px]">
+                                {s.label.split(' ')[0]}
+                              </TableHead>
                             ))}
-                          </TableBody>
-                        </Table>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {getFilteredStudents().map(student => (
+                            <TableRow 
+                              key={student.id}
+                              className="cursor-pointer hover:bg-muted/50"
+                              onClick={() => setSelectedStudentProgress(student)}
+                            >
+                              <TableCell className="font-medium">{student.full_name}</TableCell>
+                              <TableCell className="text-muted-foreground">{student.student_id}</TableCell>
+                              {stages.map(s => {
+                                const sub = submissions.find(sub => 
+                                  sub.student_id === student.id && sub.stage === s.value
+                                );
+                                return (
+                                  <TableCell key={s.value} className="text-center">
+                                    {sub ? (
+                                      sub.feedback ? 
+                                        <CheckCircle className="h-4 w-4 text-green-500 mx-auto" /> : 
+                                        <Clock className="h-4 w-4 text-yellow-500 mx-auto" />
+                                    ) : (
+                                      <span className="text-muted-foreground">—</span>
+                                    )}
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      
+                      {getFilteredStudents().length === 0 && (
+                        <div className="py-12 text-center text-muted-foreground">
+                          <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <p>No students found matching "{studentSearch}"</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Legend */}
+                    <div className="flex gap-6 pt-3 border-t text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-500" /> Reviewed
                       </div>
-                    )}
-                    <div className="flex gap-4 mt-3 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <CheckCircle className="h-3 w-3 text-green-500" /> Reviewed
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-yellow-500" /> Pending Review
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-yellow-500" /> Pending Review
-                      </div>
-                      <div className="flex items-center gap-1">
-                        — Not Submitted
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">—</span> Not Submitted
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Individual Student Progress Dialog */}
+                <Dialog 
+                  open={!!selectedStudentProgress} 
+                  onOpenChange={(open) => !open && setSelectedStudentProgress(null)}
+                >
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>{selectedStudentProgress?.full_name}</DialogTitle>
+                      <DialogDescription>ID: {selectedStudentProgress?.student_id}</DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="space-y-3">
+                      {stages.map(stage => {
+                        const sub = submissions.find(s => 
+                          s.student_id === selectedStudentProgress?.id && s.stage === stage.value
+                        );
+                        return (
+                          <div key={stage.value} className="flex items-center justify-between p-3 border rounded-lg">
+                            <span className="font-medium">{stage.label}</span>
+                            {sub ? (
+                              <Badge variant={sub.feedback ? 'default' : 'secondary'}>
+                                {sub.feedback ? 'Reviewed' : 'Pending'}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">Not Submitted</Badge>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </DialogContent>
+                </Dialog>
 
                 {/* Submissions by Stage */}
                 {submissions.length === 0 ? (
