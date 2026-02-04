@@ -31,44 +31,15 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [loadingRecipients, setLoadingRecipients] = useState(false);
 
-  // Fetch all teachers and admins when dialog opens
+  // Fetch only the student's assigned teacher when dialog opens
   useEffect(() => {
     const fetchRecipients = async () => {
-      if (!open) return;
+      if (!open || !student) return;
 
       setLoadingRecipients(true);
       try {
-        // Get all section owners (teachers)
-        const { data: sections } = await supabase
-          .from('sections')
-          .select('user_id');
-
-        const teacherIds = [...new Set(sections?.map(s => s.user_id) || [])];
-
-        // Get all admin user IDs
-        const { data: adminRoles } = await supabase
-          .from('user_roles')
-          .select('user_id')
-          .eq('role', 'admin');
-
-        const adminIds = adminRoles?.map(r => r.user_id) || [];
-
-        // Combine unique IDs
-        const allUserIds = [...new Set([...teacherIds, ...adminIds])];
-
-        // Fetch profiles for these users
-        let profiles: { user_id: string; full_name: string | null }[] = [];
-        if (allUserIds.length > 0) {
-          const { data: profilesData } = await supabase
-            .from('profiles')
-            .select('user_id, full_name')
-            .in('user_id', allUserIds);
-          profiles = profilesData || [];
-        }
-
-        // Build recipient list
+        // Build recipient list - always start with general admin option
         const recipientList: Recipient[] = [
-          // Always include general admin option first
           {
             user_id: 'general',
             full_name: null,
@@ -77,37 +48,36 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
           },
         ];
 
-        // Add teachers (users who own sections)
-        const teachers = profiles.filter(p => teacherIds.includes(p.user_id));
-        teachers.forEach(t => {
-          recipientList.push({
-            user_id: t.user_id,
-            full_name: t.full_name,
-            type: 'teacher',
-            label: t.full_name || 'Unknown Teacher',
-          });
-        });
+        // Only fetch the student's assigned teacher if they have a section
+        if (student.section_id) {
+          const { data: section } = await supabase
+            .from('sections')
+            .select('user_id')
+            .eq('id', student.section_id)
+            .single();
 
-        // Add admins (separate from teachers, even if same person)
-        const admins = profiles.filter(p => adminIds.includes(p.user_id));
-        admins.forEach(a => {
-          // Avoid duplicating if person is both teacher and admin
-          const alreadyAsTeacher = recipientList.some(
-            r => r.user_id === a.user_id && r.type === 'teacher'
-          );
-          if (!alreadyAsTeacher) {
-            recipientList.push({
-              user_id: a.user_id,
-              full_name: a.full_name,
-              type: 'admin',
-              label: `${a.full_name || 'Admin'} (Administrator)`,
-            });
+          if (section?.user_id) {
+            const { data: teacherProfile } = await supabase
+              .from('profiles')
+              .select('user_id, full_name')
+              .eq('user_id', section.user_id)
+              .single();
+
+            if (teacherProfile) {
+              recipientList.push({
+                user_id: teacherProfile.user_id,
+                full_name: teacherProfile.full_name,
+                type: 'teacher',
+                label: teacherProfile.full_name || 'My Teacher',
+              });
+            }
           }
-        });
+        }
 
         setRecipients(recipientList);
-        // Set default to general admin
-        setSelectedRecipientId('general');
+        // Set default to teacher if available, otherwise general admin
+        const teacherRecipient = recipientList.find(r => r.type === 'teacher');
+        setSelectedRecipientId(teacherRecipient?.user_id || 'general');
       } catch (error) {
         console.error('Error fetching recipients:', error);
         // Fallback to general admin only
@@ -126,7 +96,7 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
     };
 
     fetchRecipients();
-  }, [open]);
+  }, [open, student]);
 
   // Reset form when dialog closes
   useEffect(() => {
