@@ -72,7 +72,7 @@ const StudentPortal = () => {
             />
             <Button onClick={() => setMessageDialogOpen(true)}>
               <MessageSquare className="h-4 w-4 mr-2" />
-              Message Admin
+              Send Message
             </Button>
           </div>
         </div>
