@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions, FeatureKey } from '@/hooks/usePermissions';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { 
   LayoutDashboard, 
   Users, 
@@ -10,7 +11,6 @@ import {
   Calendar, 
   BookOpen, 
   CheckSquare, 
-  CalendarOff,
   ClipboardList,
   ChevronLeft,
   ChevronRight,
@@ -125,18 +125,18 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* Help section */}
-      {!collapsed && (
-        <div className="p-4 mx-2 mb-2 bg-accent/50 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <HelpCircle className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Need help?</span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Check our documentation for quick guides and tips.
-          </p>
+      {/* Theme toggle and help */}
+      <div className="p-2 border-t border-border">
+        <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between px-2")}>
+          <ThemeToggle />
+          {!collapsed && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <HelpCircle className="h-4 w-4" />
+              <span>Need help?</span>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Logout */}
       <div className="p-2 border-t border-border">
