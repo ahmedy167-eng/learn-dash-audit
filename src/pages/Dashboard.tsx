@@ -153,7 +153,7 @@ export default function Dashboard() {
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {statsCards.map((stat) => (
-            <Card key={stat.title}>
+            <Card key={stat.title} className="min-h-[120px]">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>

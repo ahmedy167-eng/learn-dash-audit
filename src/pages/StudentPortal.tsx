@@ -117,16 +117,16 @@ const StudentPortal = () => {
         <h2 className="text-xl font-semibold mb-4">Quick Access</h2>
         <div className="grid gap-4 md:grid-cols-3">
           {sections.map((section) => (
-            <Link key={section.title} to={section.href}>
-              <Card className="h-full hover:border-primary/50 transition-colors cursor-pointer">
-                <CardHeader>
+            <Link key={section.title} to={section.href} className="block h-full">
+              <Card className="h-full flex flex-col hover:border-primary/50 transition-colors cursor-pointer">
+                <CardHeader className="pb-4">
                   <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${section.color}`}>
                     <section.icon className="w-6 h-6" />
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <CardTitle className="text-lg mb-1">{section.title}</CardTitle>
-                  <CardDescription>{section.description}</CardDescription>
+                <CardContent className="flex-1 flex flex-col">
+                  <CardTitle className="text-lg mb-2">{section.title}</CardTitle>
+                  <CardDescription className="line-clamp-2">{section.description}</CardDescription>
                 </CardContent>
               </Card>
             </Link>
