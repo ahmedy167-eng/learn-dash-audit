@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, BookOpen, CheckSquare, Clock, Plus, AlertTriangle } from 'lucide-react';
+import { MessageInbox } from '@/components/admin/MessageInbox';
 import { format, isToday, isPast, isThisWeek, parseISO } from 'date-fns';
 import { Link } from 'react-router-dom';
 
@@ -170,6 +171,9 @@ export default function Dashboard() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
+          {/* Message Inbox for Teachers */}
+          <MessageInbox />
+
           {/* Overdue Tasks */}
           {overdueTasks.length > 0 && (
             <Card className="border-destructive/50">
