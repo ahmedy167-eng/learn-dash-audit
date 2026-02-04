@@ -46,21 +46,26 @@ export default function Dashboard() {
   }, [user]);
 
   const fetchDashboardData = async () => {
+    if (!user) return;
+    
     try {
-      // Fetch students count
+      // Fetch students count - only for current user's students
       const { count: studentsCount } = await supabase
         .from('students')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
 
-      // Fetch schedules count (active classes)
+      // Fetch schedules count (active classes) - only for current user
       const { count: schedulesCount } = await supabase
         .from('schedules')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
 
-      // Fetch all tasks
+      // Fetch tasks - only for current user
       const { data: tasksData } = await supabase
         .from('tasks')
         .select('*')
+        .eq('user_id', user.id)
         .eq('is_completed', false)
         .order('due_date', { ascending: true });
 
@@ -77,10 +82,11 @@ export default function Dashboard() {
         todayTasks: todayCount,
       });
 
-      // Fetch all tasks for display
+      // Fetch tasks for display - only for current user
       const { data: allTasksData } = await supabase
         .from('tasks')
         .select('*')
+        .eq('user_id', user.id)
         .order('due_date', { ascending: true })
         .limit(20);
 
