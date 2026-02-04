@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, BookOpen, CheckSquare, Clock, Plus, AlertTriangle } from 'lucide-react';
-import { MessageInbox } from '@/components/admin/MessageInbox';
+import { TeacherMessagesDropdown } from '@/components/layout/TeacherMessagesDropdown';
 import { format, isToday, isPast, isThisWeek, parseISO } from 'date-fns';
 import { Link } from 'react-router-dom';
 
@@ -38,12 +38,40 @@ export default function Dashboard() {
   });
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [teacherName, setTeacherName] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       fetchDashboardData();
+      fetchTeacherProfile();
     }
   }, [user]);
+
+  const fetchTeacherProfile = async () => {
+    if (!user) return;
+    
+    // Try user_metadata first (set during signup)
+    const metaName = user.user_metadata?.full_name;
+    if (metaName) {
+      setTeacherName(metaName);
+      return;
+    }
+    
+    // Fallback to profiles table
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (data?.full_name) {
+        setTeacherName(data.full_name);
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
+  };
 
   const fetchDashboardData = async () => {
     if (!user) return;
@@ -147,14 +175,19 @@ export default function Dashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground">Welcome back! Here's your overview.</p>
+            <p className="text-muted-foreground">
+              Welcome back{teacherName ? `, ${teacherName}` : ''}! Here's your overview.
+            </p>
           </div>
-          <Link to="/tasks">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Task
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <TeacherMessagesDropdown />
+            <Link to="/tasks">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                New Task
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -177,9 +210,6 @@ export default function Dashboard() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Message Inbox for Teachers */}
-          <MessageInbox />
-
           {/* Overdue Tasks */}
           {overdueTasks.length > 0 && (
             <Card className="border-destructive/50">
