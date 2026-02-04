@@ -69,15 +69,19 @@ export default function Students() {
   const [formCategory, setFormCategory] = useState('Regular');
 
   useEffect(() => {
-    fetchStudents();
-    fetchSections();
-  }, []);
+    if (user?.id) {
+      fetchStudents();
+      fetchSections();
+    }
+  }, [user?.id]);
 
   const fetchSections = async () => {
+    if (!user?.id) return;
     try {
       const { data, error } = await supabase
         .from('sections')
         .select('id, name, section_number, course')
+        .eq('user_id', user.id)
         .order('name');
 
       if (error) throw error;
@@ -88,10 +92,12 @@ export default function Students() {
   };
 
   const fetchStudents = async () => {
+    if (!user?.id) return;
     try {
       const { data, error } = await supabase
         .from('students')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

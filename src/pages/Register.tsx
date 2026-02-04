@@ -92,8 +92,10 @@ export default function Register() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   useEffect(() => {
-    fetchSections();
-  }, []);
+    if (user?.id) {
+      fetchSections();
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (selectedSectionId) {
@@ -106,10 +108,12 @@ export default function Register() {
   }, [selectedSectionId]);
 
   const fetchSections = async () => {
+    if (!user?.id) return;
     try {
       const { data, error } = await supabase
         .from('sections')
         .select('id, name, section_number, course, category, teaching_days')
+        .eq('user_id', user.id)
         .order('name');
 
       if (error) throw error;
@@ -122,12 +126,14 @@ export default function Register() {
     }
   };
 
-  // Fetch all students for advanced search
+  // Fetch all students for advanced search (only current teacher's students)
   const fetchAllStudents = async () => {
+    if (!user?.id) return;
     try {
       const { data } = await supabase
         .from('students')
         .select('id, full_name, student_id, section_id, section_number, course, present_count, late_count, absent_count, notes')
+        .eq('user_id', user.id)
         .order('full_name');
       setAllStudents(data || []);
     } catch (error) {

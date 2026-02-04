@@ -45,23 +45,28 @@ export default function Sections() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchSections();
-  }, []);
+    if (user?.id) {
+      fetchSections();
+    }
+  }, [user?.id]);
 
   const fetchSections = async () => {
+    if (!user?.id) return;
     try {
-      // Fetch sections
+      // Fetch only current teacher's sections
       const { data: sectionsData, error: sectionsError } = await supabase
         .from('sections')
         .select('*')
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (sectionsError) throw sectionsError;
 
-      // Fetch student counts for each section
+      // Fetch student counts for current teacher's students only
       const { data: studentsData, error: studentsError } = await supabase
         .from('students')
-        .select('section_id');
+        .select('section_id')
+        .eq('user_id', user.id);
 
       if (studentsError) throw studentsError;
 
