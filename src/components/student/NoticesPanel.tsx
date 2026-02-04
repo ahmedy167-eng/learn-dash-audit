@@ -37,7 +37,10 @@ export function NoticesPanel() {
   const [loading, setLoading] = useState(true);
 
   const fetchNotices = useCallback(async () => {
-    if (!student || !getSessionToken()) return;
+    if (!student || !getSessionToken()) {
+      setLoading(false);
+      return;
+    }
 
     try {
       const { data, error } = await getData<Notice[]>('notices');
@@ -52,6 +55,11 @@ export function NoticesPanel() {
   }, [student, getData, getSessionToken]);
 
   useEffect(() => {
+    if (!student || !getSessionToken()) {
+      setLoading(false);
+      return;
+    }
+
     fetchNotices();
 
     // Poll for new notices every 30 seconds
@@ -60,7 +68,7 @@ export function NoticesPanel() {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [fetchNotices]);
+  }, [fetchNotices, getSessionToken, student]);
 
   const markAsRead = async (noticeId: string) => {
     try {

@@ -31,7 +31,10 @@ export function useStudentMessages(
   const { getData, performAction, getSessionToken } = useStudentApi();
 
   const fetchMessages = useCallback(async () => {
-    if (!studentId || !getSessionToken()) return;
+    if (!studentId || !getSessionToken()) {
+      setLoading(false);
+      return;
+    }
 
     try {
       const { data, error } = await getData<Message[]>('messages');
@@ -86,7 +89,10 @@ export function useStudentMessages(
 
   // Fetch messages on mount and when studentId changes
   useEffect(() => {
-    if (!studentId) return;
+    if (!studentId || !getSessionToken()) {
+      setLoading(false);
+      return;
+    }
 
     fetchMessages();
 
@@ -96,7 +102,7 @@ export function useStudentMessages(
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [studentId, fetchMessages]);
+  }, [studentId, fetchMessages, getSessionToken]);
 
   return {
     messages,
