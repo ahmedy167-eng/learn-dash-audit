@@ -1,1 +1,4 @@
 project_id = "bhspeoledfydylvonobv"
+
+[functions.student-auth]
+verify_jwt = false
