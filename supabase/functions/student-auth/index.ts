@@ -510,18 +510,67 @@ Deno.serve(async (req) => {
         }
 
         case 'send_message': {
-          const { recipientUserId, subject, content } = actionData as {
-            recipientUserId: string
+          const { recipientType, recipientUserId, subject, content } = actionData as {
+            recipientType: 'admin' | 'teacher'
+            recipientUserId: string | null
             subject: string
             content: string
           }
+
+          // Validate recipient authorization
+          if (recipientUserId) {
+            // Get student's section to find assigned teacher
+            const { data: student } = await supabaseAdmin
+              .from('students')
+              .select('section_id')
+              .eq('id', studentId)
+              .single()
+
+            let isAuthorized = false
+
+            // Check if recipient is assigned teacher
+            if (student?.section_id) {
+              const { data: section } = await supabaseAdmin
+                .from('sections')
+                .select('user_id')
+                .eq('id', student.section_id)
+                .single()
+
+              if (section?.user_id === recipientUserId) {
+                isAuthorized = true
+              }
+            }
+
+            // Check if recipient is an admin
+            if (!isAuthorized) {
+              const { data: adminRole } = await supabaseAdmin
+                .from('user_roles')
+                .select('id')
+                .eq('user_id', recipientUserId)
+                .eq('role', 'admin')
+                .single()
+
+              if (adminRole) {
+                isAuthorized = true
+              }
+            }
+
+            if (!isAuthorized) {
+              return new Response(
+                JSON.stringify({ error: 'You are not authorized to message this recipient' }),
+                { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              )
+            }
+          }
+
+          // For general admin messages (recipientUserId = null), always allowed
           const insertResult = await supabaseAdmin
             .from('messages')
             .insert([{
               sender_student_id: studentId,
               sender_type: 'student',
               recipient_user_id: recipientUserId,
-              recipient_type: 'teacher',
+              recipient_type: recipientType,
               subject,
               content,
             }])
@@ -669,6 +718,100 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ data: teacher }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Get allowed message recipients for student (assigned teacher + admins)
+    if (action === 'get-recipients' && req.method === 'POST') {
+      const { sessionToken } = await req.json()
+
+      const session = await validateSession(sessionToken)
+      if (!session) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid or expired session' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const recipients: Array<{
+        user_id: string | null
+        full_name: string | null
+        type: 'general_admin' | 'admin' | 'teacher'
+        label: string
+      }> = []
+
+      // Always add general admin option
+      recipients.push({
+        user_id: null,
+        full_name: null,
+        type: 'general_admin',
+        label: 'Administrator (General Inquiries)',
+      })
+
+      // Get student's section
+      const { data: student } = await supabaseAdmin
+        .from('students')
+        .select('section_id')
+        .eq('id', session.student_id)
+        .single()
+
+      // Get assigned teacher if student has a section
+      if (student?.section_id) {
+        const { data: section } = await supabaseAdmin
+          .from('sections')
+          .select('user_id')
+          .eq('id', student.section_id)
+          .single()
+
+        if (section?.user_id) {
+          const { data: teacher } = await supabaseAdmin
+            .from('profiles')
+            .select('user_id, full_name')
+            .eq('user_id', section.user_id)
+            .single()
+
+          if (teacher) {
+            recipients.push({
+              user_id: teacher.user_id,
+              full_name: teacher.full_name,
+              type: 'teacher',
+              label: teacher.full_name || 'My Teacher',
+            })
+          }
+        }
+      }
+
+      // Get all admins
+      const { data: adminRoles } = await supabaseAdmin
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'admin')
+
+      if (adminRoles && adminRoles.length > 0) {
+        const adminUserIds = adminRoles.map(r => r.user_id)
+        
+        const { data: adminProfiles } = await supabaseAdmin
+          .from('profiles')
+          .select('user_id, full_name')
+          .in('user_id', adminUserIds)
+
+        if (adminProfiles) {
+          for (const admin of adminProfiles) {
+            recipients.push({
+              user_id: admin.user_id,
+              full_name: admin.full_name,
+              type: 'admin',
+              label: admin.full_name || 'Administrator',
+            })
+          }
+        }
+      }
+
+      console.log(`[student-auth] get-recipients: returning ${recipients.length} recipients`)
+
+      return new Response(
+        JSON.stringify({ data: recipients }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }

@@ -23,6 +23,13 @@ interface TeacherInfo {
   full_name: string;
 }
 
+interface Recipient {
+  user_id: string | null;
+  full_name: string | null;
+  type: 'general_admin' | 'admin' | 'teacher';
+  label: string;
+}
+
 type DataType = 'profile' | 'messages' | 'notices' | 'quizzes' | 'quiz_questions' | 'quiz_submissions' | 'lms_progress' | 'ca_projects' | 'ca_submissions' | 'sections';
 
 type ActionType = 'submit_quiz' | 'submit_ca' | 'update_ca' | 'send_message' | 'mark_message_read' | 'mark_notice_read' | 'mark_all_messages_read';
@@ -174,6 +181,32 @@ export function useStudentApi() {
     }
   }, [getSessionToken]);
 
+  const getRecipients = useCallback(async (): Promise<{ data: Recipient[] | null; error: Error | null }> => {
+    const sessionToken = getSessionToken();
+    
+    if (!sessionToken) {
+      return { data: null, error: new Error('Not authenticated') };
+    }
+
+    try {
+      const response = await fetch(`${STUDENT_AUTH_URL}/get-recipients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionToken }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: new Error(result.error || 'Failed to fetch recipients') };
+      }
+
+      return { data: result.data, error: null };
+    } catch (err) {
+      return { data: null, error: err instanceof Error ? err : new Error('Network error') };
+    }
+  }, [getSessionToken]);
+
   const isSessionValid = useCallback(() => {
     const token = getSessionToken();
     const expiresAt = sessionStorage.getItem('sessionExpiresAt');
@@ -189,6 +222,7 @@ export function useStudentApi() {
     getData,
     performAction,
     getTeacher,
+    getRecipients,
     getSessionToken,
     isSessionValid,
   };

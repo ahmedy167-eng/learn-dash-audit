@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
+import { useStudentApi } from '@/hooks/useStudentApi';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ interface MessageAdminDialogProps {
 }
 
 interface Recipient {
-  user_id: string;
+  user_id: string | null;
   full_name: string | null;
   type: 'general_admin' | 'admin' | 'teacher';
   label: string;
@@ -24,6 +24,7 @@ interface Recipient {
 
 export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogProps) {
   const { student } = useStudentAuth();
+  const { getRecipients, performAction } = useStudentApi();
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
   const [sending, setSending] = useState(false);
@@ -31,60 +32,42 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [loadingRecipients, setLoadingRecipients] = useState(false);
 
-  // Fetch only the student's assigned teacher when dialog opens
+  // Fetch recipients securely via Edge Function when dialog opens
   useEffect(() => {
     const fetchRecipients = async () => {
       if (!open || !student) return;
 
       setLoadingRecipients(true);
       try {
-        // Build recipient list - always start with general admin option
-        const recipientList: Recipient[] = [
-          {
-            user_id: 'general',
-            full_name: null,
-            type: 'general_admin',
-            label: 'Administrator (General Inquiries)',
-          },
-        ];
+        const { data, error } = await getRecipients();
 
-        // Only fetch the student's assigned teacher if they have a section
-        if (student.section_id) {
-          const { data: section } = await supabase
-            .from('sections')
-            .select('user_id')
-            .eq('id', student.section_id)
-            .single();
-
-          if (section?.user_id) {
-            // Use the public view that doesn't expose email addresses
-            const { data: teacherProfile } = await supabase
-              .from('teacher_public_info')
-              .select('user_id, full_name')
-              .eq('user_id', section.user_id)
-              .single();
-
-            if (teacherProfile) {
-              recipientList.push({
-                user_id: teacherProfile.user_id,
-                full_name: teacherProfile.full_name,
-                type: 'teacher',
-                label: teacherProfile.full_name || 'My Teacher',
-              });
-            }
-          }
+        if (error) {
+          console.error('Error fetching recipients:', error);
+          // Fallback to general admin only
+          setRecipients([
+            {
+              user_id: null,
+              full_name: null,
+              type: 'general_admin',
+              label: 'Administrator (General Inquiries)',
+            },
+          ]);
+          setSelectedRecipientId('general');
+          return;
         }
 
-        setRecipients(recipientList);
-        // Set default to teacher if available, otherwise general admin
-        const teacherRecipient = recipientList.find(r => r.type === 'teacher');
-        setSelectedRecipientId(teacherRecipient?.user_id || 'general');
+        if (data && data.length > 0) {
+          setRecipients(data);
+          // Set default to teacher if available, otherwise general admin
+          const teacherRecipient = data.find(r => r.type === 'teacher');
+          const defaultRecipient = teacherRecipient || data[0];
+          setSelectedRecipientId(defaultRecipient.user_id ?? 'general');
+        }
       } catch (error) {
         console.error('Error fetching recipients:', error);
-        // Fallback to general admin only
         setRecipients([
           {
-            user_id: 'general',
+            user_id: null,
             full_name: null,
             type: 'general_admin',
             label: 'Administrator (General Inquiries)',
@@ -97,7 +80,7 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
     };
 
     fetchRecipients();
-  }, [open, student]);
+  }, [open, student, getRecipients]);
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -119,7 +102,9 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
       return;
     }
 
-    const selectedRecipient = recipients.find(r => r.user_id === selectedRecipientId);
+    const selectedRecipient = recipients.find(
+      r => (r.user_id ?? 'general') === selectedRecipientId
+    );
     if (!selectedRecipient) {
       toast.error('Invalid recipient selected');
       return;
@@ -127,40 +112,14 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
 
     setSending(true);
     try {
-      let messageData;
-
-      if (selectedRecipient.type === 'general_admin') {
-        // Send to any admin (recipient_user_id = null)
-        messageData = {
-          sender_type: 'student',
-          sender_student_id: student.id,
-          recipient_type: 'admin',
-          recipient_user_id: null,
-          subject: subject.trim() || null,
-          content: content.trim(),
-        };
-      } else {
-        // Send to specific user (teacher or specific admin)
-        messageData = {
-          sender_type: 'student',
-          sender_student_id: student.id,
-          recipient_type: selectedRecipient.type,
-          recipient_user_id: selectedRecipient.user_id,
-          subject: subject.trim() || null,
-          content: content.trim(),
-        };
-      }
-
-      const { error } = await supabase.from('messages').insert([messageData]);
+      const { error } = await performAction('send_message', {
+        recipientType: selectedRecipient.type === 'teacher' ? 'teacher' : 'admin',
+        recipientUserId: selectedRecipient.user_id,
+        subject: subject.trim() || null,
+        content: content.trim(),
+      });
 
       if (error) throw error;
-
-      // Log activity
-      await supabase.from('activity_logs').insert([{
-        student_id: student.id,
-        user_type: 'student',
-        action: 'send_message',
-      }]);
 
       toast.success(`Message sent to ${selectedRecipient.label}`);
       setSubject('');
@@ -186,7 +145,7 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
             Send Message
           </DialogTitle>
           <DialogDescription>
-            Send a message to a teacher or administrator
+            Send a message to your teacher or an administrator
           </DialogDescription>
         </DialogHeader>
 
@@ -203,34 +162,24 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
                 <SelectValue placeholder={loadingRecipients ? 'Loading...' : 'Select a recipient...'} />
               </SelectTrigger>
               <SelectContent>
-                {/* General Admin Option */}
-                <SelectGroup>
-                  <SelectLabel>General</SelectLabel>
-                  {adminRecipients.filter(r => r.type === 'general_admin').map(r => (
-                    <SelectItem key={r.user_id} value={r.user_id}>
-                      {r.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-
                 {/* Teachers */}
                 {teacherRecipients.length > 0 && (
                   <SelectGroup>
                     <SelectLabel>Teachers</SelectLabel>
                     {teacherRecipients.map(r => (
-                      <SelectItem key={r.user_id} value={r.user_id}>
+                      <SelectItem key={r.user_id ?? 'teacher'} value={r.user_id ?? 'general'}>
                         {r.label}
                       </SelectItem>
                     ))}
                   </SelectGroup>
                 )}
 
-                {/* Specific Admins */}
-                {adminRecipients.filter(r => r.type === 'admin').length > 0 && (
+                {/* Administrators */}
+                {adminRecipients.length > 0 && (
                   <SelectGroup>
                     <SelectLabel>Administrators</SelectLabel>
-                    {adminRecipients.filter(r => r.type === 'admin').map(r => (
-                      <SelectItem key={r.user_id} value={r.user_id}>
+                    {adminRecipients.map(r => (
+                      <SelectItem key={r.user_id ?? 'general'} value={r.user_id ?? 'general'}>
                         {r.label}
                       </SelectItem>
                     ))}
