@@ -6,19 +6,20 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { MessageSquare, Send, User, Shield } from 'lucide-react';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MessageSquare, Send } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 
 interface MessageAdminDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-interface TeacherInfo {
+interface Recipient {
   user_id: string;
   full_name: string | null;
+  type: 'general_admin' | 'admin' | 'teacher';
+  label: string;
 }
 
 export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogProps) {
@@ -26,73 +27,115 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
   const [sending, setSending] = useState(false);
-  const [recipientType, setRecipientType] = useState<'teacher' | 'admin'>('admin');
-  const [teacher, setTeacher] = useState<TeacherInfo | null>(null);
-  const [loadingTeacher, setLoadingTeacher] = useState(false);
+  const [selectedRecipientId, setSelectedRecipientId] = useState<string>('');
+  const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [loadingRecipients, setLoadingRecipients] = useState(false);
 
-  // Fetch teacher info when dialog opens
+  // Fetch all teachers and admins when dialog opens
   useEffect(() => {
-    const fetchTeacher = async () => {
-      if (!open || !student?.section_id) {
-        setTeacher(null);
-        return;
-      }
+    const fetchRecipients = async () => {
+      if (!open) return;
 
-      setLoadingTeacher(true);
+      setLoadingRecipients(true);
       try {
-        // Get section to find user_id (teacher)
-        const { data: section, error: sectionError } = await supabase
+        // Get all section owners (teachers)
+        const { data: sections } = await supabase
           .from('sections')
+          .select('user_id');
+
+        const teacherIds = [...new Set(sections?.map(s => s.user_id) || [])];
+
+        // Get all admin user IDs
+        const { data: adminRoles } = await supabase
+          .from('user_roles')
           .select('user_id')
-          .eq('id', student.section_id)
-          .single();
+          .eq('role', 'admin');
 
-        if (sectionError || !section?.user_id) {
-          setTeacher(null);
-          return;
+        const adminIds = adminRoles?.map(r => r.user_id) || [];
+
+        // Combine unique IDs
+        const allUserIds = [...new Set([...teacherIds, ...adminIds])];
+
+        // Fetch profiles for these users
+        let profiles: { user_id: string; full_name: string | null }[] = [];
+        if (allUserIds.length > 0) {
+          const { data: profilesData } = await supabase
+            .from('profiles')
+            .select('user_id, full_name')
+            .in('user_id', allUserIds);
+          profiles = profilesData || [];
         }
 
-        // Get teacher's profile
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('user_id, full_name')
-          .eq('user_id', section.user_id)
-          .single();
+        // Build recipient list
+        const recipientList: Recipient[] = [
+          // Always include general admin option first
+          {
+            user_id: 'general',
+            full_name: null,
+            type: 'general_admin',
+            label: 'Administrator (General Inquiries)',
+          },
+        ];
 
-        if (profileError) {
-          setTeacher(null);
-          return;
-        }
+        // Add teachers (users who own sections)
+        const teachers = profiles.filter(p => teacherIds.includes(p.user_id));
+        teachers.forEach(t => {
+          recipientList.push({
+            user_id: t.user_id,
+            full_name: t.full_name,
+            type: 'teacher',
+            label: t.full_name || 'Unknown Teacher',
+          });
+        });
 
-        setTeacher(profile);
+        // Add admins (separate from teachers, even if same person)
+        const admins = profiles.filter(p => adminIds.includes(p.user_id));
+        admins.forEach(a => {
+          // Avoid duplicating if person is both teacher and admin
+          const alreadyAsTeacher = recipientList.some(
+            r => r.user_id === a.user_id && r.type === 'teacher'
+          );
+          if (!alreadyAsTeacher) {
+            recipientList.push({
+              user_id: a.user_id,
+              full_name: a.full_name,
+              type: 'admin',
+              label: `${a.full_name || 'Admin'} (Administrator)`,
+            });
+          }
+        });
+
+        setRecipients(recipientList);
+        // Set default to general admin
+        setSelectedRecipientId('general');
       } catch (error) {
-        console.error('Error fetching teacher:', error);
-        setTeacher(null);
+        console.error('Error fetching recipients:', error);
+        // Fallback to general admin only
+        setRecipients([
+          {
+            user_id: 'general',
+            full_name: null,
+            type: 'general_admin',
+            label: 'Administrator (General Inquiries)',
+          },
+        ]);
+        setSelectedRecipientId('general');
       } finally {
-        setLoadingTeacher(false);
+        setLoadingRecipients(false);
       }
     };
 
-    fetchTeacher();
-  }, [open, student?.section_id]);
+    fetchRecipients();
+  }, [open]);
 
   // Reset form when dialog closes
   useEffect(() => {
     if (!open) {
       setSubject('');
       setContent('');
-      setRecipientType(teacher ? 'teacher' : 'admin');
+      setSelectedRecipientId('');
     }
-  }, [open, teacher]);
-
-  // Set default recipient when teacher info loads
-  useEffect(() => {
-    if (teacher) {
-      setRecipientType('teacher');
-    } else {
-      setRecipientType('admin');
-    }
-  }, [teacher]);
+  }, [open]);
 
   const handleSend = async () => {
     if (!student || !content.trim()) {
@@ -100,21 +143,42 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
       return;
     }
 
-    if (recipientType === 'teacher' && !teacher) {
-      toast.error('No teacher assigned to your section');
+    if (!selectedRecipientId) {
+      toast.error('Please select a recipient');
+      return;
+    }
+
+    const selectedRecipient = recipients.find(r => r.user_id === selectedRecipientId);
+    if (!selectedRecipient) {
+      toast.error('Invalid recipient selected');
       return;
     }
 
     setSending(true);
     try {
-      const messageData = {
-        sender_type: 'student',
-        sender_student_id: student.id,
-        recipient_type: recipientType,
-        recipient_user_id: recipientType === 'teacher' ? teacher?.user_id : null,
-        subject: subject.trim() || null,
-        content: content.trim(),
-      };
+      let messageData;
+
+      if (selectedRecipient.type === 'general_admin') {
+        // Send to any admin (recipient_user_id = null)
+        messageData = {
+          sender_type: 'student',
+          sender_student_id: student.id,
+          recipient_type: 'admin',
+          recipient_user_id: null,
+          subject: subject.trim() || null,
+          content: content.trim(),
+        };
+      } else {
+        // Send to specific user (teacher or specific admin)
+        messageData = {
+          sender_type: 'student',
+          sender_student_id: student.id,
+          recipient_type: selectedRecipient.type,
+          recipient_user_id: selectedRecipient.user_id,
+          subject: subject.trim() || null,
+          content: content.trim(),
+        };
+      }
 
       const { error } = await supabase.from('messages').insert([messageData]);
 
@@ -127,7 +191,7 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
         action: 'send_message',
       }]);
 
-      toast.success(`Message sent to ${recipientType === 'teacher' ? 'your teacher' : 'admin'}`);
+      toast.success(`Message sent to ${selectedRecipient.label}`);
       setSubject('');
       setContent('');
       onOpenChange(false);
@@ -139,7 +203,8 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
     }
   };
 
-  const hasTeacher = !!teacher;
+  const teacherRecipients = recipients.filter(r => r.type === 'teacher');
+  const adminRecipients = recipients.filter(r => r.type === 'admin' || r.type === 'general_admin');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -150,73 +215,58 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
             Send Message
           </DialogTitle>
           <DialogDescription>
-            Send a message to your teacher or an administrator
+            Send a message to a teacher or administrator
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Recipient Selection */}
-          <div className="space-y-3">
-            <Label>Send to</Label>
-            <RadioGroup
-              value={recipientType}
-              onValueChange={(value) => setRecipientType(value as 'teacher' | 'admin')}
-              className="space-y-2"
+          {/* Recipient Selection Dropdown */}
+          <div className="space-y-2">
+            <Label>Select Recipient</Label>
+            <Select
+              value={selectedRecipientId}
+              onValueChange={setSelectedRecipientId}
+              disabled={loadingRecipients}
             >
-              {/* Teacher Option */}
-              <label
-                className={cn(
-                  'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
-                  recipientType === 'teacher' 
-                    ? 'border-primary bg-primary/5' 
-                    : 'border-border hover:bg-muted/50',
-                  !hasTeacher && 'opacity-50 cursor-not-allowed'
-                )}
-              >
-                <RadioGroupItem 
-                  value="teacher" 
-                  disabled={!hasTeacher || loadingTeacher}
-                  className="shrink-0"
-                />
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <User className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">My Teacher</p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {loadingTeacher 
-                        ? 'Loading...' 
-                        : hasTeacher 
-                          ? teacher.full_name || 'Unknown Teacher'
-                          : 'No teacher assigned'
-                      }
-                    </p>
-                  </div>
-                </div>
-              </label>
+              <SelectTrigger>
+                <SelectValue placeholder={loadingRecipients ? 'Loading...' : 'Select a recipient...'} />
+              </SelectTrigger>
+              <SelectContent>
+                {/* General Admin Option */}
+                <SelectGroup>
+                  <SelectLabel>General</SelectLabel>
+                  {adminRecipients.filter(r => r.type === 'general_admin').map(r => (
+                    <SelectItem key={r.user_id} value={r.user_id}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
 
-              {/* Admin Option */}
-              <label
-                className={cn(
-                  'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
-                  recipientType === 'admin' 
-                    ? 'border-primary bg-primary/5' 
-                    : 'border-border hover:bg-muted/50'
+                {/* Teachers */}
+                {teacherRecipients.length > 0 && (
+                  <SelectGroup>
+                    <SelectLabel>Teachers</SelectLabel>
+                    {teacherRecipients.map(r => (
+                      <SelectItem key={r.user_id} value={r.user_id}>
+                        {r.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 )}
-              >
-                <RadioGroupItem value="admin" className="shrink-0" />
-                <div className="flex items-center gap-3 flex-1">
-                  <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">
-                    <Shield className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Administrator</p>
-                    <p className="text-xs text-muted-foreground">General inquiries</p>
-                  </div>
-                </div>
-              </label>
-            </RadioGroup>
+
+                {/* Specific Admins */}
+                {adminRecipients.filter(r => r.type === 'admin').length > 0 && (
+                  <SelectGroup>
+                    <SelectLabel>Administrators</SelectLabel>
+                    {adminRecipients.filter(r => r.type === 'admin').map(r => (
+                      <SelectItem key={r.user_id} value={r.user_id}>
+                        {r.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
@@ -245,7 +295,7 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSend} disabled={!content.trim() || sending}>
+          <Button onClick={handleSend} disabled={!content.trim() || !selectedRecipientId || sending}>
             <Send className="h-4 w-4 mr-2" />
             {sending ? 'Sending...' : 'Send Message'}
           </Button>
