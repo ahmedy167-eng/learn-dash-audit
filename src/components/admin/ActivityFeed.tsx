@@ -108,7 +108,7 @@ export function ActivityFeed() {
   };
 
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Activity className="h-4 w-4" />

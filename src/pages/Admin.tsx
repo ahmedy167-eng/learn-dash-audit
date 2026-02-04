@@ -134,16 +134,17 @@ export default function Admin() {
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-5">
-          <Card>
+          <Card className="min-h-[120px]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Users</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{users.length}</div>
+              <p className="text-xs text-muted-foreground">Registered accounts</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="min-h-[120px]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Administrators</CardTitle>
               <Shield className="h-4 w-4 text-muted-foreground" />
@@ -152,9 +153,10 @@ export default function Admin() {
               <div className="text-2xl font-bold">
                 {users.filter(u => u.role === 'admin').length}
               </div>
+              <p className="text-xs text-muted-foreground">Admin access</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="min-h-[120px]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Regular Users</CardTitle>
               <Settings className="h-4 w-4 text-muted-foreground" />
@@ -163,24 +165,27 @@ export default function Admin() {
               <div className="text-2xl font-bold">
                 {users.filter(u => u.role === 'user').length}
               </div>
+              <p className="text-xs text-muted-foreground">Standard access</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="min-h-[120px]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Students</CardTitle>
               <GraduationCap className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{studentCount}</div>
+              <p className="text-xs text-muted-foreground">Enrolled students</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="min-h-[120px]">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Unread Messages</CardTitle>
               <MessageSquare className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{unreadMessages}</div>
+              <p className="text-xs text-muted-foreground">Pending replies</p>
             </CardContent>
           </Card>
         </div>

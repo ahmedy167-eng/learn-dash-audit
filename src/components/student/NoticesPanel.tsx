@@ -87,7 +87,7 @@ export function NoticesPanel() {
   }
 
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
           <Bell className="h-5 w-5" />
@@ -106,7 +106,7 @@ export function NoticesPanel() {
             <p className="text-sm text-muted-foreground">No notices yet</p>
           </div>
         ) : (
-          <ScrollArea className="h-[300px] pr-4">
+          <ScrollArea className="h-[250px] pr-4">
             <div className="space-y-3">
               {notices.map((notice) => {
                 const IconComponent = noticeIcons[notice.notice_type] || Bell;

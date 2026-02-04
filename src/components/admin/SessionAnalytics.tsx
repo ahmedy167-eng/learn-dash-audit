@@ -79,8 +79,8 @@ export function SessionAnalytics() {
 
   if (loading) {
     return (
-      <Card>
-        <CardContent className="flex justify-center py-8">
+      <Card className="h-full">
+        <CardContent className="flex justify-center py-8 h-full items-center">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
         </CardContent>
       </Card>
@@ -88,7 +88,7 @@ export function SessionAnalytics() {
   }
 
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <BarChart className="h-4 w-4" />
@@ -96,37 +96,39 @@ export function SessionAnalytics() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Users className="h-3.5 w-3.5" />
-              <span className="text-xs">Total Sessions</span>
+        <div className="h-[250px] flex items-center">
+          <div className="grid grid-cols-2 gap-6 w-full">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Users className="h-3.5 w-3.5" />
+                <span className="text-xs">Total Sessions</span>
+              </div>
+              <p className="text-2xl font-bold">{stats.totalSessions}</p>
             </div>
-            <p className="text-2xl font-bold">{stats.totalSessions}</p>
-          </div>
-          
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="h-3.5 w-3.5" />
-              <span className="text-xs">Avg Duration</span>
+            
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                <span className="text-xs">Avg Duration</span>
+              </div>
+              <p className="text-2xl font-bold">{stats.avgDuration}m</p>
             </div>
-            <p className="text-2xl font-bold">{stats.avgDuration}m</p>
-          </div>
-          
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <TrendingUp className="h-3.5 w-3.5" />
-              <span className="text-xs">Today</span>
+            
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <TrendingUp className="h-3.5 w-3.5" />
+                <span className="text-xs">Today</span>
+              </div>
+              <p className="text-2xl font-bold">{stats.todaySessions}</p>
             </div>
-            <p className="text-2xl font-bold">{stats.todaySessions}</p>
-          </div>
-          
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <BarChart className="h-3.5 w-3.5" />
-              <span className="text-xs">Peak Hours</span>
+            
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <BarChart className="h-3.5 w-3.5" />
+                <span className="text-xs">Peak Hours</span>
+              </div>
+              <p className="text-lg font-bold">{stats.peakHour}</p>
             </div>
-            <p className="text-lg font-bold">{stats.peakHour}</p>
           </div>
         </div>
       </CardContent>
