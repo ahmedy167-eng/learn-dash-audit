@@ -1,253 +1,273 @@
 
-
-# Teacher Dashboard Enhancement Plan
+# Fix Student Login & Add Bulk Delete Feature
 
 ## Overview
 
-This plan addresses four key requirements:
-1. **Display teacher's name on dashboard** after login
-2. **Move messages to a bell icon** instead of showing inline on dashboard
-3. **Restrict student messaging** to only their assigned teacher
-4. **Update message compose dropdown** to show teachers dynamically
+This plan addresses two issues:
+1. **Student login failure** due to duplicate student records in the database
+2. **Bulk delete feature** with a Select All/Unselect All toggle button
 
 ---
 
-## Current State Analysis
+## Part 1: Fix Student Login Issue
 
-**Issue 1: Teacher Name Not Displayed**
-- The `Dashboard.tsx` shows "Welcome back! Here's your overview." but doesn't show the teacher's name
-- The `useAuth` hook provides `user` object with `user_metadata.full_name` from signup
-- The `profiles` table also stores `full_name` which can be fetched
+### Problem
 
-**Issue 2: Messages Shown Inline**
-- `MessageInbox` component is embedded directly in the Dashboard grid
-- Takes up significant space on the dashboard
-- Should be moved to a popover/dropdown triggered by a bell icon in the header
+The student login fails with "Failed to verify credentials" because:
+- Multiple students exist with the same name + ID (registered by different teachers)
+- The query uses `.maybeSingle()` which throws an error when multiple rows match
+- The error is caught and returns a generic failure message
 
-**Issue 3: Student Can Message Any Teacher**
-- Current `MessageAdminDialog` fetches ALL teachers and admins
-- Students should only be able to message their assigned section teacher
-- The student's `section_id` links to `sections.user_id` (the teacher)
+### Solution
 
-**Issue 4: Dynamic Teacher Dropdown**
-- Already implemented but needs to be restricted based on student's section
+Change the query in `useStudentAuth.tsx` to handle multiple matches gracefully by using `.limit(1)` instead of `.maybeSingle()`.
+
+### File: `src/hooks/useStudentAuth.tsx`
+
+**Current code (lines 116-121):**
+```typescript
+const { data, error } = await supabase
+  .from('students')
+  .select('id, full_name, student_id, section_id, section_number, course, is_active')
+  .ilike('full_name', name.trim())
+  .eq('student_id', studentId.trim())
+  .maybeSingle();
+```
+
+**New code:**
+```typescript
+const { data: students, error } = await supabase
+  .from('students')
+  .select('id, full_name, student_id, section_id, section_number, course, is_active')
+  .ilike('full_name', name.trim())
+  .eq('student_id', studentId.trim())
+  .eq('is_active', true)
+  .limit(1);
+
+// Get first matching active student
+const data = students?.[0] || null;
+```
 
 ---
 
-## Solution Architecture
+## Part 2: Bulk Delete Feature
+
+### Feature Design
 
 ```text
-Teacher Login Flow:
-┌──────────────┐     ┌─────────────────┐     ┌──────────────────────┐
-│  Auth Sign In │ --> │ Fetch Profile   │ --> │ Display Name in      │
-│              │     │ (full_name)     │     │ Dashboard Header     │
-└──────────────┘     └─────────────────┘     └──────────────────────┘
-
-Dashboard Layout Change:
-┌────────────────────────────────────────────────────────────┐
-│  Dashboard                              [Bell Icon] 🔔 (3)  │
-│  Welcome back, Ahmed Ali!                                   │
-├────────────────────────────────────────────────────────────┤
-│  Stats Cards | Tasks | Overdue (NO inline message inbox)    │
-└────────────────────────────────────────────────────────────┘
-                           │
-                           ▼ Click bell
-              ┌─────────────────────────────┐
-              │  Messages Popover/Dialog    │
-              │  ┌─────────────────────────┐│
-              │  │ Student A - 2min ago   ││
-              │  │ Question about HW...   ││
-              │  └─────────────────────────┘│
-              └─────────────────────────────┘
-
-Student Messaging Flow:
-┌──────────────┐     ┌─────────────────┐     ┌──────────────────────┐
-│ Student logs │ --> │ Get section_id  │ --> │ Fetch teacher from   │
-│ in           │     │                 │     │ sections.user_id     │
-└──────────────┘     └─────────────────┘     └──────────────────────┘
-                                                      │
-                                                      ▼
-                              ┌──────────────────────────────────┐
-                              │ Only show assigned teacher in    │
-                              │ recipient dropdown + Admin option│
-                              └──────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│  [Select All / Unselect All]                     [Delete Selected (3)]   │
+├──────────────────────────────────────────────────────────────────────────┤
+│ [✓] │ # │ Full Name         │ Student ID │ ... │ Actions               │
+├──────────────────────────────────────────────────────────────────────────┤
+│ [✓] │ 1 │ Ahmed Ali         │ 447102413  │ ... │ [Edit] [Delete]       │
+│ [✓] │ 2 │ Mohammed Saleh    │ 447100945  │ ... │ [Edit] [Delete]       │
+│ [ ] │ 3 │ Fahad Alotaibi    │ 447101234  │ ... │ [Edit] [Delete]       │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
----
+### File: `src/pages/Register.tsx`
 
-## File Changes
+### Changes Required:
 
-### 1. Create TeacherMessagesDropdown Component
-
-**New File:** `src/components/layout/TeacherMessagesDropdown.tsx`
-
-Creates a bell icon with notification badge that opens a popover/dialog showing messages:
-- Displays unread count badge
-- Lists messages in a scrollable popover
-- Clicking a message opens reply dialog
-- Uses existing `MessageInbox` logic but in popover format
-
+#### 1. Add New Imports
 ```typescript
-// Key structure:
-export function TeacherMessagesDropdown() {
-  const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [open, setOpen] = useState(false);
-
-  // Fetch messages for this user
-  // Show bell icon with badge
-  // Popover with message list
-  // Dialog for reading/replying
-}
+import { Checkbox } from '@/components/ui/checkbox';
+import { CheckSquare, Square } from 'lucide-react';
 ```
 
-### 2. Update Dashboard.tsx
-
-**File:** `src/pages/Dashboard.tsx`
-
-**Changes:**
-- Fetch teacher's profile name from `profiles` table or `user_metadata`
-- Remove inline `MessageInbox` component
-- Add bell icon button in header that triggers the messages dropdown
-- Display personalized welcome message
-
-**Before:**
+#### 2. Add Selection State Variables
 ```typescript
-<h1 className="text-2xl font-bold">Dashboard</h1>
-<p className="text-muted-foreground">Welcome back! Here's your overview.</p>
-// MessageInbox embedded in grid
+// New state for bulk selection
+const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
+const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 ```
 
-**After:**
-```typescript
-const [profile, setProfile] = useState<{ full_name: string } | null>(null);
+#### 3. Add Selection Handler Functions
 
-// In header:
-<div className="flex items-center justify-between">
-  <div>
-    <h1 className="text-2xl font-bold">Dashboard</h1>
-    <p className="text-muted-foreground">
-      Welcome back{profile?.full_name ? `, ${profile.full_name}` : ''}!
-    </p>
-  </div>
-  <div className="flex items-center gap-2">
-    <TeacherMessagesDropdown />  // Bell icon with messages
-    <Link to="/tasks"><Button>New Task</Button></Link>
-  </div>
-</div>
-// No MessageInbox in grid
+```typescript
+// Toggle single student selection
+const toggleStudentSelection = (studentId: string) => {
+  setSelectedStudents(prev => {
+    const newSet = new Set(prev);
+    if (newSet.has(studentId)) {
+      newSet.delete(studentId);
+    } else {
+      newSet.add(studentId);
+    }
+    return newSet;
+  });
+};
+
+// Toggle select all / unselect all
+const toggleSelectAll = () => {
+  if (selectedStudents.size === filteredStudents.length) {
+    // All selected -> unselect all
+    setSelectedStudents(new Set());
+  } else {
+    // Select all
+    setSelectedStudents(new Set(filteredStudents.map(s => s.id)));
+  }
+};
+
+// Check if all students are selected
+const allSelected = filteredStudents.length > 0 && 
+  selectedStudents.size === filteredStudents.length;
 ```
 
-### 3. Update MessageAdminDialog.tsx for Student Restrictions
+#### 4. Clear Selection When Section Changes
 
-**File:** `src/components/student/MessageAdminDialog.tsx`
-
-**Changes:**
-- Only fetch the student's assigned teacher (from their section)
-- Keep "Administrator (General)" option for admin messages
-- Remove ability to message other teachers
-
-**Current Logic:**
 ```typescript
-// Fetches ALL section owners (teachers)
-const { data: sections } = await supabase
-  .from('sections')
-  .select('user_id');
-const teacherIds = [...new Set(sections?.map(s => s.user_id) || [])];
+// In existing useEffect for selectedSectionId, add:
+useEffect(() => {
+  if (selectedSectionId) {
+    fetchStudentsForSection(selectedSectionId);
+  } else {
+    setStudents([]);
+  }
+  // Clear selection when section changes
+  setSelectedStudents(new Set());
+}, [selectedSectionId]);
 ```
 
-**New Logic:**
+#### 5. Add Bulk Delete Function
+
 ```typescript
-// Only fetch the student's assigned teacher
-if (student?.section_id) {
-  const { data: section } = await supabase
-    .from('sections')
-    .select('user_id')
-    .eq('id', student.section_id)
-    .single();
+const bulkDeleteStudents = async () => {
+  if (selectedStudents.size === 0) return;
   
-  if (section?.user_id) {
-    const { data: teacherProfile } = await supabase
-      .from('profiles')
-      .select('user_id, full_name')
-      .eq('user_id', section.user_id)
-      .single();
+  setIsBulkDeleting(true);
+  try {
+    const { error } = await supabase
+      .from('students')
+      .delete()
+      .in('id', Array.from(selectedStudents));
+
+    if (error) throw error;
     
-    // Add only this teacher to recipients
-    recipientList.push({
-      user_id: teacherProfile.user_id,
-      full_name: teacherProfile.full_name,
-      type: 'teacher',
-      label: `${teacherProfile.full_name || 'My Teacher'}`,
-    });
-  }
-}
-```
-
-**UI Change:**
-- If student has no section assigned, show only "Administrator" option
-- If student has section, show:
-  - Their assigned teacher
-  - Administrator (General) option
-
----
-
-## Implementation Details
-
-### Profile Fetching for Teacher Name
-
-```typescript
-// In Dashboard.tsx useEffect
-const fetchProfile = async () => {
-  if (!user) return;
-  
-  // Try user_metadata first (set during signup)
-  const metaName = user.user_metadata?.full_name;
-  if (metaName) {
-    setProfile({ full_name: metaName });
-    return;
-  }
-  
-  // Fallback to profiles table
-  const { data } = await supabase
-    .from('profiles')
-    .select('full_name')
-    .eq('user_id', user.id)
-    .single();
-  
-  if (data) {
-    setProfile(data);
+    toast.success(`Successfully removed ${selectedStudents.size} student(s)`);
+    setSelectedStudents(new Set());
+    
+    if (selectedSectionId) {
+      fetchStudentsForSection(selectedSectionId);
+    }
+  } catch (error) {
+    console.error('Error bulk deleting students:', error);
+    toast.error('Failed to delete students');
+  } finally {
+    setIsBulkDeleting(false);
   }
 };
 ```
 
-### Messages Dropdown Structure
+#### 6. Add Bulk Actions Toolbar (Above Table)
+
+Insert this above the `<Table>` component (around line 609):
 
 ```typescript
-// TeacherMessagesDropdown.tsx
-<Popover open={open} onOpenChange={setOpen}>
-  <PopoverTrigger asChild>
-    <Button variant="ghost" size="icon" className="relative">
-      <Bell className="h-5 w-5" />
-      {unreadCount > 0 && (
-        <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center">
-          {unreadCount > 9 ? '9+' : unreadCount}
-        </Badge>
-      )}
-    </Button>
-  </PopoverTrigger>
-  <PopoverContent className="w-80 p-0" align="end">
-    <div className="p-3 border-b">
-      <h4 className="font-semibold">Messages</h4>
+{filteredStudents.length > 0 && (
+  <div className="flex items-center justify-between mb-4 p-3 bg-muted/50 rounded-lg">
+    <div className="flex items-center gap-3">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={toggleSelectAll}
+        className="gap-2"
+      >
+        {allSelected ? (
+          <>
+            <Square className="h-4 w-4" />
+            Unselect All
+          </>
+        ) : (
+          <>
+            <CheckSquare className="h-4 w-4" />
+            Select All
+          </>
+        )}
+      </Button>
+      <span className="text-sm text-muted-foreground">
+        {selectedStudents.size > 0 
+          ? `${selectedStudents.size} of ${filteredStudents.length} selected`
+          : `${filteredStudents.length} students`}
+      </span>
     </div>
-    <ScrollArea className="h-[300px]">
-      {messages.map(msg => (
-        <MessageItem key={msg.id} message={msg} onClick={openMessage} />
-      ))}
-    </ScrollArea>
-  </PopoverContent>
-</Popover>
+    
+    {selectedStudents.size > 0 && (
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="destructive" size="sm">
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete Selected ({selectedStudents.size})
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedStudents.size} Students?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove {selectedStudents.size} student(s) from this section. 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={bulkDeleteStudents}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isBulkDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                `Delete ${selectedStudents.size} Students`
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    )}
+  </div>
+)}
+```
+
+#### 7. Add Checkbox Column to Table
+
+**Update TableHeader (line 610-619):**
+```typescript
+<TableHeader>
+  <TableRow>
+    <TableHead className="w-[40px]">
+      <Checkbox
+        checked={allSelected}
+        onCheckedChange={toggleSelectAll}
+      />
+    </TableHead>
+    <TableHead>#</TableHead>
+    <TableHead>Full Name</TableHead>
+    <TableHead>Student ID</TableHead>
+    <TableHead>Attendance</TableHead>
+    <TableHead>Absence %</TableHead>
+    <TableHead>Comments</TableHead>
+    <TableHead className="text-right">Actions</TableHead>
+  </TableRow>
+</TableHeader>
+```
+
+**Update TableRow (line 622-698):**
+Add checkbox as first cell in each row:
+```typescript
+<TableRow key={student.id}>
+  <TableCell>
+    <Checkbox
+      checked={selectedStudents.has(student.id)}
+      onCheckedChange={() => toggleStudentSelection(student.id)}
+    />
+  </TableCell>
+  <TableCell className="font-medium">{index + 1}</TableCell>
+  {/* ... rest of cells remain the same */}
+</TableRow>
 ```
 
 ---
@@ -256,26 +276,17 @@ const fetchProfile = async () => {
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/components/layout/TeacherMessagesDropdown.tsx` | Create | Bell icon with messages popover for teachers |
-| `src/pages/Dashboard.tsx` | Modify | Add teacher name, remove inline inbox, add bell icon |
-| `src/components/student/MessageAdminDialog.tsx` | Modify | Restrict to only assigned teacher + admin |
+| `src/hooks/useStudentAuth.tsx` | Modify | Fix duplicate student login issue by using `.limit(1)` instead of `.maybeSingle()` |
+| `src/pages/Register.tsx` | Modify | Add bulk delete with Select All/Unselect All toggle button |
 
 ---
 
-## Technical Notes
+## User Experience
 
-- **Teacher Name Source**: First tries `user.user_metadata.full_name`, falls back to `profiles` table
-- **Section Teacher Lookup**: Uses `sections.user_id` where `sections.id = student.section_id`
-- **Existing Notifications**: The `MessageInbox` realtime subscription pattern is reused in the dropdown
-- **Student Without Section**: Can only message "Administrator (General)"
-- **Backward Compatibility**: Existing messages and notification behavior preserved
-
----
-
-## Edge Cases Handled
-
-1. **Student not assigned to section**: Shows only Admin option
-2. **Teacher profile missing name**: Falls back to email or "Teacher"
-3. **New teacher with no messages**: Shows empty state in popover
-4. **Real-time updates**: Maintains realtime subscription for new messages
-
+1. **Student Login**: Now works even if the student is registered in multiple sections
+2. **Select All Button**: One click selects all visible students in the current section
+3. **Unselect All Button**: Same button toggles to unselect all when all are selected
+4. **Individual Selection**: Checkboxes in each row for fine-grained selection
+5. **Bulk Delete**: Red button appears showing count, with confirmation dialog
+6. **Individual Delete**: Still works via the trash icon on each row (preserved)
+7. **Section Change**: Selection automatically clears when switching sections
