@@ -113,12 +113,17 @@ export function StudentAuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (name: string, studentId: string): Promise<{ error: Error | null }> => {
     try {
       // Query the students table to verify credentials
-      const { data, error } = await supabase
+      // Use limit(1) instead of maybeSingle() to handle duplicate students gracefully
+      const { data: students, error } = await supabase
         .from('students')
         .select('id, full_name, student_id, section_id, section_number, course, is_active')
         .ilike('full_name', name.trim())
         .eq('student_id', studentId.trim())
-        .maybeSingle();
+        .eq('is_active', true)
+        .limit(1);
+
+      // Get first matching active student
+      const data = students?.[0] || null;
 
       if (error) {
         return { error: new Error('Failed to verify credentials. Please try again.') };

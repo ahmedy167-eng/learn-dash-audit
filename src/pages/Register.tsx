@@ -12,7 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Users, Loader2, Plus, Pencil, Trash2, ClipboardList, Search, MessageSquare, Download, Upload, FileSpreadsheet, Filter, Bell } from 'lucide-react';
+import { Users, Loader2, Plus, Pencil, Trash2, ClipboardList, Search, MessageSquare, Download, Upload, FileSpreadsheet, Filter, Bell, CheckSquare, Square } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { WeekCalendar } from '@/components/register/WeekCalendar';
@@ -86,6 +87,10 @@ export default function Register() {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<Date>(new Date());
   const [allStudents, setAllStudents] = useState<Student[]>([]);
 
+  // Bulk selection state
+  const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
   useEffect(() => {
     fetchSections();
   }, []);
@@ -96,6 +101,8 @@ export default function Register() {
     } else {
       setStudents([]);
     }
+    // Clear selection when section changes
+    setSelectedStudents(new Set());
   }, [selectedSectionId]);
 
   const fetchSections = async () => {
@@ -418,6 +425,56 @@ export default function Register() {
     student.student_id.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Bulk selection handlers
+  const toggleStudentSelection = (studentId: string) => {
+    setSelectedStudents(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(studentId)) {
+        newSet.delete(studentId);
+      } else {
+        newSet.add(studentId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedStudents.size === filteredStudents.length) {
+      setSelectedStudents(new Set());
+    } else {
+      setSelectedStudents(new Set(filteredStudents.map(s => s.id)));
+    }
+  };
+
+  const allSelected = filteredStudents.length > 0 && 
+    selectedStudents.size === filteredStudents.length;
+
+  const bulkDeleteStudents = async () => {
+    if (selectedStudents.size === 0) return;
+    
+    setIsBulkDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('students')
+        .delete()
+        .in('id', Array.from(selectedStudents));
+
+      if (error) throw error;
+      
+      toast.success(`Successfully removed ${selectedStudents.size} student(s)`);
+      setSelectedStudents(new Set());
+      
+      if (selectedSectionId) {
+        fetchStudentsForSection(selectedSectionId);
+      }
+    } catch (error) {
+      console.error('Error bulk deleting students:', error);
+      toast.error('Failed to delete students');
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="p-6 space-y-6">
@@ -606,9 +663,80 @@ export default function Register() {
                   </p>
                 </div>
               ) : (
+                <>
+                  {/* Bulk Actions Toolbar */}
+                  <div className="flex items-center justify-between mb-4 p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={toggleSelectAll}
+                        className="gap-2"
+                      >
+                        {allSelected ? (
+                          <>
+                            <Square className="h-4 w-4" />
+                            Unselect All
+                          </>
+                        ) : (
+                          <>
+                            <CheckSquare className="h-4 w-4" />
+                            Select All
+                          </>
+                        )}
+                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        {selectedStudents.size > 0 
+                          ? `${selectedStudents.size} of ${filteredStudents.length} selected`
+                          : `${filteredStudents.length} students`}
+                      </span>
+                    </div>
+                    
+                    {selectedStudents.size > 0 && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="sm">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Selected ({selectedStudents.size})
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete {selectedStudents.size} Students?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently remove {selectedStudents.size} student(s) from this section. 
+                              This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={bulkDeleteStudents}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              {isBulkDeleting ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Deleting...
+                                </>
+                              ) : (
+                                `Delete ${selectedStudents.size} Students`
+                              )}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </div>
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[40px]">
+                        <Checkbox
+                          checked={allSelected}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                      </TableHead>
                       <TableHead>#</TableHead>
                       <TableHead>Full Name</TableHead>
                       <TableHead>Student ID</TableHead>
@@ -621,6 +749,12 @@ export default function Register() {
                   <TableBody>
                     {filteredStudents.map((student, index) => (
                       <TableRow key={student.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedStudents.has(student.id)}
+                            onCheckedChange={() => toggleStudentSelection(student.id)}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">{index + 1}</TableCell>
                         <TableCell className="font-medium">{student.full_name}</TableCell>
                         <TableCell>{student.student_id}</TableCell>
@@ -698,6 +832,7 @@ export default function Register() {
                     ))}
                   </TableBody>
                 </Table>
+                </>
               )}
             </CardContent>
           </Card>
