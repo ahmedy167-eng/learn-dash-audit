@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
+import { useStudentMessages } from '@/hooks/useStudentMessages';
 import { StudentLayout } from '@/components/student/StudentLayout';
 import { NoticesPanel } from '@/components/student/NoticesPanel';
 import { MessageAdminDialog } from '@/components/student/MessageAdminDialog';
+import { MessageNotificationBadge } from '@/components/student/MessageNotificationBadge';
+import { StudentMessagesDialog } from '@/components/student/StudentMessagesDialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ClipboardList, BookOpen, FolderOpen, User, MessageSquare } from 'lucide-react';
@@ -11,6 +14,19 @@ import { Link } from 'react-router-dom';
 const StudentPortal = () => {
   const { student } = useStudentAuth();
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  const [messagesDialogOpen, setMessagesDialogOpen] = useState(false);
+
+  const handleNewMessage = useCallback(() => {
+    setMessagesDialogOpen(true);
+  }, []);
+
+  const {
+    messages,
+    unreadCount,
+    loading: messagesLoading,
+    markAsRead,
+    markAllAsRead,
+  } = useStudentMessages(student?.id, handleNewMessage);
 
   const sections = [
     {
@@ -49,10 +65,16 @@ const StudentPortal = () => {
               Access your quizzes, track your progress, and manage your projects.
             </p>
           </div>
-          <Button onClick={() => setMessageDialogOpen(true)}>
-            <MessageSquare className="h-4 w-4 mr-2" />
-            Message Admin
-          </Button>
+          <div className="flex items-center gap-2">
+            <MessageNotificationBadge
+              unreadCount={unreadCount}
+              onClick={() => setMessagesDialogOpen(true)}
+            />
+            <Button onClick={() => setMessageDialogOpen(true)}>
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Message Admin
+            </Button>
+          </div>
         </div>
 
         {/* Student Info Card */}
@@ -115,6 +137,16 @@ const StudentPortal = () => {
       <MessageAdminDialog 
         open={messageDialogOpen} 
         onOpenChange={setMessageDialogOpen} 
+      />
+
+      <StudentMessagesDialog
+        open={messagesDialogOpen}
+        onOpenChange={setMessagesDialogOpen}
+        messages={messages}
+        unreadCount={unreadCount}
+        loading={messagesLoading}
+        onMarkAsRead={markAsRead}
+        onMarkAllAsRead={markAllAsRead}
       />
     </StudentLayout>
   );
