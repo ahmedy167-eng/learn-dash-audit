@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
+import { useStudentApi } from '@/hooks/useStudentApi';
 import { StudentLayout } from '@/components/student/StudentLayout';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +26,7 @@ interface QuizQuestion {
   option_b: string;
   option_c: string;
   option_d: string;
-  correct_answer: string;
+  correct_answer?: string;
 }
 
 interface QuizSubmission {
@@ -38,6 +38,7 @@ interface QuizSubmission {
 
 const StudentQuizzes = () => {
   const { student } = useStudentAuth();
+  const { getData, performAction } = useStudentApi();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -56,12 +57,7 @@ const StudentQuizzes = () => {
       return;
     }
 
-    const { data, error } = await supabase
-      .from('quizzes')
-      .select('*')
-      .eq('section_id', student.section_id)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
+    const { data, error } = await getData<Quiz[]>('quizzes');
 
     if (error) {
       toast.error('Failed to load quizzes');
@@ -76,10 +72,7 @@ const StudentQuizzes = () => {
     setLoading(true);
 
     // Fetch questions
-    const { data: questionsData, error: questionsError } = await supabase
-      .from('quiz_questions')
-      .select('*')
-      .eq('quiz_id', quiz.id);
+    const { data: questionsData, error: questionsError } = await getData<QuizQuestion[]>('quiz_questions', { quizId: quiz.id });
 
     if (questionsError) {
       toast.error('Failed to load quiz questions');
@@ -91,20 +84,16 @@ const StudentQuizzes = () => {
 
     // Fetch existing submissions
     if (student) {
-      const questionIds = questionsData?.map(q => q.id) || [];
-      if (questionIds.length > 0) {
-        const { data: submissionsData } = await supabase
-          .from('quiz_submissions')
-          .select('*')
-          .eq('student_id', student.id)
-          .in('question_id', questionIds);
+      const { data: submissionsData } = await getData<QuizSubmission[]>('quiz_submissions');
 
-        const submissionsMap: Record<string, QuizSubmission> = {};
-        submissionsData?.forEach(sub => {
+      const submissionsMap: Record<string, QuizSubmission> = {};
+      const questionIds = new Set((questionsData || []).map(q => q.id));
+      submissionsData?.forEach(sub => {
+        if (questionIds.has(sub.question_id)) {
           submissionsMap[sub.question_id] = sub;
-        });
-        setSubmissions(submissionsMap);
-      }
+        }
+      });
+      setSubmissions(submissionsMap);
     }
 
     setLoading(false);
@@ -122,27 +111,22 @@ const StudentQuizzes = () => {
 
     setSubmitting(true);
 
-    const isCorrect = currentAnswers[question.id] === question.correct_answer;
-
-    const { data, error } = await supabase
-      .from('quiz_submissions')
-      .insert({
-        question_id: question.id,
-        student_id: student.id,
-        selected_answer: currentAnswers[question.id],
-        is_correct: isCorrect,
-      })
-      .select()
-      .single();
+    // Note: correct_answer is not exposed to client anymore for security
+    // The server will validate and return whether it's correct
+    const { data, error } = await performAction<QuizSubmission>('submit_quiz', {
+      questionId: question.id,
+      selectedAnswer: currentAnswers[question.id],
+      isCorrect: false, // Server will validate this
+    });
 
     if (error) {
       toast.error('Failed to submit answer');
-    } else {
+    } else if (data) {
       setSubmissions(prev => ({ ...prev, [question.id]: data }));
-      if (isCorrect) {
+      if (data.is_correct) {
         toast.success('Correct answer! 🎉');
       } else {
-        toast.error(`Incorrect. The correct answer is ${question.correct_answer}`);
+        toast.error('Incorrect answer');
       }
     }
 
@@ -239,16 +223,7 @@ const StudentQuizzes = () => {
                         ].map((option) => (
                           <div key={option.value} className="flex items-center space-x-2">
                             <RadioGroupItem value={option.value} id={`${question.id}-${option.value}`} />
-                            <Label 
-                              htmlFor={`${question.id}-${option.value}`}
-                              className={
-                                hasSubmitted && option.value === question.correct_answer
-                                  ? 'text-green-600 font-medium'
-                                  : hasSubmitted && option.value === submission.selected_answer && !submission.is_correct
-                                  ? 'text-red-600'
-                                  : ''
-                              }
-                            >
+                            <Label htmlFor={`${question.id}-${option.value}`}>
                               {option.value}. {option.label}
                             </Label>
                           </div>

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useEffect, useState, useCallback } from 'react';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
+import { useStudentApi } from '@/hooks/useStudentApi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -32,19 +32,15 @@ const noticeColors: Record<string, string> = {
 
 export function NoticesPanel() {
   const { student } = useStudentAuth();
+  const { getData, performAction, getSessionToken } = useStudentApi();
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchNotices = async () => {
-    if (!student) return;
+  const fetchNotices = useCallback(async () => {
+    if (!student || !getSessionToken()) return;
 
     try {
-      const { data, error } = await supabase
-        .from('student_notices')
-        .select('*')
-        .eq('student_id', student.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
+      const { data, error } = await getData<Notice[]>('notices');
 
       if (error) throw error;
       setNotices(data || []);
@@ -53,18 +49,22 @@ export function NoticesPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [student, getData, getSessionToken]);
 
   useEffect(() => {
     fetchNotices();
-  }, [student]);
+
+    // Poll for new notices every 30 seconds
+    const interval = setInterval(() => {
+      fetchNotices();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchNotices]);
 
   const markAsRead = async (noticeId: string) => {
     try {
-      await supabase
-        .from('student_notices')
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .eq('id', noticeId);
+      await performAction('mark_notice_read', { noticeId });
 
       setNotices(prev => prev.map(n => 
         n.id === noticeId ? { ...n, is_read: true } : n

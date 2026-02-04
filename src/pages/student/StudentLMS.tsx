@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
+import { useStudentApi } from '@/hooks/useStudentApi';
 import { StudentLayout } from '@/components/student/StudentLayout';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { BookOpen, Trophy, CheckCircle, Clock, Loader2 } from 'lucide-react';
@@ -13,11 +13,12 @@ interface LMSProgress {
   unit_name: string;
   points: number;
   is_completed: boolean;
-  created_at: string;
+  updated_at: string;
 }
 
 const StudentLMS = () => {
   const { student } = useStudentAuth();
+  const { getData } = useStudentApi();
   const [progress, setProgress] = useState<LMSProgress[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,11 +32,7 @@ const StudentLMS = () => {
       return;
     }
 
-    const { data, error } = await supabase
-      .from('lms_progress')
-      .select('*')
-      .eq('student_id', student.id)
-      .order('created_at', { ascending: true });
+    const { data, error } = await getData<LMSProgress[]>('lms_progress');
 
     if (error) {
       toast.error('Failed to load LMS progress');

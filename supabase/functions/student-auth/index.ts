@@ -421,11 +421,27 @@ Deno.serve(async (req) => {
 
       switch (studentAction) {
         case 'submit_quiz': {
-          const { questionId, selectedAnswer, isCorrect } = actionData as {
+          const { questionId, selectedAnswer } = actionData as {
             questionId: string
             selectedAnswer: string
-            isCorrect: boolean
           }
+          
+          // Fetch the question to verify the correct answer server-side
+          const { data: question, error: questionError } = await supabaseAdmin
+            .from('quiz_questions')
+            .select('correct_answer')
+            .eq('id', questionId)
+            .single()
+
+          if (questionError || !question) {
+            return new Response(
+              JSON.stringify({ error: 'Question not found' }),
+              { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+
+          const isCorrect = selectedAnswer === question.correct_answer
+
           const insertResult = await supabaseAdmin
             .from('quiz_submissions')
             .insert([{
