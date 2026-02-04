@@ -17,6 +17,8 @@ interface Message {
   sender_type: string;
   sender_student_id: string | null;
   sender_user_id: string | null;
+  recipient_type: string;
+  recipient_user_id: string | null;
   subject: string | null;
   content: string;
   is_read: boolean;
@@ -33,11 +35,14 @@ export function MessageInbox() {
   const [sending, setSending] = useState(false);
 
   const fetchMessages = async () => {
+    if (!user) return;
+    
     try {
+      // Fetch messages addressed to admin OR to this specific user
       const { data, error } = await supabase
         .from('messages')
-        .select('id, sender_type, sender_student_id, sender_user_id, subject, content, is_read, created_at')
-        .eq('recipient_type', 'admin')
+        .select('id, sender_type, sender_student_id, sender_user_id, recipient_type, recipient_user_id, subject, content, is_read, created_at')
+        .or(`recipient_type.eq.admin,recipient_user_id.eq.${user.id}`)
         .order('created_at', { ascending: false })
         .limit(20);
 
