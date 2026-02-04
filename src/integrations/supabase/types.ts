@@ -1021,7 +1021,21 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      teacher_public_info: {
+        Row: {
+          full_name: string | null
+          user_id: string | null
+        }
+        Insert: {
+          full_name?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          full_name?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
