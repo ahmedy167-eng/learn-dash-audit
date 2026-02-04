@@ -14,10 +14,11 @@ interface Student {
   full_name: string;
   student_id: string;
   section_number: string | null;
+  section_id: string | null;
   course: string | null;
-  present_count: number;
-  late_count: number;
-  absent_count: number;
+  present_count: number | null;
+  late_count: number | null;
+  absent_count: number | null;
 }
 
 interface Section {

@@ -2,6 +2,7 @@ import { ReactNode, useState } from 'react';
 import { Navigate, NavLink as RouterNavLink, useLocation } from 'react-router-dom';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
 import { 
   LayoutDashboard, 
@@ -115,8 +116,11 @@ export function StudentLayout({ children }: StudentLayoutProps) {
           })}
         </nav>
 
-        {/* Logout */}
-        <div className="p-2 border-t border-border">
+        {/* Theme toggle and Logout */}
+        <div className="p-2 border-t border-border space-y-1">
+          <div className={cn("flex items-center", collapsed ? "justify-center" : "px-2")}>
+            <ThemeToggle />
+          </div>
           <Button
             variant="ghost"
             onClick={signOut}

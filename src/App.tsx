@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { PermissionsProvider } from "@/hooks/usePermissions";
 import { StudentAuthProvider } from "@/hooks/useStudentAuth";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import AdminLogin from "./pages/AdminLogin";
@@ -34,45 +35,47 @@ const queryClient = new QueryClient();
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <StudentAuthProvider>
-          <TooltipProvider>
-            <Sonner />
-            <BrowserRouter>
-              <PermissionsProvider>
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/admin-login" element={<AdminLogin />} />
-                  <Route path="/admin" element={<Admin />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/students" element={<Students />} />
-                  <Route path="/register" element={<Register />} />
-                  <Route path="/sections" element={<Sections />} />
-                  <Route path="/sections/new" element={<SectionForm />} />
-                  <Route path="/sections/edit/:id" element={<SectionForm />} />
-                  <Route path="/virtual-audit" element={<VirtualAudit />} />
-                  <Route path="/schedule" element={<Schedule />} />
-                  <Route path="/lesson-plan" element={<LessonPlan />} />
-                  <Route path="/tasks" element={<Tasks />} />
-                  <Route path="/off-days" element={<OffDays />} />
-                  <Route path="/quizzes" element={<Quizzes />} />
-                  <Route path="/lms-management" element={<LMSManagement />} />
-                  <Route path="/ca-projects" element={<CAProjects />} />
-                  <Route path="/student-login" element={<StudentLogin />} />
-                  <Route path="/student-portal" element={<StudentPortal />} />
-                  <Route path="/student-portal/quizzes" element={<StudentQuizzes />} />
-                  <Route path="/student-portal/lms" element={<StudentLMS />} />
-                  <Route path="/student-portal/ca-projects" element={<StudentCAProjects />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </PermissionsProvider>
-            </BrowserRouter>
-          </TooltipProvider>
-        </StudentAuthProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <StudentAuthProvider>
+            <TooltipProvider>
+              <Sonner />
+              <BrowserRouter>
+                <PermissionsProvider>
+                  <Routes>
+                    <Route path="/" element={<Index />} />
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/admin-login" element={<AdminLogin />} />
+                    <Route path="/admin" element={<Admin />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/students" element={<Students />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/sections" element={<Sections />} />
+                    <Route path="/sections/new" element={<SectionForm />} />
+                    <Route path="/sections/edit/:id" element={<SectionForm />} />
+                    <Route path="/virtual-audit" element={<VirtualAudit />} />
+                    <Route path="/schedule" element={<Schedule />} />
+                    <Route path="/lesson-plan" element={<LessonPlan />} />
+                    <Route path="/tasks" element={<Tasks />} />
+                    <Route path="/off-days" element={<OffDays />} />
+                    <Route path="/quizzes" element={<Quizzes />} />
+                    <Route path="/lms-management" element={<LMSManagement />} />
+                    <Route path="/ca-projects" element={<CAProjects />} />
+                    <Route path="/student-login" element={<StudentLogin />} />
+                    <Route path="/student-portal" element={<StudentPortal />} />
+                    <Route path="/student-portal/quizzes" element={<StudentQuizzes />} />
+                    <Route path="/student-portal/lms" element={<StudentLMS />} />
+                    <Route path="/student-portal/ca-projects" element={<StudentCAProjects />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </PermissionsProvider>
+              </BrowserRouter>
+            </TooltipProvider>
+          </StudentAuthProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 
