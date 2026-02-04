@@ -181,6 +181,15 @@ export function useStudentApi() {
     }
   }, [getSessionToken]);
 
+  const isSessionValid = useCallback(() => {
+    const token = getSessionToken();
+    const expiresAt = sessionStorage.getItem('sessionExpiresAt');
+    
+    if (!token || !expiresAt) return false;
+    
+    return new Date(expiresAt) > new Date();
+  }, [getSessionToken]);
+
   const getRecipients = useCallback(async (): Promise<{ data: Recipient[] | null; error: Error | null }> => {
     const sessionToken = getSessionToken();
     
@@ -207,23 +216,14 @@ export function useStudentApi() {
     }
   }, [getSessionToken]);
 
-  const isSessionValid = useCallback(() => {
-    const token = getSessionToken();
-    const expiresAt = sessionStorage.getItem('sessionExpiresAt');
-    
-    if (!token || !expiresAt) return false;
-    
-    return new Date(expiresAt) > new Date();
-  }, [getSessionToken]);
-
   return {
     login,
     logout,
     getData,
     performAction,
     getTeacher,
-    getRecipients,
     getSessionToken,
     isSessionValid,
+    getRecipients,
   };
 }
