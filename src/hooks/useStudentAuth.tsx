@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useStudentApi } from './useStudentApi';
+import { toast } from 'sonner';
 
 interface Student {
   id: string;
@@ -25,6 +26,17 @@ export function StudentAuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const { login, logout, isSessionValid } = useStudentApi();
+
+  useEffect(() => {
+    const onSessionExpired = () => {
+      setStudent(null);
+      setSessionId(null);
+      toast.error('Session expired. Please sign in again.');
+    };
+
+    window.addEventListener('student-auth:session-expired', onSessionExpired);
+    return () => window.removeEventListener('student-auth:session-expired', onSessionExpired);
+  }, []);
 
   useEffect(() => {
     // Check if student is already logged in (stored in sessionStorage)

@@ -39,6 +39,23 @@ export function useStudentApi() {
     return sessionStorage.getItem('studentSessionToken');
   }, []);
 
+  const clearStudentSession = useCallback(() => {
+    sessionStorage.removeItem('studentSessionToken');
+    sessionStorage.removeItem('studentAuth');
+    sessionStorage.removeItem('sessionId');
+    sessionStorage.removeItem('sessionExpiresAt');
+  }, []);
+
+  const notifyStudentSessionExpired = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('student-auth:session-expired'));
+  }, []);
+
+  const handleUnauthorized = useCallback(() => {
+    clearStudentSession();
+    notifyStudentSessionExpired();
+  }, [clearStudentSession, notifyStudentSessionExpired]);
+
   const login = useCallback(async (name: string, studentId: string): Promise<{ data: LoginResponse | null; error: Error | null }> => {
     try {
       const response = await fetch(`${STUDENT_AUTH_URL}/login`, {
@@ -80,11 +97,8 @@ export function useStudentApi() {
       }
     }
 
-    sessionStorage.removeItem('studentSessionToken');
-    sessionStorage.removeItem('studentAuth');
-    sessionStorage.removeItem('sessionId');
-    sessionStorage.removeItem('sessionExpiresAt');
-  }, [getSessionToken]);
+    clearStudentSession();
+  }, [clearStudentSession, getSessionToken]);
 
   const getData = useCallback(async <T,>(
     dataType: DataType, 
@@ -107,10 +121,7 @@ export function useStudentApi() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          // Session expired, clear storage
-          sessionStorage.removeItem('studentSessionToken');
-          sessionStorage.removeItem('studentAuth');
-          sessionStorage.removeItem('sessionId');
+          handleUnauthorized();
         }
         return { data: null, error: new Error(result.error || 'Failed to fetch data') };
       }
@@ -119,7 +130,7 @@ export function useStudentApi() {
     } catch (err) {
       return { data: null, error: err instanceof Error ? err : new Error('Network error') };
     }
-  }, [getSessionToken]);
+  }, [getSessionToken, handleUnauthorized]);
 
   const performAction = useCallback(async <T,>(
     action: ActionType,
@@ -142,9 +153,7 @@ export function useStudentApi() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          sessionStorage.removeItem('studentSessionToken');
-          sessionStorage.removeItem('studentAuth');
-          sessionStorage.removeItem('sessionId');
+          handleUnauthorized();
         }
         return { data: null, error: new Error(result.error || 'Action failed') };
       }
@@ -153,7 +162,7 @@ export function useStudentApi() {
     } catch (err) {
       return { data: null, error: err instanceof Error ? err : new Error('Network error') };
     }
-  }, [getSessionToken]);
+  }, [getSessionToken, handleUnauthorized]);
 
   const getTeacher = useCallback(async (): Promise<{ data: TeacherInfo | null; error: Error | null }> => {
     const sessionToken = getSessionToken();
@@ -172,6 +181,9 @@ export function useStudentApi() {
       const result = await response.json();
 
       if (!response.ok) {
+        if (response.status === 401) {
+          handleUnauthorized();
+        }
         return { data: null, error: new Error(result.error || 'Failed to fetch teacher') };
       }
 
@@ -179,7 +191,7 @@ export function useStudentApi() {
     } catch (err) {
       return { data: null, error: err instanceof Error ? err : new Error('Network error') };
     }
-  }, [getSessionToken]);
+  }, [getSessionToken, handleUnauthorized]);
 
   const isSessionValid = useCallback(() => {
     const token = getSessionToken();
@@ -207,6 +219,9 @@ export function useStudentApi() {
       const result = await response.json();
 
       if (!response.ok) {
+        if (response.status === 401) {
+          handleUnauthorized();
+        }
         return { data: null, error: new Error(result.error || 'Failed to fetch recipients') };
       }
 
@@ -214,7 +229,7 @@ export function useStudentApi() {
     } catch (err) {
       return { data: null, error: err instanceof Error ? err : new Error('Network error') };
     }
-  }, [getSessionToken]);
+  }, [getSessionToken, handleUnauthorized]);
 
   return {
     login,
