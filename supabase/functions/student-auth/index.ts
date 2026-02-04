@@ -782,32 +782,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Get all admins
-      const { data: adminRoles } = await supabaseAdmin
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'admin')
-
-      if (adminRoles && adminRoles.length > 0) {
-        const adminUserIds = adminRoles.map(r => r.user_id)
-        
-        const { data: adminProfiles } = await supabaseAdmin
-          .from('profiles')
-          .select('user_id, full_name')
-          .in('user_id', adminUserIds)
-
-        if (adminProfiles) {
-          for (const admin of adminProfiles) {
-            recipients.push({
-              user_id: admin.user_id,
-              full_name: admin.full_name,
-              type: 'admin',
-              label: admin.full_name || 'Administrator',
-            })
-          }
-        }
-      }
-
       console.log(`[student-auth] get-recipients: returning ${recipients.length} recipients`)
 
       return new Response(
