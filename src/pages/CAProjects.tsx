@@ -18,6 +18,7 @@ import { Plus, Trash2, Edit, FolderOpen, Upload, Download, Loader2, MessageSquar
 import { toast } from 'sonner';
 import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 interface Section {
   id: string;
@@ -829,7 +830,7 @@ const CAProjects = () => {
                                     <div className="bg-muted/50 p-3 rounded text-sm">
                                       <div 
                                         className="prose prose-sm max-w-none"
-                                        dangerouslySetInnerHTML={{ __html: submission.content }}
+                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(submission.content) }}
                                       />
                                     </div>
                                   )}

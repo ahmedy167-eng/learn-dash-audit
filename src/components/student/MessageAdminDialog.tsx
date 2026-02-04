@@ -57,8 +57,9 @@ export function MessageAdminDialog({ open, onOpenChange }: MessageAdminDialogPro
             .single();
 
           if (section?.user_id) {
+            // Use the public view that doesn't expose email addresses
             const { data: teacherProfile } = await supabase
-              .from('profiles')
+              .from('teacher_public_info')
               .select('user_id, full_name')
               .eq('user_id', section.user_id)
               .single();
