@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useStudentApi } from './useStudentApi';
 import { toast } from 'sonner';
 
 interface Message {
@@ -28,19 +28,18 @@ export function useStudentMessages(
   const [messages, setMessages] = useState<Message[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const { getData, performAction, getSessionToken } = useStudentApi();
 
   const fetchMessages = useCallback(async () => {
-    if (!studentId) return;
+    if (!studentId || !getSessionToken()) return;
 
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('id, subject, content, sender_type, is_read, read_at, created_at')
-        .eq('recipient_student_id', studentId)
-        .eq('recipient_type', 'student')
-        .order('created_at', { ascending: false });
+      const { data, error } = await getData<Message[]>('messages');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching messages:', error);
+        return;
+      }
 
       setMessages(data || []);
       setUnreadCount((data || []).filter(m => !m.is_read).length);
@@ -49,14 +48,11 @@ export function useStudentMessages(
     } finally {
       setLoading(false);
     }
-  }, [studentId]);
+  }, [studentId, getData, getSessionToken]);
 
   const markAsRead = async (messageId: string) => {
     try {
-      const { error } = await supabase
-        .from('messages')
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .eq('id', messageId);
+      const { error } = await performAction('mark_message_read', { messageId });
 
       if (error) throw error;
 
@@ -75,11 +71,7 @@ export function useStudentMessages(
     if (!studentId) return;
 
     try {
-      const { error } = await supabase
-        .from('messages')
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .eq('recipient_student_id', studentId)
-        .eq('is_read', false);
+      const { error } = await performAction('mark_all_messages_read', {});
 
       if (error) throw error;
 
@@ -92,46 +84,19 @@ export function useStudentMessages(
     }
   };
 
-  // Subscribe to realtime updates for new messages
+  // Fetch messages on mount and when studentId changes
   useEffect(() => {
     if (!studentId) return;
 
     fetchMessages();
 
-    const channel = supabase
-      .channel(`student-messages-${studentId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `recipient_student_id=eq.${studentId}`,
-        },
-        (payload) => {
-          const newMessage = payload.new as Message;
-          
-          // Show toast notification
-          toast.info('📬 New Message!', {
-            description: newMessage.subject || 'You have received a new message',
-            action: {
-              label: 'View',
-              onClick: () => onNewMessage?.(),
-            },
-            duration: 5000,
-          });
+    // Poll for new messages every 30 seconds since we can't use realtime without auth
+    const interval = setInterval(() => {
+      fetchMessages();
+    }, 30000);
 
-          // Update messages list and unread count
-          setMessages(prev => [newMessage, ...prev]);
-          setUnreadCount(prev => prev + 1);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [studentId, fetchMessages, onNewMessage]);
+    return () => clearInterval(interval);
+  }, [studentId, fetchMessages]);
 
   return {
     messages,

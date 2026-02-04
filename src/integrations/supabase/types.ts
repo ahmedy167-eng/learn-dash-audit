@@ -918,33 +918,39 @@ export type Database = {
       user_sessions: {
         Row: {
           created_at: string
+          expires_at: string | null
           id: string
           is_active: boolean | null
           login_at: string
           logout_at: string | null
           session_duration_minutes: number | null
+          session_token: string | null
           student_id: string | null
           user_id: string | null
           user_type: string
         }
         Insert: {
           created_at?: string
+          expires_at?: string | null
           id?: string
           is_active?: boolean | null
           login_at?: string
           logout_at?: string | null
           session_duration_minutes?: number | null
+          session_token?: string | null
           student_id?: string | null
           user_id?: string | null
           user_type: string
         }
         Update: {
           created_at?: string
+          expires_at?: string | null
           id?: string
           is_active?: boolean | null
           login_at?: string
           logout_at?: string | null
           session_duration_minutes?: number | null
+          session_token?: string | null
           student_id?: string | null
           user_id?: string | null
           user_type?: string

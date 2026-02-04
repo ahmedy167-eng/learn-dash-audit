@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
+import { useStudentApi } from '@/hooks/useStudentApi';
 import { StudentLayout } from '@/components/student/StudentLayout';
-import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import { saveAs } from 'file-saver';
 import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 interface CAProject {
   id: string;
@@ -44,6 +45,7 @@ const stages = [
 
 const StudentCAProjects = () => {
   const { student } = useStudentAuth();
+  const { getData, performAction } = useStudentApi();
   const [projects, setProjects] = useState<CAProject[]>([]);
   const [submissions, setSubmissions] = useState<Record<string, CASubmission[]>>({});
   const [currentContent, setCurrentContent] = useState<Record<string, string>>({});
@@ -59,29 +61,15 @@ const StudentCAProjects = () => {
     fetchProjects();
   }, [student]);
 
-  // Realtime subscription for live updates when admin uploads PDFs
+  // Poll for updates every 30 seconds since we can't use realtime without auth
   useEffect(() => {
     if (!student?.section_id) return;
 
-    const channel = supabase
-      .channel('ca-projects-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'ca_projects',
-          filter: `section_id=eq.${student.section_id}`
-        },
-        () => {
-          fetchProjects();
-        }
-      )
-      .subscribe();
+    const interval = setInterval(() => {
+      fetchProjects();
+    }, 30000);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => clearInterval(interval);
   }, [student?.section_id]);
 
   const fetchProjects = async () => {
@@ -90,11 +78,7 @@ const StudentCAProjects = () => {
       return;
     }
 
-    const { data, error } = await supabase
-      .from('ca_projects')
-      .select('*')
-      .eq('section_id', student.section_id)
-      .order('created_at', { ascending: false });
+    const { data, error } = await getData<CAProject[]>('ca_projects');
 
     if (error) {
       toast.error('Failed to load CA projects');
@@ -103,12 +87,7 @@ const StudentCAProjects = () => {
       
       // Fetch submissions for all projects
       if (data && data.length > 0 && student) {
-        const projectIds = data.map(p => p.id);
-        const { data: submissionsData } = await supabase
-          .from('ca_submissions')
-          .select('*')
-          .eq('student_id', student.id)
-          .in('project_id', projectIds);
+        const { data: submissionsData } = await getData<CASubmission[]>('ca_submissions');
 
         const submissionsMap: Record<string, CASubmission[]> = {};
         submissionsData?.forEach(sub => {
@@ -146,15 +125,18 @@ const StudentCAProjects = () => {
 
     setSubmitting(true);
 
+    // Sanitize content before submission
+    const sanitizedContent = sanitizeHtml(currentContent[stage]);
+
     // Check if submission already exists
     const existingSubmission = submissions[project.id]?.find(s => s.stage === stage);
 
     if (existingSubmission) {
       // Update existing
-      const { error } = await supabase
-        .from('ca_submissions')
-        .update({ content: currentContent[stage] })
-        .eq('id', existingSubmission.id);
+      const { error } = await performAction('update_ca', {
+        submissionId: existingSubmission.id,
+        content: sanitizedContent,
+      });
 
       if (error) {
         toast.error('Failed to update submission');
@@ -164,14 +146,11 @@ const StudentCAProjects = () => {
       }
     } else {
       // Create new
-      const { error } = await supabase
-        .from('ca_submissions')
-        .insert({
-          project_id: project.id,
-          student_id: student.id,
-          stage,
-          content: currentContent[stage],
-        });
+      const { error } = await performAction('submit_ca', {
+        projectId: project.id,
+        stage,
+        content: sanitizedContent,
+      });
 
       if (error) {
         toast.error('Failed to submit');
