@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth, isNetworkError } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Shield, Loader2 } from 'lucide-react';
+import { Shield, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -14,10 +14,14 @@ const loginSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 1000;
+
 export default function AdminLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showRetryButton, setShowRetryButton] = useState(false);
   
   const { signIn, user } = useAuth();
   const navigate = useNavigate();
@@ -27,6 +31,33 @@ export default function AdminLogin() {
       navigate('/admin', { replace: true });
     }
   }, [user, navigate]);
+
+  const handleLoginWithRetry = async (attempt = 0): Promise<void> => {
+    const { error } = await signIn(email, password);
+    
+    if (error) {
+      // Check if it's a network error and we should retry
+      if (isNetworkError(error) && attempt < MAX_RETRIES) {
+        toast.info(`Connection issue. Retrying... (${attempt + 1}/${MAX_RETRIES})`);
+        await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
+        return handleLoginWithRetry(attempt + 1);
+      }
+      
+      // Handle final errors
+      if (error.message.includes('Network error') || isNetworkError(error)) {
+        setShowRetryButton(true);
+        toast.error('Unable to connect. Please check your internet and try again.');
+      } else if (error.message.includes('Invalid login credentials')) {
+        toast.error('Invalid email or password. Please try again.');
+      } else {
+        toast.error(error.message);
+      }
+    } else {
+      setShowRetryButton(false);
+      toast.success('Welcome, Administrator!');
+      navigate('/admin');
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,19 +69,15 @@ export default function AdminLogin() {
     }
 
     setIsLoading(true);
-    const { error } = await signIn(email, password);
+    await handleLoginWithRetry(0);
     setIsLoading(false);
-    
-    if (error) {
-      if (error.message.includes('Invalid login credentials')) {
-        toast.error('Invalid email or password. Please try again.');
-      } else {
-        toast.error(error.message);
-      }
-    } else {
-      toast.success('Welcome, Administrator!');
-      navigate('/admin');
-    }
+  };
+
+  const handleRetry = async () => {
+    setShowRetryButton(false);
+    setIsLoading(true);
+    await handleLoginWithRetry(0);
+    setIsLoading(false);
   };
 
   return (
@@ -92,6 +119,28 @@ export default function AdminLogin() {
               Sign In as Admin
             </Button>
           </form>
+          
+          {showRetryButton && (
+            <div className="mt-4 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+              <p className="text-sm text-muted-foreground mb-2 text-center">
+                Connection failed. Please check your internet connection.
+              </p>
+              <Button 
+                onClick={handleRetry} 
+                variant="outline" 
+                className="w-full"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                Retry Connection
+              </Button>
+            </div>
+          )}
+          
           <div className="mt-4 text-center">
             <a href="/auth" className="text-sm text-muted-foreground hover:text-primary">
               ← Back to regular login

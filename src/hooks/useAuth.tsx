@@ -2,6 +2,17 @@ import { useState, useEffect, createContext, useContext, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+// Helper to detect network-level errors
+export const isNetworkError = (error: unknown): boolean => {
+  if (error instanceof TypeError && error.message === 'Failed to fetch') {
+    return true;
+  }
+  if (error instanceof Error && error.message.includes('Failed to fetch')) {
+    return true;
+  }
+  return false;
+};
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -41,25 +52,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string, fullName: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            full_name: fullName,
+          }
         }
+      });
+      return { error };
+    } catch (err) {
+      if (isNetworkError(err)) {
+        return { error: new Error('Network error. Please check your connection and try again.') };
       }
-    });
-    return { error };
+      return { error: err instanceof Error ? err : new Error('An unexpected error occurred') };
+    }
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error };
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return { error };
+    } catch (err) {
+      if (isNetworkError(err)) {
+        return { error: new Error('Network error. Please check your connection and try again.') };
+      }
+      return { error: err instanceof Error ? err : new Error('An unexpected error occurred') };
+    }
   };
 
   const signOut = async () => {
