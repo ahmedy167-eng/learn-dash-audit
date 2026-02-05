@@ -6,6 +6,70 @@ const corsHeaders = {
 }
 
 // ============================================================
+// RATE LIMITING UTILITIES
+// ============================================================
+
+const RATE_LIMIT_MAX_ATTEMPTS = 5
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
+
+interface RateLimitEntry {
+  attempts: number
+  resetTime: number
+}
+
+// Get client IP from request headers
+function getClientIP(req: Request): string {
+  // Try various headers that might contain the real IP
+  const forwarded = req.headers.get('x-forwarded-for')
+  if (forwarded) {
+    // x-forwarded-for can contain multiple IPs, take the first one
+    return forwarded.split(',')[0].trim()
+  }
+  
+  const realIp = req.headers.get('x-real-ip')
+  if (realIp) {
+    return realIp
+  }
+  
+  // Fallback to a hash of user-agent + some other identifiers
+  const userAgent = req.headers.get('user-agent') || 'unknown'
+  return `ua-${userAgent.slice(0, 50)}`
+}
+
+// Check and update rate limit for login attempts
+async function checkRateLimit(kv: Deno.Kv, clientIP: string): Promise<{ allowed: boolean; remainingAttempts?: number; retryAfterSeconds?: number }> {
+  const rateLimitKey = ['rate_limit', 'student_auth', clientIP]
+  const now = Date.now()
+  
+  const entry = await kv.get<RateLimitEntry>(rateLimitKey)
+  
+  if (entry.value) {
+    const { attempts, resetTime } = entry.value
+    
+    // Check if window has expired
+    if (now >= resetTime) {
+      // Reset the counter
+      await kv.set(rateLimitKey, { attempts: 1, resetTime: now + RATE_LIMIT_WINDOW_MS }, { expireIn: RATE_LIMIT_WINDOW_MS })
+      return { allowed: true, remainingAttempts: RATE_LIMIT_MAX_ATTEMPTS - 1 }
+    }
+    
+    // Check if max attempts reached
+    if (attempts >= RATE_LIMIT_MAX_ATTEMPTS) {
+      const retryAfterSeconds = Math.ceil((resetTime - now) / 1000)
+      return { allowed: false, remainingAttempts: 0, retryAfterSeconds }
+    }
+    
+    // Increment counter
+    await kv.set(rateLimitKey, { attempts: attempts + 1, resetTime }, { expireIn: resetTime - now })
+    return { allowed: true, remainingAttempts: RATE_LIMIT_MAX_ATTEMPTS - attempts - 1 }
+  }
+  
+  // No entry exists, create new one
+  await kv.set(rateLimitKey, { attempts: 1, resetTime: now + RATE_LIMIT_WINDOW_MS }, { expireIn: RATE_LIMIT_WINDOW_MS })
+  return { allowed: true, remainingAttempts: RATE_LIMIT_MAX_ATTEMPTS - 1 }
+}
+
+// ============================================================
 // INPUT VALIDATION UTILITIES
 // ============================================================
 
@@ -177,6 +241,9 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Initialize Deno KV for rate limiting
+    const kv = await Deno.openKv()
+    
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -187,6 +254,27 @@ Deno.serve(async (req) => {
 
     // Login endpoint - validates student credentials and creates session token
     if (action === 'login' && req.method === 'POST') {
+      // Rate limiting check
+      const clientIP = getClientIP(req)
+      const rateLimitResult = await checkRateLimit(kv, clientIP)
+      
+      if (!rateLimitResult.allowed) {
+        console.log(`[student-auth] Rate limit exceeded for IP: ${clientIP}`)
+        return new Response(
+          JSON.stringify({ 
+            error: `Too many login attempts. Please try again in ${Math.ceil((rateLimitResult.retryAfterSeconds || 900) / 60)} minutes.` 
+          }),
+          { 
+            status: 429, 
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json',
+              'Retry-After': String(rateLimitResult.retryAfterSeconds || 900)
+            } 
+          }
+        )
+      }
+      
       const { name, studentId }: StudentLoginRequest = await req.json()
 
       // Validate name

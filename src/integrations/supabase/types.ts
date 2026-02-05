@@ -1047,13 +1047,6 @@ export type Database = {
       }
     }
     Functions: {
-      get_teacher_public_info: {
-        Args: never
-        Returns: {
-          full_name: string
-          user_id: string
-        }[]
-      }
       has_permission: {
         Args: { _feature: string; _user_id: string }
         Returns: boolean
