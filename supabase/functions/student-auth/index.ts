@@ -123,7 +123,7 @@ const validators = {
   // Data type for get-data endpoint
   dataType: (val: unknown): ValidationResult => {
     if (typeof val !== 'string') return { valid: false, error: 'Data type must be a string' }
-    const validTypes = ['profile', 'messages', 'notices', 'quizzes', 'quiz_questions', 'quiz_submissions', 'lms_progress', 'ca_projects', 'ca_submissions', 'sections']
+       const validTypes = ['profile', 'messages', 'notices', 'quizzes', 'quiz_questions', 'quiz_submissions', 'quiz_results', 'lms_progress', 'ca_projects', 'ca_submissions', 'sections']
     if (!validTypes.includes(val)) {
       return { valid: false, error: 'Invalid data type' }
     }
@@ -160,7 +160,7 @@ interface StudentLoginRequest {
 
 interface StudentDataRequest {
   sessionToken: string
-  dataType: 'profile' | 'messages' | 'notices' | 'quizzes' | 'quiz_questions' | 'quiz_submissions' | 'lms_progress' | 'ca_projects' | 'ca_submissions' | 'sections'
+   dataType: 'profile' | 'messages' | 'notices' | 'quizzes' | 'quiz_questions' | 'quiz_submissions' | 'quiz_results' | 'lms_progress' | 'ca_projects' | 'ca_submissions' | 'sections'
   filters?: Record<string, unknown>
 }
 
@@ -479,6 +479,107 @@ Deno.serve(async (req) => {
           break
         }
 
+         case 'quiz_results': {
+           const quizId = filters?.quizId as string
+           if (!quizId) {
+             return new Response(
+               JSON.stringify({ error: 'Quiz ID is required' }),
+               { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+             )
+           }
+           
+           // Validate quiz ID format
+           const quizIdValidation = validators.uuid(quizId)
+           if (!quizIdValidation.valid) {
+             return validationError('Invalid quiz ID format')
+           }
+           
+           // Get all questions for this quiz
+           const { data: allQuestions, error: questionsError } = await supabaseAdmin
+             .from('quiz_questions')
+             .select('id, question_text, reading_passage, option_a, option_b, option_c, option_d, correct_answer, explanation')
+             .eq('quiz_id', quizId)
+           
+           if (questionsError) {
+             console.error('[student-auth] Failed to fetch quiz questions:', questionsError)
+             return new Response(
+               JSON.stringify({ error: 'Failed to fetch quiz data' }),
+               { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+             )
+           }
+           
+           if (!allQuestions || allQuestions.length === 0) {
+             data = { complete: false, results: [], message: 'No questions found for this quiz' }
+             break
+           }
+           
+           // Get student's submissions for this quiz
+           const questionIds = allQuestions.map(q => q.id)
+           const { data: submissions, error: submissionsError } = await supabaseAdmin
+             .from('quiz_submissions')
+             .select('question_id, selected_answer, is_correct, submitted_at')
+             .eq('student_id', studentId)
+             .in('question_id', questionIds)
+           
+           if (submissionsError) {
+             console.error('[student-auth] Failed to fetch submissions:', submissionsError)
+             return new Response(
+               JSON.stringify({ error: 'Failed to fetch submission data' }),
+               { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+             )
+           }
+           
+           // Check if ALL questions have been answered
+           const answeredQuestions = new Set(submissions?.map(s => s.question_id) || [])
+           const allAnswered = allQuestions.every(q => answeredQuestions.has(q.id))
+           
+           if (!allAnswered) {
+             // Return incomplete status - don't reveal answers yet
+             data = { 
+               complete: false, 
+               totalQuestions: allQuestions.length,
+               answeredCount: answeredQuestions.size,
+               message: 'Complete all questions to see your results' 
+             }
+             break
+           }
+           
+           // All questions answered - return full results with correct answers and explanations
+           const submissionMap = new Map(submissions?.map(s => [s.question_id, s]) || [])
+           
+           const results = allQuestions.map(q => {
+             const submission = submissionMap.get(q.id)
+             return {
+               question_id: q.id,
+               question_text: q.question_text,
+               reading_passage: q.reading_passage,
+               option_a: q.option_a,
+               option_b: q.option_b,
+               option_c: q.option_c,
+               option_d: q.option_d,
+               selected_answer: submission?.selected_answer || null,
+               correct_answer: q.correct_answer,
+               is_correct: submission?.is_correct || false,
+               explanation: q.explanation,
+               submitted_at: submission?.submitted_at || null
+             }
+           })
+           
+           const correctCount = results.filter(r => r.is_correct).length
+           const incorrectCount = results.filter(r => !r.is_correct).length
+           const scorePercentage = Math.round((correctCount / results.length) * 100)
+           
+           data = {
+             complete: true,
+             totalQuestions: results.length,
+             correctCount,
+             incorrectCount,
+             scorePercentage,
+             results
+           }
+           break
+         }
+ 
         case 'lms_progress': {
           const result = await supabaseAdmin
             .from('lms_progress')

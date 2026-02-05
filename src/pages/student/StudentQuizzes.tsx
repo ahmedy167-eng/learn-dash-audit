@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { ClipboardList, CheckCircle, XCircle, ArrowLeft, Loader2 } from 'lucide-react';
+ import { ClipboardList, CheckCircle, XCircle, ArrowLeft, Loader2, Trophy, Lightbulb } from 'lucide-react';
+ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 
 interface Quiz {
@@ -36,6 +37,31 @@ interface QuizSubmission {
   is_correct: boolean;
 }
 
+ interface QuizResult {
+   question_id: string;
+   question_text: string;
+   reading_passage: string | null;
+   option_a: string;
+   option_b: string;
+   option_c: string;
+   option_d: string;
+   selected_answer: string | null;
+   correct_answer: string;
+   is_correct: boolean;
+   explanation: string | null;
+ }
+ 
+ interface QuizResultsData {
+   complete: boolean;
+   totalQuestions: number;
+   correctCount?: number;
+   incorrectCount?: number;
+   scorePercentage?: number;
+   answeredCount?: number;
+   results?: QuizResult[];
+   message?: string;
+ }
+ 
 const StudentQuizzes = () => {
   const { student } = useStudentAuth();
   const { getData, performAction } = useStudentApi();
@@ -46,6 +72,9 @@ const StudentQuizzes = () => {
   const [currentAnswers, setCurrentAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+   const [showResults, setShowResults] = useState(false);
+   const [quizResults, setQuizResults] = useState<QuizResultsData | null>(null);
+   const [loadingResults, setLoadingResults] = useState(false);
 
   useEffect(() => {
     fetchQuizzes();
@@ -138,7 +167,43 @@ const StudentQuizzes = () => {
     setQuestions([]);
     setSubmissions({});
     setCurrentAnswers({});
+     setShowResults(false);
+     setQuizResults(null);
   };
+ 
+   // Check if all questions are answered
+   const allQuestionsAnswered = questions.length > 0 && questions.every(q => !!submissions[q.id]);
+ 
+   const handleViewResults = async () => {
+     if (!selectedQuiz) return;
+     
+     setLoadingResults(true);
+     const { data, error } = await getData<QuizResultsData>('quiz_results', { quizId: selectedQuiz.id });
+     
+     if (error) {
+       toast.error('Failed to load results');
+       setLoadingResults(false);
+       return;
+     }
+     
+     if (data && data.complete) {
+       setQuizResults(data);
+       setShowResults(true);
+     } else {
+       toast.error(data?.message || 'Complete all questions first');
+     }
+     setLoadingResults(false);
+   };
+ 
+   const getOptionLabel = (answer: string, question: QuizResult) => {
+     switch (answer) {
+       case 'A': return question.option_a;
+       case 'B': return question.option_b;
+       case 'C': return question.option_c;
+       case 'D': return question.option_d;
+       default: return '';
+     }
+   };
 
   if (loading && !selectedQuiz) {
     return (
@@ -150,8 +215,144 @@ const StudentQuizzes = () => {
     );
   }
 
-  // Quiz Detail View
+   // Quiz Results View
   if (selectedQuiz) {
+     if (showResults && quizResults) {
+       return (
+         <StudentLayout>
+           <div className="p-6 md:p-8">
+             <Button variant="ghost" onClick={() => setShowResults(false)} className="mb-4">
+               <ArrowLeft className="mr-2 h-4 w-4" />
+               Back to Questions
+             </Button>
+ 
+             {/* Score Summary Card */}
+             <Card className="mb-6 border-primary/20">
+               <CardHeader className="text-center pb-4">
+                 <div className="mx-auto mb-4 p-4 bg-primary/10 rounded-full w-fit">
+                   <Trophy className="h-8 w-8 text-primary" />
+                 </div>
+                 <CardTitle className="text-2xl">Quiz Complete!</CardTitle>
+                 <CardDescription>{selectedQuiz.title}</CardDescription>
+               </CardHeader>
+               <CardContent className="space-y-4">
+                 <div className="text-center">
+                   <p className="text-4xl font-bold text-primary mb-2">
+                     {quizResults.correctCount}/{quizResults.totalQuestions}
+                   </p>
+                   <p className="text-muted-foreground">
+                     Score: {quizResults.scorePercentage}%
+                   </p>
+                 </div>
+                 <Progress value={quizResults.scorePercentage} className="h-3" />
+                 <div className="flex justify-center gap-6 pt-2">
+                   <div className="text-center">
+                     <div className="flex items-center gap-1 text-green-600">
+                       <CheckCircle className="h-4 w-4" />
+                       <span className="font-semibold">{quizResults.correctCount}</span>
+                     </div>
+                     <p className="text-xs text-muted-foreground">Correct</p>
+                   </div>
+                   <div className="text-center">
+                     <div className="flex items-center gap-1 text-red-600">
+                       <XCircle className="h-4 w-4" />
+                       <span className="font-semibold">{quizResults.incorrectCount}</span>
+                     </div>
+                     <p className="text-xs text-muted-foreground">Incorrect</p>
+                   </div>
+                 </div>
+               </CardContent>
+             </Card>
+ 
+             {/* Question Results */}
+             <div className="space-y-4">
+               <h2 className="text-lg font-semibold">Question Review</h2>
+               {quizResults.results?.map((result, index) => (
+                 <Card key={result.question_id} className={result.is_correct ? 'border-green-200' : 'border-red-200'}>
+                   <CardHeader className="pb-3">
+                     <div className="flex items-start justify-between">
+                       <CardTitle className="text-base">Question {index + 1}</CardTitle>
+                       <Badge variant={result.is_correct ? 'default' : 'destructive'}>
+                         {result.is_correct ? (
+                           <><CheckCircle className="w-3 h-3 mr-1" /> Correct</>
+                         ) : (
+                           <><XCircle className="w-3 h-3 mr-1" /> Incorrect</>
+                         )}
+                       </Badge>
+                     </div>
+                   </CardHeader>
+                   <CardContent className="space-y-4">
+                     {result.reading_passage && (
+                       <div className="bg-muted/50 p-4 rounded-lg">
+                         <p className="text-sm font-medium mb-2">Reading Passage:</p>
+                         <p className="text-sm whitespace-pre-wrap">{result.reading_passage}</p>
+                       </div>
+                     )}
+ 
+                     <p className="font-medium">{result.question_text}</p>
+ 
+                     <div className="space-y-2">
+                       {['A', 'B', 'C', 'D'].map((option) => {
+                         const isSelected = result.selected_answer === option;
+                         const isCorrect = result.correct_answer === option;
+                         let className = 'p-3 rounded-lg border text-sm flex items-center justify-between';
+                         
+                         if (isCorrect) {
+                           className += ' bg-green-50 border-green-300 dark:bg-green-950/30 dark:border-green-700';
+                         } else if (isSelected && !isCorrect) {
+                           className += ' bg-red-50 border-red-300 dark:bg-red-950/30 dark:border-red-700';
+                         } else {
+                           className += ' bg-muted/30 border-border';
+                         }
+                         
+                         return (
+                           <div key={option} className={className}>
+                             <span>
+                               <span className="font-semibold mr-2">{option}.</span>
+                               {getOptionLabel(option, result)}
+                             </span>
+                             <div className="flex items-center gap-2">
+                               {isSelected && (
+                                 <Badge variant="outline" className="text-xs">Your answer</Badge>
+                               )}
+                               {isCorrect && (
+                                 <CheckCircle className="h-4 w-4 text-green-600" />
+                               )}
+                             </div>
+                           </div>
+                         );
+                       })}
+                     </div>
+ 
+                     {/* Explanation for incorrect answers */}
+                     {!result.is_correct && result.explanation && (
+                       <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                         <div className="flex items-start gap-2">
+                           <Lightbulb className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                           <div>
+                             <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">Explanation</p>
+                             <p className="text-sm text-amber-700 dark:text-amber-300">{result.explanation}</p>
+                           </div>
+                         </div>
+                       </div>
+                     )}
+                   </CardContent>
+                 </Card>
+               ))}
+             </div>
+ 
+             <div className="mt-6">
+               <Button onClick={goBack} variant="outline" className="w-full">
+                 <ArrowLeft className="mr-2 h-4 w-4" />
+                 Back to Quizzes
+               </Button>
+             </div>
+           </div>
+         </StudentLayout>
+       );
+     }
+ 
+     // Quiz Questions View
     return (
       <StudentLayout>
         <div className="p-6 md:p-8">
@@ -180,6 +381,24 @@ const StudentQuizzes = () => {
             </Card>
           ) : (
             <div className="space-y-6">
+               {/* Done Button - Shows when all questions are answered */}
+               {allQuestionsAnswered && (
+                 <Card className="border-primary/50 bg-primary/5">
+                   <CardContent className="flex flex-col items-center justify-center py-6">
+                     <CheckCircle className="h-8 w-8 text-primary mb-2" />
+                     <p className="text-lg font-semibold mb-1">All questions answered!</p>
+                     <p className="text-sm text-muted-foreground mb-4">Click below to see your results</p>
+                     <Button onClick={handleViewResults} disabled={loadingResults} size="lg">
+                       {loadingResults ? (
+                         <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading Results...</>
+                       ) : (
+                         <><Trophy className="mr-2 h-4 w-4" /> View Results</>
+                       )}
+                     </Button>
+                   </CardContent>
+                 </Card>
+               )}
+ 
               {questions.map((question, index) => {
                 const submission = submissions[question.id];
                 const hasSubmitted = !!submission;

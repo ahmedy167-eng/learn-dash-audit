@@ -13,7 +13,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Trash2, Edit, ClipboardList, Loader2, CheckCircle, HelpCircle, BookOpen, Users } from 'lucide-react';
+ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+ import { Plus, Trash2, Edit, ClipboardList, Loader2, CheckCircle, HelpCircle, BookOpen, Users, BarChart3, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 
 interface Section {
@@ -47,6 +50,25 @@ interface QuizQuestion {
   option_c: string;
   option_d: string;
   correct_answer: string;
+   explanation: string | null;
+ }
+ 
+ interface StudentQuizSubmission {
+   student_id: string;
+   student_name: string;
+   student_number: string;
+   total_questions: number;
+   correct_answers: number;
+   incorrect_answers: number;
+   score_percentage: number;
+   submitted_at: string;
+   answers: {
+     question_id: string;
+     question_text: string;
+     selected_answer: string;
+     correct_answer: string;
+     is_correct: boolean;
+   }[];
 }
 
 const Quizzes = () => {
@@ -76,6 +98,13 @@ const Quizzes = () => {
   const [optionD, setOptionD] = useState('');
   const [correctAnswer, setCorrectAnswer] = useState('');
   const [editingQuestion, setEditingQuestion] = useState<QuizQuestion | null>(null);
+   const [explanation, setExplanation] = useState('');
+ 
+   // Results view states
+   const [resultsDialogOpen, setResultsDialogOpen] = useState(false);
+   const [resultsLoading, setResultsLoading] = useState(false);
+   const [studentResults, setStudentResults] = useState<StudentQuizSubmission[]>([]);
+   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -131,10 +160,105 @@ const Quizzes = () => {
     if (error) {
       toast.error('Failed to load questions');
     } else {
-      setQuestions(data || []);
+       setQuestions((data || []).map(q => ({ ...q, explanation: q.explanation || null })));
     }
   };
 
+   const fetchQuizResults = async (quizId: string) => {
+     setResultsLoading(true);
+     
+     // Fetch all questions for this quiz
+     const { data: questionsData } = await supabase
+       .from('quiz_questions')
+       .select('id, question_text, correct_answer')
+       .eq('quiz_id', quizId);
+     
+     if (!questionsData || questionsData.length === 0) {
+       setStudentResults([]);
+       setResultsLoading(false);
+       return;
+     }
+     
+     const questionIds = questionsData.map(q => q.id);
+     
+     // Fetch all submissions for these questions
+     const { data: submissionsData } = await supabase
+       .from('quiz_submissions')
+       .select('student_id, question_id, selected_answer, is_correct, submitted_at')
+       .in('question_id', questionIds);
+     
+     if (!submissionsData || submissionsData.length === 0) {
+       setStudentResults([]);
+       setResultsLoading(false);
+       return;
+     }
+     
+     // Get unique student IDs
+     const studentIds = [...new Set(submissionsData.map(s => s.student_id))];
+     
+     // Fetch student details
+     const { data: studentsData } = await supabase
+       .from('students')
+       .select('id, full_name, student_id')
+       .in('id', studentIds);
+     
+     const studentsMap = new Map(studentsData?.map(s => [s.id, s]) || []);
+     const questionsMap = new Map(questionsData.map(q => [q.id, q]));
+     
+     // Group submissions by student
+     const studentSubmissions = new Map<string, typeof submissionsData>();
+     submissionsData.forEach(sub => {
+       const existing = studentSubmissions.get(sub.student_id) || [];
+       existing.push(sub);
+       studentSubmissions.set(sub.student_id, existing);
+     });
+     
+     // Build results
+     const results: StudentQuizSubmission[] = [];
+     studentSubmissions.forEach((subs, studentId) => {
+       const student = studentsMap.get(studentId);
+       if (!student) return;
+       
+       const correctCount = subs.filter(s => s.is_correct).length;
+       const latestSubmission = subs.reduce((latest, s) => 
+         new Date(s.submitted_at) > new Date(latest.submitted_at) ? s : latest
+       , subs[0]);
+       
+       results.push({
+         student_id: studentId,
+         student_name: student.full_name,
+         student_number: student.student_id,
+         total_questions: questionsData.length,
+         correct_answers: correctCount,
+         incorrect_answers: subs.length - correctCount,
+         score_percentage: Math.round((correctCount / questionsData.length) * 100),
+         submitted_at: latestSubmission.submitted_at,
+         answers: subs.map(s => {
+           const question = questionsMap.get(s.question_id);
+           return {
+             question_id: s.question_id,
+             question_text: question?.question_text || '',
+             selected_answer: s.selected_answer,
+             correct_answer: question?.correct_answer || '',
+             is_correct: s.is_correct
+           };
+         })
+       });
+     });
+     
+     // Sort by score descending
+     results.sort((a, b) => b.score_percentage - a.score_percentage);
+     
+     setStudentResults(results);
+     setResultsLoading(false);
+   };
+ 
+   const openResultsDialog = (quiz: Quiz) => {
+     setSelectedQuiz(quiz);
+     setResultsDialogOpen(true);
+     fetchQuizResults(quiz.id);
+   };
+ 
   const handleCreateQuiz = async () => {
     if (!user || !formTitle.trim() || !formSectionId) {
       toast.error('Please fill in all required fields');
@@ -224,6 +348,7 @@ const Quizzes = () => {
         option_c: optionC.trim(),
         option_d: optionD.trim(),
         correct_answer: correctAnswer,
+         explanation: explanation.trim() || null,
       });
 
     if (error) {
@@ -252,6 +377,7 @@ const Quizzes = () => {
         option_c: optionC.trim(),
         option_d: optionD.trim(),
         correct_answer: correctAnswer,
+         explanation: explanation.trim() || null,
       })
       .eq('id', editingQuestion.id);
 
@@ -298,6 +424,7 @@ const Quizzes = () => {
     setOptionD('');
     setCorrectAnswer('');
     setEditingQuestion(null);
+     setExplanation('');
   };
 
   const openEditQuiz = (quiz: Quiz) => {
@@ -318,6 +445,7 @@ const Quizzes = () => {
     setOptionC(question.option_c);
     setOptionD(question.option_d);
     setCorrectAnswer(question.correct_answer);
+     setExplanation(question.explanation || '');
     setQuestionDialogOpen(true);
   };
 
@@ -535,6 +663,13 @@ const Quizzes = () => {
                             <Edit className="h-3.5 w-3.5 mr-1" />
                             Edit
                           </Button>
+                         <Button 
+                           variant="outline" 
+                           size="sm"
+                           onClick={(e) => { e.stopPropagation(); openResultsDialog(quiz); }}
+                         >
+                           <BarChart3 className="h-3.5 w-3.5" />
+                         </Button>
                           <Button 
                             variant="outline" 
                             size="sm"
@@ -613,6 +748,18 @@ const Quizzes = () => {
                           </SelectContent>
                         </Select>
                       </div>
+                       <div className="space-y-2">
+                         <Label>Explanation (Optional)</Label>
+                         <Textarea 
+                           value={explanation} 
+                           onChange={(e) => setExplanation(e.target.value)} 
+                           placeholder="Explain why this is the correct answer... (shown to students after they complete the quiz)" 
+                           rows={3} 
+                         />
+                         <p className="text-xs text-muted-foreground">
+                           This explanation will be shown to students who answer incorrectly after completing the quiz
+                         </p>
+                       </div>
                       <Button onClick={editingQuestion ? handleUpdateQuestion : handleCreateQuestion} className="w-full">
                         {editingQuestion ? 'Update Question' : 'Add Question'}
                       </Button>
@@ -705,6 +852,13 @@ const Quizzes = () => {
                             Delete
                           </Button>
                         </div>
+                         
+                         {question.explanation && (
+                           <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
+                             <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-1">💡 Explanation</p>
+                             <p className="text-sm text-amber-700 dark:text-amber-300">{question.explanation}</p>
+                           </div>
+                         )}
                       </CardContent>
                     </Card>
                   ))}
@@ -714,6 +868,123 @@ const Quizzes = () => {
             </CardContent>
           </Card>
         </div>
+         
+         {/* Results Dialog */}
+         <Dialog open={resultsDialogOpen} onOpenChange={setResultsDialogOpen}>
+           <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+             <DialogHeader>
+               <DialogTitle className="flex items-center gap-2">
+                 <BarChart3 className="h-5 w-5" />
+                 Quiz Results: {selectedQuiz?.title}
+               </DialogTitle>
+               <DialogDescription>
+                 Student performance and detailed answers
+               </DialogDescription>
+             </DialogHeader>
+             
+             <ScrollArea className="flex-1 -mx-6 px-6">
+               {resultsLoading ? (
+                 <div className="flex items-center justify-center py-12">
+                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                 </div>
+               ) : studentResults.length === 0 ? (
+                 <div className="flex flex-col items-center justify-center py-12">
+                   <BarChart3 className="h-12 w-12 text-muted-foreground mb-4" />
+                   <p className="text-muted-foreground">No submissions yet</p>
+                   <p className="text-sm text-muted-foreground">Students haven't taken this quiz yet</p>
+                 </div>
+               ) : (
+                 <div className="space-y-3">
+                   {studentResults.map((result) => (
+                     <Collapsible 
+                       key={result.student_id}
+                       open={expandedStudent === result.student_id}
+                       onOpenChange={(open) => setExpandedStudent(open ? result.student_id : null)}
+                     >
+                       <Card>
+                         <CollapsibleTrigger asChild>
+                           <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors pb-3">
+                             <div className="flex items-center justify-between">
+                               <div className="flex items-center gap-3">
+                                 <div className="space-y-1">
+                                   <CardTitle className="text-base">{result.student_name}</CardTitle>
+                                   <CardDescription className="text-xs">ID: {result.student_number}</CardDescription>
+                                 </div>
+                               </div>
+                               <div className="flex items-center gap-4">
+                                 <div className="text-right">
+                                   <p className="text-lg font-bold text-primary">{result.score_percentage}%</p>
+                                   <p className="text-xs text-muted-foreground">
+                                     {result.correct_answers}/{result.total_questions} correct
+                                   </p>
+                                 </div>
+                                 <div className="flex items-center gap-2">
+                                   <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
+                                     <CheckCircle className="h-3 w-3 mr-1" />
+                                     {result.correct_answers}
+                                   </Badge>
+                                   <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200">
+                                     <XCircle className="h-3 w-3 mr-1" />
+                                     {result.incorrect_answers}
+                                   </Badge>
+                                   {expandedStudent === result.student_id ? (
+                                     <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                   ) : (
+                                     <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                   )}
+                                 </div>
+                               </div>
+                             </div>
+                             <Progress value={result.score_percentage} className="h-2 mt-2" />
+                           </CardHeader>
+                         </CollapsibleTrigger>
+                         <CollapsibleContent>
+                           <CardContent className="pt-0">
+                             <Separator className="mb-4" />
+                             <Table>
+                               <TableHeader>
+                                 <TableRow>
+                                   <TableHead className="w-12">#</TableHead>
+                                   <TableHead>Question</TableHead>
+                                   <TableHead className="w-24">Selected</TableHead>
+                                   <TableHead className="w-24">Correct</TableHead>
+                                   <TableHead className="w-20">Result</TableHead>
+                                 </TableRow>
+                               </TableHeader>
+                               <TableBody>
+                                 {result.answers.map((answer, idx) => (
+                                   <TableRow key={answer.question_id}>
+                                     <TableCell className="font-medium">{idx + 1}</TableCell>
+                                     <TableCell className="max-w-xs truncate">{answer.question_text}</TableCell>
+                                     <TableCell>
+                                       <Badge variant="outline">{answer.selected_answer}</Badge>
+                                     </TableCell>
+                                     <TableCell>
+                                       <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
+                                         {answer.correct_answer}
+                                       </Badge>
+                                     </TableCell>
+                                     <TableCell>
+                                       {answer.is_correct ? (
+                                         <CheckCircle className="h-5 w-5 text-green-600" />
+                                       ) : (
+                                         <XCircle className="h-5 w-5 text-red-600" />
+                                       )}
+                                     </TableCell>
+                                   </TableRow>
+                                 ))}
+                               </TableBody>
+                             </Table>
+                           </CardContent>
+                         </CollapsibleContent>
+                       </Card>
+                     </Collapsible>
+                   ))}
+                 </div>
+               )}
+             </ScrollArea>
+           </DialogContent>
+         </Dialog>
       </div>
     </DashboardLayout>
   );
