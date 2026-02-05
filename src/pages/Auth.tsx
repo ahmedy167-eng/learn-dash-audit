@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth, isNetworkError } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { GraduationCap, Loader2, ArrowLeft } from 'lucide-react';
+import { GraduationCap, Loader2, ArrowLeft, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -26,6 +26,9 @@ const resetSchema = z.object({
   email: z.string().email('Invalid email address'),
 });
 
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 1000;
+
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [loginEmail, setLoginEmail] = useState('');
@@ -36,6 +39,8 @@ export default function Auth() {
   const [resetEmail, setResetEmail] = useState('');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [showRetryButton, setShowRetryButton] = useState(false);
+  const [lastAction, setLastAction] = useState<'login' | 'signup' | null>(null);
   
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
@@ -45,6 +50,34 @@ export default function Auth() {
       navigate('/dashboard', { replace: true });
     }
   }, [user, navigate]);
+
+  const handleLoginWithRetry = async (attempt = 0): Promise<void> => {
+    const { error } = await signIn(loginEmail, loginPassword);
+    
+    if (error) {
+      // Check if it's a network error and we should retry
+      if (isNetworkError(error) && attempt < MAX_RETRIES) {
+        toast.info(`Connection issue. Retrying... (${attempt + 1}/${MAX_RETRIES})`);
+        await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
+        return handleLoginWithRetry(attempt + 1);
+      }
+      
+      // Handle final errors
+      if (error.message.includes('Network error') || isNetworkError(error)) {
+        setShowRetryButton(true);
+        setLastAction('login');
+        toast.error('Unable to connect. Please check your internet and try again.');
+      } else if (error.message.includes('Invalid login credentials')) {
+        toast.error('Invalid email or password. Please try again.');
+      } else {
+        toast.error(error.message);
+      }
+    } else {
+      setShowRetryButton(false);
+      toast.success('Welcome back!');
+      navigate('/dashboard');
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,25 +89,34 @@ export default function Auth() {
     }
 
     setIsLoading(true);
-    try {
-      const { error } = await signIn(loginEmail, loginPassword);
-      
-      if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          toast.error('Invalid email or password. Please try again.');
-        } else if (error.message.includes('Failed to fetch')) {
-          toast.error('Network error. Please check your connection and try again.');
-        } else {
-          toast.error(error.message);
-        }
-      } else {
-        toast.success('Welcome back!');
-        navigate('/dashboard');
+    await handleLoginWithRetry(0);
+    setIsLoading(false);
+  };
+
+  const handleSignupWithRetry = async (attempt = 0): Promise<void> => {
+    const { error } = await signUp(signupEmail, signupPassword, signupName);
+    
+    if (error) {
+      // Check if it's a network error and we should retry
+      if (isNetworkError(error) && attempt < MAX_RETRIES) {
+        toast.info(`Connection issue. Retrying... (${attempt + 1}/${MAX_RETRIES})`);
+        await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
+        return handleSignupWithRetry(attempt + 1);
       }
-    } catch (err) {
-      toast.error('Network error. Please check your connection and try again.');
-    } finally {
-      setIsLoading(false);
+      
+      // Handle final errors
+      if (error.message.includes('Network error') || isNetworkError(error)) {
+        setShowRetryButton(true);
+        setLastAction('signup');
+        toast.error('Unable to connect. Please check your internet and try again.');
+      } else if (error.message.includes('already registered')) {
+        toast.error('This email is already registered. Please sign in instead.');
+      } else {
+        toast.error(error.message);
+      }
+    } else {
+      setShowRetryButton(false);
+      toast.success('Account created! Please check your email to verify your account.');
     }
   };
 
@@ -92,23 +134,19 @@ export default function Auth() {
     }
 
     setIsLoading(true);
-    try {
-      const { error } = await signUp(signupEmail, signupPassword, signupName);
-      
-      if (error) {
-        if (error.message.includes('already registered')) {
-          toast.error('This email is already registered. Please sign in instead.');
-        } else if (error.message.includes('Failed to fetch')) {
-          toast.error('Network error. Please check your connection and try again.');
-        } else {
-          toast.error(error.message);
-        }
-      } else {
-        toast.success('Account created! Please check your email to verify your account.');
-      }
-    } catch (err) {
-      toast.error('Network error. Please check your connection and try again.');
-    } finally {
+    await handleSignupWithRetry(0);
+    setIsLoading(false);
+  };
+
+  const handleRetry = async () => {
+    setShowRetryButton(false);
+    if (lastAction === 'login') {
+      setIsLoading(true);
+      await handleLoginWithRetry(0);
+      setIsLoading(false);
+    } else if (lastAction === 'signup') {
+      setIsLoading(true);
+      await handleSignupWithRetry(0);
       setIsLoading(false);
     }
   };
@@ -313,6 +351,28 @@ export default function Auth() {
               </form>
             </TabsContent>
           </Tabs>
+          
+          {showRetryButton && (
+            <div className="mt-4 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+              <p className="text-sm text-muted-foreground mb-2 text-center">
+                Connection failed. Please check your internet connection.
+              </p>
+              <Button 
+                onClick={handleRetry} 
+                variant="outline" 
+                className="w-full"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                Retry Connection
+              </Button>
+            </div>
+          )}
+          
           <div className="mt-4 space-y-2 text-center">
             <a 
               href="/student-login" 
