@@ -5,6 +5,154 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
+// ============================================================
+// INPUT VALIDATION UTILITIES
+// ============================================================
+
+// UUID v4 format regex
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+// Extended session token format (two UUIDs joined by hyphen)
+const SESSION_TOKEN_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+// Validation result type
+interface ValidationResult {
+  valid: boolean
+  error?: string
+}
+
+// Validators for different input types
+const validators = {
+  // Name: 2-100 chars, allows letters, spaces, hyphens, apostrophes, and common international characters
+  name: (val: unknown): ValidationResult => {
+    if (typeof val !== 'string') return { valid: false, error: 'Name must be a string' }
+    const trimmed = val.trim()
+    if (trimmed.length < 2) return { valid: false, error: 'Name must be at least 2 characters' }
+    if (trimmed.length > 100) return { valid: false, error: 'Name must be less than 100 characters' }
+    // Allow letters, spaces, hyphens, apostrophes, and common accented characters
+    if (!/^[\p{L}\s\-']+$/u.test(trimmed)) {
+      return { valid: false, error: 'Name contains invalid characters' }
+    }
+    return { valid: true }
+  },
+
+  // Student ID: 1-50 chars, alphanumeric with hyphens/underscores
+  studentId: (val: unknown): ValidationResult => {
+    if (typeof val !== 'string') return { valid: false, error: 'Student ID must be a string' }
+    const trimmed = val.trim()
+    if (trimmed.length < 1) return { valid: false, error: 'Student ID is required' }
+    if (trimmed.length > 50) return { valid: false, error: 'Student ID must be less than 50 characters' }
+    if (!/^[a-zA-Z0-9\-_]+$/.test(trimmed)) {
+      return { valid: false, error: 'Student ID can only contain letters, numbers, hyphens, and underscores' }
+    }
+    return { valid: true }
+  },
+
+  // Session token: must match expected format
+  sessionToken: (val: unknown): ValidationResult => {
+    if (typeof val !== 'string') return { valid: false, error: 'Session token must be a string' }
+    if (!SESSION_TOKEN_REGEX.test(val)) {
+      return { valid: false, error: 'Invalid session token format' }
+    }
+    return { valid: true }
+  },
+
+  // UUID: standard UUID v4 format
+  uuid: (val: unknown): ValidationResult => {
+    if (typeof val !== 'string') return { valid: false, error: 'ID must be a string' }
+    if (!UUID_REGEX.test(val)) {
+      return { valid: false, error: 'Invalid ID format' }
+    }
+    return { valid: true }
+  },
+
+  // Subject: optional, max 200 chars
+  subject: (val: unknown): ValidationResult => {
+    if (val === null || val === undefined || val === '') return { valid: true }
+    if (typeof val !== 'string') return { valid: false, error: 'Subject must be a string' }
+    if (val.length > 200) return { valid: false, error: 'Subject must be less than 200 characters' }
+    return { valid: true }
+  },
+
+  // Message content: 1-10000 chars
+  messageContent: (val: unknown): ValidationResult => {
+    if (typeof val !== 'string') return { valid: false, error: 'Message content must be a string' }
+    const trimmed = val.trim()
+    if (trimmed.length < 1) return { valid: false, error: 'Message content is required' }
+    if (trimmed.length > 10000) return { valid: false, error: 'Message must be less than 10,000 characters' }
+    return { valid: true }
+  },
+
+  // CA submission content: 1-50000 chars (allows for longer essays)
+  caContent: (val: unknown): ValidationResult => {
+    if (typeof val !== 'string') return { valid: false, error: 'Content must be a string' }
+    const trimmed = val.trim()
+    if (trimmed.length < 1) return { valid: false, error: 'Content is required' }
+    if (trimmed.length > 50000) return { valid: false, error: 'Content must be less than 50,000 characters' }
+    return { valid: true }
+  },
+
+  // Quiz answer: single letter A-D
+  quizAnswer: (val: unknown): ValidationResult => {
+    if (typeof val !== 'string') return { valid: false, error: 'Answer must be a string' }
+    if (!/^[A-Da-d]$/.test(val)) {
+      return { valid: false, error: 'Answer must be A, B, C, or D' }
+    }
+    return { valid: true }
+  },
+
+  // CA stage: valid stage names
+  caStage: (val: unknown): ValidationResult => {
+    if (typeof val !== 'string') return { valid: false, error: 'Stage must be a string' }
+    const validStages = ['ideas', 'first_draft', 'second_draft', 'final_draft']
+    if (!validStages.includes(val)) {
+      return { valid: false, error: 'Invalid submission stage' }
+    }
+    return { valid: true }
+  },
+
+  // Recipient type: admin or teacher
+  recipientType: (val: unknown): ValidationResult => {
+    if (typeof val !== 'string') return { valid: false, error: 'Recipient type must be a string' }
+    if (val !== 'admin' && val !== 'teacher') {
+      return { valid: false, error: 'Recipient type must be admin or teacher' }
+    }
+    return { valid: true }
+  },
+
+  // Data type for get-data endpoint
+  dataType: (val: unknown): ValidationResult => {
+    if (typeof val !== 'string') return { valid: false, error: 'Data type must be a string' }
+    const validTypes = ['profile', 'messages', 'notices', 'quizzes', 'quiz_questions', 'quiz_submissions', 'lms_progress', 'ca_projects', 'ca_submissions', 'sections']
+    if (!validTypes.includes(val)) {
+      return { valid: false, error: 'Invalid data type' }
+    }
+    return { valid: true }
+  },
+
+  // Action type for action endpoint
+  actionType: (val: unknown): ValidationResult => {
+    if (typeof val !== 'string') return { valid: false, error: 'Action must be a string' }
+    const validActions = ['submit_quiz', 'submit_ca', 'update_ca', 'send_message', 'mark_message_read', 'mark_notice_read', 'mark_all_messages_read']
+    if (!validActions.includes(val)) {
+      return { valid: false, error: 'Invalid action' }
+    }
+    return { valid: true }
+  },
+}
+
+// Helper to create a 400 response
+function validationError(message: string): Response {
+  return new Response(
+    JSON.stringify({ error: message }),
+    { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  )
+}
+
+// ============================================================
+// MAIN HANDLER
+// ============================================================
+
 interface StudentLoginRequest {
   name: string
   studentId: string
@@ -41,11 +189,16 @@ Deno.serve(async (req) => {
     if (action === 'login' && req.method === 'POST') {
       const { name, studentId }: StudentLoginRequest = await req.json()
 
-      if (!name?.trim() || !studentId?.trim()) {
-        return new Response(
-          JSON.stringify({ error: 'Name and student ID are required' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+      // Validate name
+      const nameValidation = validators.name(name)
+      if (!nameValidation.valid) {
+        return validationError(nameValidation.error!)
+      }
+
+      // Validate student ID
+      const studentIdValidation = validators.studentId(studentId)
+      if (!studentIdValidation.valid) {
+        return validationError(studentIdValidation.error!)
       }
 
       console.log(`[student-auth] Login attempt for student ID: ${studentId}`)
@@ -141,11 +294,10 @@ Deno.serve(async (req) => {
     if (action === 'logout' && req.method === 'POST') {
       const { sessionToken } = await req.json()
 
-      if (!sessionToken) {
-        return new Response(
-          JSON.stringify({ error: 'Session token required' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+      // Validate session token format
+      const tokenValidation = validators.sessionToken(sessionToken)
+      if (!tokenValidation.valid) {
+        return validationError(tokenValidation.error!)
       }
 
       // Find and end session
@@ -187,7 +339,9 @@ Deno.serve(async (req) => {
 
     // Validate session helper
     async function validateSession(sessionToken: string) {
-      if (!sessionToken) return null
+      // Validate session token format before querying
+      const tokenValidation = validators.sessionToken(sessionToken)
+      if (!tokenValidation.valid) return null
 
       const { data: session } = await supabaseAdmin
         .from('user_sessions')
@@ -212,6 +366,18 @@ Deno.serve(async (req) => {
     // Get student data endpoint
     if (action === 'get-data' && req.method === 'POST') {
       const { sessionToken, dataType, filters }: StudentDataRequest = await req.json()
+
+      // Validate session token format
+      const tokenValidation = validators.sessionToken(sessionToken)
+      if (!tokenValidation.valid) {
+        return validationError(tokenValidation.error!)
+      }
+
+      // Validate data type
+      const dataTypeValidation = validators.dataType(dataType)
+      if (!dataTypeValidation.valid) {
+        return validationError(dataTypeValidation.error!)
+      }
 
       const session = await validateSession(sessionToken)
       if (!session) {
@@ -286,6 +452,11 @@ Deno.serve(async (req) => {
         case 'quiz_questions': {
           const quizId = filters?.quizId as string
           if (quizId) {
+            // Validate quiz ID format
+            const quizIdValidation = validators.uuid(quizId)
+            if (!quizIdValidation.valid) {
+              return validationError('Invalid quiz ID format')
+            }
             const result = await supabaseAdmin
               .from('quiz_questions')
               .select('id, question_text, reading_passage, option_a, option_b, option_c, option_d, quiz_id')
@@ -364,6 +535,11 @@ Deno.serve(async (req) => {
         case 'ca_submissions': {
           const projectId = filters?.projectId as string
           if (projectId) {
+            // Validate project ID format
+            const projectIdValidation = validators.uuid(projectId)
+            if (!projectIdValidation.valid) {
+              return validationError('Invalid project ID format')
+            }
             const result = await supabaseAdmin
               .from('ca_submissions')
               .select('id, project_id, stage, content, feedback, submitted_at')
@@ -429,6 +605,18 @@ Deno.serve(async (req) => {
     if (action === 'action' && req.method === 'POST') {
       const { sessionToken, action: studentAction, data: actionData }: StudentActionRequest = await req.json()
 
+      // Validate session token format
+      const tokenValidation = validators.sessionToken(sessionToken)
+      if (!tokenValidation.valid) {
+        return validationError(tokenValidation.error!)
+      }
+
+      // Validate action type
+      const actionValidation = validators.actionType(studentAction)
+      if (!actionValidation.valid) {
+        return validationError(actionValidation.error!)
+      }
+
       const session = await validateSession(sessionToken)
       if (!session) {
         return new Response(
@@ -448,6 +636,18 @@ Deno.serve(async (req) => {
             selectedAnswer: string
           }
           
+          // Validate question ID
+          const questionIdValidation = validators.uuid(questionId)
+          if (!questionIdValidation.valid) {
+            return validationError('Invalid question ID format')
+          }
+
+          // Validate selected answer
+          const answerValidation = validators.quizAnswer(selectedAnswer)
+          if (!answerValidation.valid) {
+            return validationError(answerValidation.error!)
+          }
+
           // Fetch the question to verify the correct answer server-side
           const { data: question, error: questionError } = await supabaseAdmin
             .from('quiz_questions')
@@ -485,6 +685,25 @@ Deno.serve(async (req) => {
             stage: string
             content: string
           }
+
+          // Validate project ID
+          const projectIdValidation = validators.uuid(projectId)
+          if (!projectIdValidation.valid) {
+            return validationError('Invalid project ID format')
+          }
+
+          // Validate stage
+          const stageValidation = validators.caStage(stage)
+          if (!stageValidation.valid) {
+            return validationError(stageValidation.error!)
+          }
+
+          // Validate content
+          const contentValidation = validators.caContent(content)
+          if (!contentValidation.valid) {
+            return validationError(contentValidation.error!)
+          }
+
           const insertResult = await supabaseAdmin
             .from('ca_submissions')
             .insert([{
@@ -505,6 +724,19 @@ Deno.serve(async (req) => {
             submissionId: string
             content: string
           }
+
+          // Validate submission ID
+          const submissionIdValidation = validators.uuid(submissionId)
+          if (!submissionIdValidation.valid) {
+            return validationError('Invalid submission ID format')
+          }
+
+          // Validate content
+          const contentValidation = validators.caContent(content)
+          if (!contentValidation.valid) {
+            return validationError(contentValidation.error!)
+          }
+
           // Verify the submission belongs to this student
           const { data: existing } = await supabaseAdmin
             .from('ca_submissions')
@@ -537,6 +769,32 @@ Deno.serve(async (req) => {
             recipientUserId: string | null
             subject: string
             content: string
+          }
+
+          // Validate recipient type
+          const recipientTypeValidation = validators.recipientType(recipientType)
+          if (!recipientTypeValidation.valid) {
+            return validationError(recipientTypeValidation.error!)
+          }
+
+          // Validate recipient user ID if provided
+          if (recipientUserId !== null) {
+            const recipientIdValidation = validators.uuid(recipientUserId)
+            if (!recipientIdValidation.valid) {
+              return validationError('Invalid recipient ID format')
+            }
+          }
+
+          // Validate subject (optional)
+          const subjectValidation = validators.subject(subject)
+          if (!subjectValidation.valid) {
+            return validationError(subjectValidation.error!)
+          }
+
+          // Validate message content
+          const contentValidation = validators.messageContent(content)
+          if (!contentValidation.valid) {
+            return validationError(contentValidation.error!)
           }
 
           // Validate recipient authorization
@@ -605,6 +863,13 @@ Deno.serve(async (req) => {
 
         case 'mark_message_read': {
           const { messageId } = actionData as { messageId: string }
+
+          // Validate message ID
+          const messageIdValidation = validators.uuid(messageId)
+          if (!messageIdValidation.valid) {
+            return validationError('Invalid message ID format')
+          }
+
           // Verify message belongs to this student
           const { data: message } = await supabaseAdmin
             .from('messages')
@@ -644,6 +909,13 @@ Deno.serve(async (req) => {
 
         case 'mark_notice_read': {
           const { noticeId } = actionData as { noticeId: string }
+
+          // Validate notice ID
+          const noticeIdValidation = validators.uuid(noticeId)
+          if (!noticeIdValidation.valid) {
+            return validationError('Invalid notice ID format')
+          }
+
           // Verify notice belongs to this student
           const { data: notice } = await supabaseAdmin
             .from('student_notices')
@@ -694,6 +966,12 @@ Deno.serve(async (req) => {
     // Get teacher info for messaging
     if (action === 'get-teacher' && req.method === 'POST') {
       const { sessionToken } = await req.json()
+
+      // Validate session token format
+      const tokenValidation = validators.sessionToken(sessionToken)
+      if (!tokenValidation.valid) {
+        return validationError(tokenValidation.error!)
+      }
 
       const session = await validateSession(sessionToken)
       if (!session) {
@@ -747,6 +1025,12 @@ Deno.serve(async (req) => {
     // Get allowed message recipients for student (assigned teacher + admins)
     if (action === 'get-recipients' && req.method === 'POST') {
       const { sessionToken } = await req.json()
+
+      // Validate session token format
+      const tokenValidation = validators.sessionToken(sessionToken)
+      if (!tokenValidation.valid) {
+        return validationError(tokenValidation.error!)
+      }
 
       const session = await validateSession(sessionToken)
       if (!session) {
