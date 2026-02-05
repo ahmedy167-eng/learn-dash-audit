@@ -20,6 +20,19 @@ import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { sanitizeHtml } from '@/lib/sanitize';
 
+// Helper function to get a signed URL for private bucket files
+const getSignedPdfUrl = async (filePath: string): Promise<string | null> => {
+  const { data, error } = await supabase.storage
+    .from('ca-project-pdfs')
+    .createSignedUrl(filePath, 3600); // 1 hour expiry
+  
+  if (error || !data?.signedUrl) {
+    console.error('Failed to generate signed URL:', error);
+    return null;
+  }
+  return data.signedUrl;
+};
+
 interface Section {
   id: string;
   name: string;
@@ -261,13 +274,11 @@ const CAProjects = () => {
       return;
     }
 
-    const { data: urlData } = supabase.storage
-      .from('ca-project-pdfs')
-      .getPublicUrl(data.path);
-
+    // Store the file path (not public URL) since bucket is now private
+    // We'll generate signed URLs when accessing the file
     const { error: updateError } = await supabase
       .from('ca_projects')
-      .update({ pdf_url: urlData.publicUrl })
+      .update({ pdf_url: data.path })
       .eq('id', uploadTargetProjectId);
 
     if (updateError) {
@@ -607,7 +618,19 @@ const CAProjects = () => {
                         Upload PDF
                       </Button>
                       {project.pdf_url && (
-                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); window.open(project.pdf_url!, '_blank'); }}>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={async (e) => { 
+                            e.stopPropagation(); 
+                            const signedUrl = await getSignedPdfUrl(project.pdf_url!);
+                            if (signedUrl) {
+                              window.open(signedUrl, '_blank');
+                            } else {
+                              toast.error('Failed to access PDF');
+                            }
+                          }}
+                        >
                           <Download className="h-4 w-4 mr-1" />
                           View PDF
                         </Button>
