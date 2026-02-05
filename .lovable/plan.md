@@ -1,118 +1,60 @@
 
-# Plan: Fix Login Network Error Handling
+# Plan: Fix Quiz Panel Alignment and Equal Sizing
 
-## Problem Analysis
+## Problem Identified
 
-The login is failing with a `TypeError: Failed to fetch` error. This is a network-level issue where requests aren't reaching the backend at all.
+Looking at the Quizzes page layout, the two main panels (Quiz List on the left and Questions Panel on the right) have inconsistent heights and visual balance:
 
-**Key Observations:**
-- Network requests to the authentication server are failing before reaching it
-- The error is already being caught, but users are seeing a generic network error
-- There's no retry mechanism for transient failures
-- The current error detection relies on fragile string matching
+1. The left panel uses a 2-column span while the right uses 3-column span
+2. Empty state placeholders have inconsistent padding (py-16 vs py-20)
+3. The panels don't visually align at the same height despite having the same ScrollArea height
 
-## Proposed Solution
+## Solution
 
-### 1. Improve Error Handling in useAuth Hook
-Add proper error type detection and wrap the Supabase calls with better error handling that returns meaningful error objects.
-
-### 2. Add Retry Logic with Exponential Backoff
-Implement automatic retry (1-2 attempts) for network failures to handle transient issues gracefully.
-
-### 3. Improve User Feedback
-Provide clearer error messages and add a "Retry" option when network errors occur.
+Make both panels visually balanced with equal heights using consistent Card wrappers and matching internal dimensions.
 
 ---
 
-## Technical Implementation
+## Technical Changes
 
-### File Changes
+### File: `src/pages/Quizzes.tsx`
 
-**1. `src/hooks/useAuth.tsx`**
-- Wrap Supabase auth calls in try-catch blocks
-- Return proper error objects instead of raw Supabase errors
-- Add network error detection helper
+**1. Wrap both panels in Card containers for visual consistency**
+- Add a parent Card wrapper around each panel's content
+- This ensures both sides have matching borders and backgrounds
 
-**2. `src/pages/Auth.tsx`**
-- Add a retry mechanism with state tracking
-- Show a "Retry" button for network errors
-- Improve error message clarity
+**2. Standardize empty state padding**
+- Change left panel empty state from `py-16` to `py-20`
+- Ensures both empty states have identical visual weight
 
-**3. `src/pages/AdminLogin.tsx`**
-- Apply the same retry improvements for consistency
+**3. Use flex layout with equal height containers**
+- Apply `flex flex-col` to the grid children
+- Use `flex-1` on the ScrollArea containers to fill available space equally
+
+**4. Add minimum height to both panels**
+- Apply `min-h-[600px]` to both panel cards
+- Ensures consistent sizing regardless of content
 
 ---
 
 ## Code Changes Summary
 
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│  src/hooks/useAuth.tsx                                      │
-├─────────────────────────────────────────────────────────────┤
-│  • Add try-catch wrapping for signIn and signUp             │
-│  • Create isNetworkError helper function                    │
-│  • Return standardized error objects                        │
-└─────────────────────────────────────────────────────────────┘
+Lines 441-520 (Left Panel):
+- Wrap content in a Card with min-h-[600px]
+- Change empty state from py-16 to py-20
+- Add flex layout for proper stretching
 
-┌─────────────────────────────────────────────────────────────┐
-│  src/pages/Auth.tsx                                         │
-├─────────────────────────────────────────────────────────────┤
-│  • Add retry state and counter                              │
-│  • Implement auto-retry (up to 2 attempts)                  │
-│  • Show "Retry" button after network failures               │
-│  • Add retry functionality that clears on success           │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│  src/pages/AdminLogin.tsx                                   │
-├─────────────────────────────────────────────────────────────┤
-│  • Apply same retry improvements as Auth.tsx                │
-└─────────────────────────────────────────────────────────────┘
+Lines 522-682 (Right Panel):  
+- Wrap content in a matching Card with min-h-[600px]
+- Keep py-20 for empty states (already consistent)
+- Add flex layout for proper stretching
 ```
 
-## Implementation Details
+## Visual Outcome
 
-### Network Error Detection Helper
-```typescript
-const isNetworkError = (error: unknown): boolean => {
-  if (error instanceof TypeError && error.message === 'Failed to fetch') {
-    return true;
-  }
-  if (error instanceof Error && error.message.includes('Failed to fetch')) {
-    return true;
-  }
-  return false;
-};
-```
-
-### Retry Logic Pattern
-```typescript
-const [retryCount, setRetryCount] = useState(0);
-const MAX_RETRIES = 2;
-
-const handleLoginWithRetry = async (attempt = 0) => {
-  try {
-    const { error } = await signIn(email, password);
-    if (error && isNetworkError(error) && attempt < MAX_RETRIES) {
-      // Wait briefly then retry
-      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-      return handleLoginWithRetry(attempt + 1);
-    }
-    // Handle result...
-  } catch (err) {
-    if (isNetworkError(err) && attempt < MAX_RETRIES) {
-      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-      return handleLoginWithRetry(attempt + 1);
-    }
-    // Show network error with retry button
-  }
-};
-```
-
-## Expected Outcome
-
-After implementing these changes:
-1. Transient network failures will be automatically retried (up to 2 times)
-2. Users will see clearer error messages
-3. A "Retry" button will appear after persistent network failures
-4. The auth experience will be more resilient to temporary connectivity issues
+After these changes:
+- Both panels will have equal visual weight
+- The border styling will be consistent on both sides
+- Empty states will align perfectly
+- Content areas will stretch to fill the same height
