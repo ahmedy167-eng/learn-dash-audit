@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,11 +12,6 @@ const corsHeaders = {
 
 const RATE_LIMIT_MAX_ATTEMPTS = 5
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
-
-interface RateLimitEntry {
-  attempts: number
-  resetTime: number
-}
 
 // Get client IP from request headers
 function getClientIP(req: Request): string {
@@ -36,36 +32,59 @@ function getClientIP(req: Request): string {
   return `ua-${userAgent.slice(0, 50)}`
 }
 
-// Check and update rate limit for login attempts
-async function checkRateLimit(kv: Deno.Kv, clientIP: string): Promise<{ allowed: boolean; remainingAttempts?: number; retryAfterSeconds?: number }> {
-  const rateLimitKey = ['rate_limit', 'student_auth', clientIP]
-  const now = Date.now()
-  
-  const entry = await kv.get<RateLimitEntry>(rateLimitKey)
-  
-  if (entry.value) {
-    const { attempts, resetTime } = entry.value
-    
-    // Check if window has expired
-    if (now >= resetTime) {
-      // Reset the counter
-      await kv.set(rateLimitKey, { attempts: 1, resetTime: now + RATE_LIMIT_WINDOW_MS }, { expireIn: RATE_LIMIT_WINDOW_MS })
-      return { allowed: true, remainingAttempts: RATE_LIMIT_MAX_ATTEMPTS - 1 }
-    }
-    
-    // Check if max attempts reached
-    if (attempts >= RATE_LIMIT_MAX_ATTEMPTS) {
-      const retryAfterSeconds = Math.ceil((resetTime - now) / 1000)
-      return { allowed: false, remainingAttempts: 0, retryAfterSeconds }
-    }
-    
-    // Increment counter
-    await kv.set(rateLimitKey, { attempts: attempts + 1, resetTime }, { expireIn: resetTime - now })
-    return { allowed: true, remainingAttempts: RATE_LIMIT_MAX_ATTEMPTS - attempts - 1 }
+// Database-backed rate limiting function
+async function checkRateLimit(
+  supabaseAdmin: SupabaseClient,
+  clientIP: string
+): Promise<{ allowed: boolean; remainingAttempts?: number; retryAfterSeconds?: number }> {
+  const now = new Date()
+  const windowStart = new Date(now.getTime() - RATE_LIMIT_WINDOW_MS)
+
+  // Clean up old entries (older than window)
+  await supabaseAdmin
+    .from('login_rate_limits')
+    .delete()
+    .lt('window_start', windowStart.toISOString())
+
+  // Check for existing rate limit entry within window
+  const { data: existing, error } = await supabaseAdmin
+    .from('login_rate_limits')
+    .select('id, attempts, window_start')
+    .eq('client_ip', clientIP)
+    .gte('window_start', windowStart.toISOString())
+    .order('window_start', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (error && error.code !== 'PGRST116') {
+    // PGRST116 = no rows found, which is expected for new IPs
+    console.error('[student-auth] Rate limit check error:', error)
+    // On error, allow the request but log it
+    return { allowed: true, remainingAttempts: RATE_LIMIT_MAX_ATTEMPTS - 1 }
   }
-  
-  // No entry exists, create new one
-  await kv.set(rateLimitKey, { attempts: 1, resetTime: now + RATE_LIMIT_WINDOW_MS }, { expireIn: RATE_LIMIT_WINDOW_MS })
+
+  if (existing) {
+    // Check if max attempts reached
+    if (existing.attempts >= RATE_LIMIT_MAX_ATTEMPTS) {
+      const windowEnd = new Date(new Date(existing.window_start).getTime() + RATE_LIMIT_WINDOW_MS)
+      const retryAfterSeconds = Math.ceil((windowEnd.getTime() - now.getTime()) / 1000)
+      return { allowed: false, remainingAttempts: 0, retryAfterSeconds: Math.max(0, retryAfterSeconds) }
+    }
+
+    // Increment attempts
+    await supabaseAdmin
+      .from('login_rate_limits')
+      .update({ attempts: existing.attempts + 1 })
+      .eq('id', existing.id)
+
+    return { allowed: true, remainingAttempts: RATE_LIMIT_MAX_ATTEMPTS - existing.attempts - 1 }
+  }
+
+  // Create new rate limit entry
+  await supabaseAdmin
+    .from('login_rate_limits')
+    .insert({ client_ip: clientIP, attempts: 1, window_start: now.toISOString() })
+
   return { allowed: true, remainingAttempts: RATE_LIMIT_MAX_ATTEMPTS - 1 }
 }
 
@@ -241,9 +260,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Initialize Deno KV for rate limiting
-    const kv = await Deno.openKv()
-    
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -256,7 +272,7 @@ Deno.serve(async (req) => {
     if (action === 'login' && req.method === 'POST') {
       // Rate limiting check
       const clientIP = getClientIP(req)
-      const rateLimitResult = await checkRateLimit(kv, clientIP)
+      const rateLimitResult = await checkRateLimit(supabaseAdmin, clientIP)
       
       if (!rateLimitResult.allowed) {
         console.log(`[student-auth] Rate limit exceeded for IP: ${clientIP}`)
