@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Users, Loader2, Plus, Pencil, Trash2, ClipboardList, Search, MessageSquare, Download, Upload, FileSpreadsheet, Filter, Bell, CheckSquare, Square } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { WeekCalendar } from '@/components/register/WeekCalendar';
 import { AdvancedSearchFilters } from '@/components/register/AdvancedSearchFilters';
 import { PostNoticeDialog } from '@/components/register/PostNoticeDialog';
@@ -329,62 +329,90 @@ export default function Register() {
       toast.error('Please select a section first');
       return;
     }
-    
-    // Create workbook with headers
-    const ws = XLSX.utils.aoa_to_sheet([
-      ['Full Name', 'Student ID'],
-      ['', ''], // Empty row as example
-    ]);
-    
-    // Set column widths
-    ws['!cols'] = [{ wch: 30 }, { wch: 20 }];
-    
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, selectedSection.name.substring(0, 31)); // Excel sheet name max 31 chars
-    
-    // Download file
-    XLSX.writeFile(wb, `${selectedSection.name}_Student_Template.xlsx`);
-    toast.success('Template downloaded!');
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(selectedSection.name.substring(0, 31));
+    worksheet.addRow(['Full Name', 'Student ID']);
+    worksheet.addRow(['', '']);
+    worksheet.getColumn(1).width = 30;
+    worksheet.getColumn(2).width = 20;
+    worksheet.getRow(1).font = { bold: true };
+
+    workbook.xlsx.writeBuffer().then((buffer) => {
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${selectedSection.name}_Student_Template.xlsx`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success('Template downloaded!');
+    }).catch((error) => {
+      console.error('Error creating Excel file:', error);
+      toast.error('Failed to create template');
+    });
   };
 
   // Handle Excel file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        
-        // Get first sheet
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        
-        // Convert to JSON (skip header row)
-        const jsonData = XLSX.utils.sheet_to_json<{[key: string]: string}>(worksheet);
-        
-        // Map to our format (handle different column name variations)
-        const students = jsonData.map(row => ({
-          full_name: String(row['Full Name'] || row['full_name'] || row['Name'] || ''),
-          student_id: String(row['Student ID'] || row['student_id'] || row['ID'] || ''),
-        })).filter(s => s.full_name.trim() && s.student_id.trim());
-        
+
+    const workbook = new ExcelJS.Workbook();
+    file.arrayBuffer()
+      .then((buffer) => workbook.xlsx.load(buffer))
+      .then(() => {
+        const worksheet = workbook.worksheets[0];
+        if (!worksheet) {
+          toast.error('No worksheet found in the Excel file');
+          return;
+        }
+
+        const headerRow = worksheet.getRow(1);
+        const headers: { [key: number]: string } = {};
+        headerRow.eachCell((cell, colNumber) => {
+          headers[colNumber] = String(cell.value || '').toLowerCase().trim();
+        });
+
+        let nameColIndex = 0;
+        let idColIndex = 0;
+        for (const [colNum, header] of Object.entries(headers)) {
+          const col = parseInt(colNum);
+          if (header === 'full name' || header === 'full_name' || header === 'name') {
+            nameColIndex = col;
+          } else if (header === 'student id' || header === 'student_id' || header === 'id') {
+            idColIndex = col;
+          }
+        }
+
+        if (!nameColIndex || !idColIndex) {
+          toast.error('Could not find "Full Name" and "Student ID" columns');
+          return;
+        }
+
+        const students: { full_name: string; student_id: string }[] = [];
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber === 1) return;
+          const fullName = String(row.getCell(nameColIndex).value || '').trim();
+          const studentId = String(row.getCell(idColIndex).value || '').trim();
+          if (fullName && studentId) {
+            students.push({ full_name: fullName, student_id: studentId });
+          }
+        });
+
         if (students.length === 0) {
           toast.error('No valid student data found. Make sure columns are "Full Name" and "Student ID"');
           return;
         }
-        
+
         setImportPreview(students);
         setIsImportDialogOpen(true);
-      } catch (error) {
+      })
+      .catch((error) => {
         console.error('Error reading Excel file:', error);
         toast.error('Failed to read Excel file. Please check the file format.');
-      }
-    };
-    
-    reader.readAsArrayBuffer(file);
+      });
+
     e.target.value = ''; // Reset input
   };
 
