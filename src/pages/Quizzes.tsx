@@ -438,25 +438,25 @@ const Quizzes = () => {
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid gap-6 lg:grid-cols-5">
+        <div className="grid gap-6 lg:grid-cols-5 items-start">
           {/* Quiz List - Left Panel */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Your Quizzes</h2>
-              <Badge variant="secondary">{quizzes.length} total</Badge>
-            </div>
-            
-            <ScrollArea className="h-[600px] pr-4">
+          <Card className="lg:col-span-2 flex flex-col min-h-[600px]">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Your Quizzes</CardTitle>
+                <Badge variant="secondary">{quizzes.length} total</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col p-0">
+              <ScrollArea className="flex-1 px-6 pb-6">
               {quizzes.length === 0 ? (
-                <Card className="border-dashed">
-                  <CardContent className="flex flex-col items-center justify-center py-16">
+                <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-lg">
                     <div className="p-4 bg-muted rounded-full mb-4">
                       <ClipboardList className="h-8 w-8 text-muted-foreground" />
                     </div>
                     <p className="font-medium text-muted-foreground">No quizzes yet</p>
                     <p className="text-sm text-muted-foreground mt-1">Create your first quiz to get started</p>
-                  </CardContent>
-                </Card>
+                </div>
               ) : (
                 <div className="space-y-3">
                   {quizzes.map((quiz) => (
@@ -516,15 +516,17 @@ const Quizzes = () => {
                   ))}
                 </div>
               )}
-            </ScrollArea>
-          </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
 
           {/* Questions Panel - Right Side */}
-          <div className="lg:col-span-3 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">
-                {selectedQuiz ? selectedQuiz.title : 'Select a Quiz'}
-              </h2>
+          <Card className="lg:col-span-3 flex flex-col min-h-[600px]">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">
+                  {selectedQuiz ? selectedQuiz.title : 'Select a Quiz'}
+                </CardTitle>
               {selectedQuiz && (
                 <Dialog open={questionDialogOpen} onOpenChange={(open) => { setQuestionDialogOpen(open); if (!open) resetQuestionForm(); }}>
                   <DialogTrigger asChild>
@@ -585,29 +587,26 @@ const Quizzes = () => {
                   </DialogContent>
                 </Dialog>
               )}
-            </div>
-
-            <ScrollArea className="h-[600px] pr-4">
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col p-0">
+              <ScrollArea className="flex-1 px-6 pb-6">
               {!selectedQuiz ? (
-                <Card className="border-dashed">
-                  <CardContent className="flex flex-col items-center justify-center py-20">
+                <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-lg">
                     <div className="p-4 bg-muted rounded-full mb-4">
                       <HelpCircle className="h-8 w-8 text-muted-foreground" />
                     </div>
                     <p className="font-medium text-muted-foreground">No quiz selected</p>
                     <p className="text-sm text-muted-foreground mt-1">Select a quiz from the left to manage questions</p>
-                  </CardContent>
-                </Card>
+                </div>
               ) : questions.length === 0 ? (
-                <Card className="border-dashed">
-                  <CardContent className="flex flex-col items-center justify-center py-20">
+                <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-lg">
                     <div className="p-4 bg-muted rounded-full mb-4">
                       <Plus className="h-8 w-8 text-muted-foreground" />
                     </div>
                     <p className="font-medium text-muted-foreground">No questions yet</p>
                     <p className="text-sm text-muted-foreground mt-1">Add your first question to this quiz</p>
-                  </CardContent>
-                </Card>
+                </div>
               ) : (
                 <div className="space-y-4">
                   {questions.map((question, index) => (
@@ -678,8 +677,9 @@ const Quizzes = () => {
                   ))}
                 </div>
               )}
-            </ScrollArea>
-          </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </DashboardLayout>
