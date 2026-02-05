@@ -331,7 +331,29 @@ Deno.serve(async (req) => {
               .from('ca_projects')
               .select('id, title, description, pdf_url, deadline_ideas, deadline_first_draft, deadline_second_draft, deadline_final_draft')
               .eq('section_id', student.section_id)
-            data = result.data
+            
+            // Generate signed URLs for PDFs (since bucket is now private)
+            if (result.data) {
+              const projectsWithSignedUrls = await Promise.all(
+                result.data.map(async (project) => {
+                  if (project.pdf_url) {
+                    // Generate a signed URL valid for 4 hours
+                    const { data: signedUrlData } = await supabaseAdmin.storage
+                      .from('ca-project-pdfs')
+                      .createSignedUrl(project.pdf_url, 14400) // 4 hours
+                    
+                    return {
+                      ...project,
+                      pdf_url: signedUrlData?.signedUrl || null
+                    }
+                  }
+                  return project
+                })
+              )
+              data = projectsWithSignedUrls
+            } else {
+              data = result.data
+            }
             error = result.error
           } else {
             data = []
