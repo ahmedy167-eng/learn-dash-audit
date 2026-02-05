@@ -1,88 +1,118 @@
 
+# Plan: Fix Login Network Error Handling
 
-# Fix Student Messaging Recipient Dropdown
+## Problem Analysis
 
-## Problem
+The login is failing with a `TypeError: Failed to fetch` error. This is a network-level issue where requests aren't reaching the backend at all.
 
-The current implementation shows duplicate admin entries ("Waleed" appearing twice) because the Edge Function fetches all users with the `admin` role and lists each one as a separate recipient. The expected behavior is that students should only be able to message:
+**Key Observations:**
+- Network requests to the authentication server are failing before reaching it
+- The error is already being caught, but users are seeing a generic network error
+- There's no retry mechanism for transient failures
+- The current error detection relies on fragile string matching
 
-1. Their **assigned teacher** (Steve)
-2. A **single general admin option** for inquiries
+## Proposed Solution
 
-## Root Cause
+### 1. Improve Error Handling in useAuth Hook
+Add proper error type detection and wrap the Supabase calls with better error handling that returns meaningful error objects.
 
-In `supabase/functions/student-auth/index.ts` (lines 785-808), the `get-recipients` endpoint queries all admins from `user_roles` and adds each one individually:
+### 2. Add Retry Logic with Exponential Backoff
+Implement automatic retry (1-2 attempts) for network failures to handle transient issues gracefully.
 
-```typescript
-// Current problematic code
-const { data: adminRoles } = await supabaseAdmin
-  .from('user_roles')
-  .select('user_id')
-  .eq('role', 'admin')
-
-if (adminRoles && adminRoles.length > 0) {
-  // Adds EACH admin as a separate recipient - THIS IS THE BUG
-  for (const admin of adminProfiles) {
-    recipients.push({...})
-  }
-}
-```
-
-## Solution
-
-Remove the section that adds individual admins (lines 785-808). The "Administrator (General Inquiries)" option (already added at lines 744-750) is sufficient for students to contact administration.
+### 3. Improve User Feedback
+Provide clearer error messages and add a "Retry" option when network errors occur.
 
 ---
 
-## Technical Details
+## Technical Implementation
 
-### File: `supabase/functions/student-auth/index.ts`
+### File Changes
 
-**Remove lines 785-808** (the block that queries and adds individual admin profiles):
+**1. `src/hooks/useAuth.tsx`**
+- Wrap Supabase auth calls in try-catch blocks
+- Return proper error objects instead of raw Supabase errors
+- Add network error detection helper
 
+**2. `src/pages/Auth.tsx`**
+- Add a retry mechanism with state tracking
+- Show a "Retry" button for network errors
+- Improve error message clarity
+
+**3. `src/pages/AdminLogin.tsx`**
+- Apply the same retry improvements for consistency
+
+---
+
+## Code Changes Summary
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  src/hooks/useAuth.tsx                                      │
+├─────────────────────────────────────────────────────────────┤
+│  • Add try-catch wrapping for signIn and signUp             │
+│  • Create isNetworkError helper function                    │
+│  • Return standardized error objects                        │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  src/pages/Auth.tsx                                         │
+├─────────────────────────────────────────────────────────────┤
+│  • Add retry state and counter                              │
+│  • Implement auto-retry (up to 2 attempts)                  │
+│  • Show "Retry" button after network failures               │
+│  • Add retry functionality that clears on success           │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  src/pages/AdminLogin.tsx                                   │
+├─────────────────────────────────────────────────────────────┤
+│  • Apply same retry improvements as Auth.tsx                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Implementation Details
+
+### Network Error Detection Helper
 ```typescript
-// DELETE THIS BLOCK
-// Get all admins
-const { data: adminRoles } = await supabaseAdmin
-  .from('user_roles')
-  .select('user_id')
-  .eq('role', 'admin')
+const isNetworkError = (error: unknown): boolean => {
+  if (error instanceof TypeError && error.message === 'Failed to fetch') {
+    return true;
+  }
+  if (error instanceof Error && error.message.includes('Failed to fetch')) {
+    return true;
+  }
+  return false;
+};
+```
 
-if (adminRoles && adminRoles.length > 0) {
-  const adminUserIds = adminRoles.map(r => r.user_id)
-  
-  const { data: adminProfiles } = await supabaseAdmin
-    .from('profiles')
-    .select('user_id, full_name')
-    .in('user_id', adminUserIds)
+### Retry Logic Pattern
+```typescript
+const [retryCount, setRetryCount] = useState(0);
+const MAX_RETRIES = 2;
 
-  if (adminProfiles) {
-    for (const admin of adminProfiles) {
-      recipients.push({
-        user_id: admin.user_id,
-        full_name: admin.full_name,
-        type: 'admin',
-        label: admin.full_name || 'Administrator',
-      })
+const handleLoginWithRetry = async (attempt = 0) => {
+  try {
+    const { error } = await signIn(email, password);
+    if (error && isNetworkError(error) && attempt < MAX_RETRIES) {
+      // Wait briefly then retry
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+      return handleLoginWithRetry(attempt + 1);
     }
+    // Handle result...
+  } catch (err) {
+    if (isNetworkError(err) && attempt < MAX_RETRIES) {
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+      return handleLoginWithRetry(attempt + 1);
+    }
+    // Show network error with retry button
   }
-}
+};
 ```
 
-### Expected Result After Fix
+## Expected Outcome
 
-The dropdown will show only:
-
-| Recipient | Type |
-|-----------|------|
-| Steve | Teacher (assigned) |
-| Administrator (General Inquiries) | General Admin |
-
----
-
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `supabase/functions/student-auth/index.ts` | Remove the individual admin lookup block (lines 785-808) |
-
+After implementing these changes:
+1. Transient network failures will be automatically retried (up to 2 times)
+2. Users will see clearer error messages
+3. A "Retry" button will appear after persistent network failures
+4. The auth experience will be more resilient to temporary connectivity issues
