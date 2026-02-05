@@ -346,6 +346,30 @@ export type Database = {
           },
         ]
       }
+      login_rate_limits: {
+        Row: {
+          attempts: number | null
+          client_ip: string
+          created_at: string | null
+          id: string
+          window_start: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          client_ip: string
+          created_at?: string | null
+          id?: string
+          window_start?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          client_ip?: string
+          created_at?: string | null
+          id?: string
+          window_start?: string | null
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
