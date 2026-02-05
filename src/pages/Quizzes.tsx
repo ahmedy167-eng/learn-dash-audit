@@ -22,6 +22,11 @@ interface Section {
   section_number: string | null;
 }
 
+interface SectionStudentCount {
+  section_id: string;
+  count: number;
+}
+
 interface Quiz {
   id: string;
   section_id: string;
@@ -48,6 +53,7 @@ const Quizzes = () => {
   const { user } = useAuth();
   const [sections, setSections] = useState<Section[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [sectionStudentCounts, setSectionStudentCounts] = useState<Record<string, number>>({});
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,6 +89,23 @@ const Quizzes = () => {
       .select('id, name, section_number')
       .eq('user_id', user.id);
     setSections(sectionsData || []);
+
+    // Fetch student counts per section
+    const sectionIds = (sectionsData || []).map(s => s.id);
+    if (sectionIds.length > 0) {
+      const { data: studentsData } = await supabase
+        .from('students')
+        .select('section_id')
+        .in('section_id', sectionIds);
+      
+      const counts: Record<string, number> = {};
+      (studentsData || []).forEach(student => {
+        if (student.section_id) {
+          counts[student.section_id] = (counts[student.section_id] || 0) + 1;
+        }
+      });
+      setSectionStudentCounts(counts);
+    }
 
     const { data: quizzesData, error } = await supabase
       .from('quizzes')
@@ -352,11 +375,14 @@ const Quizzes = () => {
                     <SelectContent>
                       {sections.map((section) => (
                         <SelectItem key={section.id} value={section.id}>
-                          {section.name} {section.section_number && `(${section.section_number})`}
+                          {section.name} {section.section_number && `(${section.section_number})`} - {sectionStudentCounts[section.id] || 0} students
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Only students assigned to this section will see the quiz
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>Title *</Label>
@@ -477,6 +503,7 @@ const Quizzes = () => {
                               <span className="flex items-center gap-1">
                                 <BookOpen className="h-3 w-3" />
                                 {quiz.sections?.name}
+                                {quiz.sections?.section_number && ` (${quiz.sections.section_number})`}
                               </span>
                             </CardDescription>
                           </div>
@@ -489,6 +516,12 @@ const Quizzes = () => {
                         </div>
                       </CardHeader>
                       <CardContent className="pt-0">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Badge variant="outline" className="text-xs">
+                            <Users className="h-3 w-3 mr-1" />
+                            {sectionStudentCounts[quiz.section_id] || 0} students
+                          </Badge>
+                        </div>
                         {quiz.description && (
                           <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{quiz.description}</p>
                         )}
