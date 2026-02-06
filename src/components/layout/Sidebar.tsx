@@ -48,10 +48,9 @@ export function Sidebar() {
   const { signOut } = useAuth();
   const { hasPermission, isAdmin, loading: permLoading } = usePermissions();
 
-  // Filter nav items based on permissions - show all while loading
   const visibleNavItems = navItems.filter(item => {
-    if (!item.permission) return true; // Dashboard is always visible
-    if (permLoading) return true; // Show all items while loading to prevent flash
+    if (!item.permission) return true;
+    if (permLoading) return true;
     return hasPermission(item.permission);
   });
 
@@ -65,7 +64,7 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className={cn("flex items-center gap-2", collapsed && "justify-center w-full")}>
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center transition-transform duration-300 hover:rotate-12">
             <GraduationCap className="w-5 h-5 text-primary-foreground" />
           </div>
           {!collapsed && <span className="font-semibold text-foreground">EduPortal</span>}
@@ -94,30 +93,30 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-        {visibleNavItems.map((item) => (
+        {visibleNavItems.map((item, index) => (
           <NavLink
             key={item.title}
             to={item.url}
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
-              collapsed && "justify-center px-2"
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200",
+              collapsed && "justify-center px-2",
+              `animate-in stagger-${Math.min(index + 1, 5)}`
             )}
-            activeClassName="bg-accent text-accent-foreground font-medium"
+            activeClassName="bg-accent text-accent-foreground font-medium border-l-2 border-primary"
           >
             <item.icon className="h-5 w-5 flex-shrink-0" />
             {!collapsed && <span>{item.title}</span>}
           </NavLink>
         ))}
         
-        {/* Admin link - visible while loading or if confirmed admin */}
         {(permLoading || isAdmin) && (
           <NavLink
             to="/admin"
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200",
               collapsed && "justify-center px-2"
             )}
-            activeClassName="bg-accent text-accent-foreground font-medium"
+            activeClassName="bg-accent text-accent-foreground font-medium border-l-2 border-primary"
           >
             <Shield className="h-5 w-5 flex-shrink-0" />
             {!collapsed && <span>Admin</span>}
@@ -144,7 +143,7 @@ export function Sidebar() {
           variant="ghost"
           onClick={signOut}
           className={cn(
-            "w-full flex items-center gap-3 text-muted-foreground hover:text-destructive",
+            "w-full flex items-center gap-3 text-muted-foreground hover:text-destructive transition-colors",
             collapsed && "justify-center"
           )}
         >

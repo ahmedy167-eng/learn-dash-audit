@@ -40,10 +40,10 @@ const StudentLogin = () => {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
-      <header className="border-b border-border">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-lg">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center transition-transform duration-300 hover:rotate-6">
               <GraduationCap className="w-6 h-6 text-primary-foreground" />
             </div>
             <span className="text-xl font-bold text-foreground">EduPortal</span>
@@ -56,8 +56,9 @@ const StudentLogin = () => {
       </header>
 
       {/* Login Form */}
-      <main className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+      <main className="flex-1 flex items-center justify-center p-4 relative">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_hsl(var(--primary)/0.04)_0%,_transparent_70%)]" />
+        <Card className="w-full max-w-md animate-fade-in relative">
           <CardHeader className="text-center">
             <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
               <GraduationCap className="w-8 h-8 text-primary" />

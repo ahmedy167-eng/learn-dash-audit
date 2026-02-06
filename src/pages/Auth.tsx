@@ -55,14 +55,12 @@ export default function Auth() {
     const { error } = await signIn(loginEmail, loginPassword);
     
     if (error) {
-      // Check if it's a network error and we should retry
       if (isNetworkError(error) && attempt < MAX_RETRIES) {
         toast.info(`Connection issue. Retrying... (${attempt + 1}/${MAX_RETRIES})`);
         await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
         return handleLoginWithRetry(attempt + 1);
       }
       
-      // Handle final errors
       if (error.message.includes('Network error') || isNetworkError(error)) {
         setShowRetryButton(true);
         setLastAction('login');
@@ -97,14 +95,12 @@ export default function Auth() {
     const { error } = await signUp(signupEmail, signupPassword, signupName);
     
     if (error) {
-      // Check if it's a network error and we should retry
       if (isNetworkError(error) && attempt < MAX_RETRIES) {
         toast.info(`Connection issue. Retrying... (${attempt + 1}/${MAX_RETRIES})`);
         await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
         return handleSignupWithRetry(attempt + 1);
       }
       
-      // Handle final errors
       if (error.message.includes('Network error') || isNetworkError(error)) {
         setShowRetryButton(true);
         setLastAction('signup');
@@ -185,8 +181,9 @@ export default function Auth() {
 
   if (showForgotPassword) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md">
+      <div className="flex min-h-screen items-center justify-center bg-background p-4 relative">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_hsl(var(--primary)/0.04)_0%,_transparent_70%)]" />
+        <Card className="w-full max-w-md animate-fade-in relative">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 w-12 h-12 bg-primary rounded-xl flex items-center justify-center">
               <GraduationCap className="w-7 h-7 text-primary-foreground" />
@@ -254,8 +251,9 @@ export default function Auth() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 relative">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_hsl(var(--primary)/0.04)_0%,_transparent_70%)]" />
+      <Card className="w-full max-w-md animate-fade-in relative">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 w-12 h-12 bg-primary rounded-xl flex items-center justify-center">
             <GraduationCap className="w-7 h-7 text-primary-foreground" />
@@ -274,36 +272,17 @@ export default function Auth() {
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="login-email">Email</Label>
-                  <Input
-                    id="login-email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    required
-                  />
+                  <Input id="login-email" type="email" placeholder="you@example.com" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="login-password">Password</Label>
-                  <Input
-                    id="login-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    required
-                  />
+                  <Input id="login-password" type="password" placeholder="••••••••" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} required />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Sign In
                 </Button>
-                <Button 
-                  type="button"
-                  variant="link" 
-                  className="w-full text-sm"
-                  onClick={() => setShowForgotPassword(true)}
-                >
+                <Button type="button" variant="link" className="w-full text-sm" onClick={() => setShowForgotPassword(true)}>
                   Forgot your password?
                 </Button>
               </form>
@@ -313,36 +292,15 @@ export default function Auth() {
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="signup-name">Full Name</Label>
-                  <Input
-                    id="signup-name"
-                    type="text"
-                    placeholder="John Doe"
-                    value={signupName}
-                    onChange={(e) => setSignupName(e.target.value)}
-                    required
-                  />
+                  <Input id="signup-name" type="text" placeholder="John Doe" value={signupName} onChange={(e) => setSignupName(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">Email</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={signupEmail}
-                    onChange={(e) => setSignupEmail(e.target.value)}
-                    required
-                  />
+                  <Input id="signup-email" type="email" placeholder="you@example.com" value={signupEmail} onChange={(e) => setSignupEmail(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Password</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={signupPassword}
-                    onChange={(e) => setSignupPassword(e.target.value)}
-                    required
-                  />
+                  <Input id="signup-password" type="password" placeholder="••••••••" value={signupPassword} onChange={(e) => setSignupPassword(e.target.value)} required />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -357,33 +315,18 @@ export default function Auth() {
               <p className="text-sm text-muted-foreground mb-2 text-center">
                 Connection failed. Please check your internet connection.
               </p>
-              <Button 
-                onClick={handleRetry} 
-                variant="outline" 
-                className="w-full"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                )}
+              <Button onClick={handleRetry} variant="outline" className="w-full" disabled={isLoading}>
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                 Retry Connection
               </Button>
             </div>
           )}
           
           <div className="mt-4 space-y-2 text-center">
-            <a 
-              href="/student-login" 
-              className="block text-sm text-muted-foreground hover:text-primary"
-            >
+            <a href="/student-login" className="block text-sm text-muted-foreground hover:text-primary transition-colors">
               Student? Login here →
             </a>
-            <a 
-              href="/admin-login" 
-              className="block text-sm text-muted-foreground hover:text-primary"
-            >
+            <a href="/admin-login" className="block text-sm text-muted-foreground hover:text-primary transition-colors">
               Administrator? Sign in here →
             </a>
           </div>
