@@ -42,6 +42,10 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Always set loading to true when starting a real fetch
+    // This ensures UI shows permission-gated items while loading
+    setLoading(true);
+
     try {
       // Fetch user role
       const { data: roleData, error: roleError } = await supabase
