@@ -36,6 +36,7 @@ const FEATURES = [
   { key: 'lesson_plan', label: 'Lesson Plan', description: 'Create lesson plans' },
   { key: 'tasks', label: 'Tasks', description: 'Personal task management' },
   { key: 'off_days', label: 'Off Days', description: 'Request time off' },
+  { key: 'staff_chat', label: 'Staff Chat', description: 'Send and receive messages with other staff' },
 ];
 
 export function UserPermissionsDialog({ user, open, onOpenChange, onUpdate }: UserPermissionsDialogProps) {
