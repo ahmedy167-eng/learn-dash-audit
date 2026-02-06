@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 export interface StaffMember {
   user_id: string;
   full_name: string | null;
   email: string | null;
   role: 'admin' | 'user';
+  messageRole: 'admin' | 'teacher'; // mapped role for messages table
 }
 
 export interface StaffMessage {
@@ -25,6 +27,11 @@ export interface ConversationPreview {
   unreadCount: number;
 }
 
+/** Map user_roles.role → messages sender_type/recipient_type */
+function mapRoleToMessageType(role: 'admin' | 'user'): 'admin' | 'teacher' {
+  return role === 'admin' ? 'admin' : 'teacher';
+}
+
 export function useStaffChat() {
   const { user } = useAuth();
   const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
@@ -34,7 +41,27 @@ export function useStaffChat() {
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [totalUnread, setTotalUnread] = useState(0);
+  const [currentUserMessageRole, setCurrentUserMessageRole] = useState<'admin' | 'teacher'>('teacher');
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  // Fetch current user's role for message type mapping
+  const fetchCurrentUserRole = useCallback(async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching current user role:', error);
+      return;
+    }
+
+    const role = (data?.role || 'user') as 'admin' | 'user';
+    setCurrentUserMessageRole(mapRoleToMessageType(role));
+  }, [user]);
 
   // Fetch all staff members with their roles
   const fetchStaffMembers = useCallback(async () => {
@@ -62,12 +89,16 @@ export function useStaffChat() {
 
     const members: StaffMember[] = (profiles || [])
       .filter(p => p.user_id !== user.id)
-      .map(p => ({
-        user_id: p.user_id,
-        full_name: p.full_name,
-        email: p.email,
-        role: (roleMap.get(p.user_id) || 'user') as 'admin' | 'user',
-      }));
+      .map(p => {
+        const role = (roleMap.get(p.user_id) || 'user') as 'admin' | 'user';
+        return {
+          user_id: p.user_id,
+          full_name: p.full_name,
+          email: p.email,
+          role,
+          messageRole: mapRoleToMessageType(role),
+        };
+      });
 
     setStaffMembers(members);
     return members;
@@ -82,8 +113,8 @@ export function useStaffChat() {
     const { data: allMessages, error } = await supabase
       .from('messages')
       .select('*')
-      .eq('sender_type', 'staff')
-      .eq('recipient_type', 'staff')
+      .in('sender_type', ['admin', 'teacher'])
+      .in('recipient_type', ['admin', 'teacher'])
       .or(`sender_user_id.eq.${user.id},recipient_user_id.eq.${user.id}`)
       .order('created_at', { ascending: false });
 
@@ -147,8 +178,8 @@ export function useStaffChat() {
     const { data, error } = await supabase
       .from('messages')
       .select('*')
-      .eq('sender_type', 'staff')
-      .eq('recipient_type', 'staff')
+      .in('sender_type', ['admin', 'teacher'])
+      .in('recipient_type', ['admin', 'teacher'])
       .or(
         `and(sender_user_id.eq.${user.id},recipient_user_id.eq.${contactId}),and(sender_user_id.eq.${contactId},recipient_user_id.eq.${user.id})`
       )
@@ -187,16 +218,21 @@ export function useStaffChat() {
       content: content.trim(),
       sender_user_id: user.id,
       recipient_user_id: selectedContact.user_id,
-      sender_type: 'staff',
-      recipient_type: 'staff',
+      sender_type: currentUserMessageRole,
+      recipient_type: selectedContact.messageRole,
     });
 
     if (error) {
       console.error('Error sending message:', error);
+      toast({
+        title: 'Message failed',
+        description: 'Could not send your message. Please try again.',
+        variant: 'destructive',
+      });
       return false;
     }
     return true;
-  }, [user, selectedContact]);
+  }, [user, selectedContact, currentUserMessageRole]);
 
   // Select a contact and load thread
   const selectContact = useCallback((contact: StaffMember) => {
@@ -216,27 +252,31 @@ export function useStaffChat() {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `sender_type=eq.staff`,
+          filter: `recipient_user_id=eq.${user.id}`,
         },
         (payload) => {
-          const newMsg = payload.new as StaffMessage;
-          
+          const newMsg = payload.new as StaffMessage & { sender_type: string; recipient_type: string };
+
+          // Only handle staff-to-staff messages
+          const staffTypes = ['admin', 'teacher'];
+          if (!staffTypes.includes(newMsg.sender_type) || !staffTypes.includes(newMsg.recipient_type)) {
+            return;
+          }
+
           // If this message is part of the active conversation, add it
           if (
             selectedContact &&
-            ((newMsg.sender_user_id === user.id && newMsg.recipient_user_id === selectedContact.user_id) ||
-             (newMsg.sender_user_id === selectedContact.user_id && newMsg.recipient_user_id === user.id))
+            newMsg.sender_user_id === selectedContact.user_id &&
+            newMsg.recipient_user_id === user.id
           ) {
             setMessages(prev => [...prev, newMsg]);
             
-            // Auto-mark as read if we received it
-            if (newMsg.recipient_user_id === user.id) {
-              supabase
-                .from('messages')
-                .update({ is_read: true, read_at: new Date().toISOString() })
-                .eq('id', newMsg.id)
-                .then(() => fetchConversations());
-            }
+            // Auto-mark as read
+            supabase
+              .from('messages')
+              .update({ is_read: true, read_at: new Date().toISOString() })
+              .eq('id', newMsg.id)
+              .then(() => fetchConversations());
           }
 
           // Always refresh conversation previews
@@ -246,10 +286,41 @@ export function useStaffChat() {
       .on(
         'postgres_changes',
         {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const newMsg = payload.new as StaffMessage & { sender_type: string; recipient_type: string };
+
+          const staffTypes = ['admin', 'teacher'];
+          if (!staffTypes.includes(newMsg.sender_type) || !staffTypes.includes(newMsg.recipient_type)) {
+            return;
+          }
+
+          // If this is our own sent message in the active conversation, add it
+          if (
+            selectedContact &&
+            newMsg.sender_user_id === user.id &&
+            newMsg.recipient_user_id === selectedContact.user_id
+          ) {
+            setMessages(prev => {
+              // Avoid duplicates
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
+          }
+
+          fetchConversations();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
           event: 'UPDATE',
           schema: 'public',
           table: 'messages',
-          filter: `sender_type=eq.staff`,
         },
         () => {
           fetchConversations();
@@ -268,6 +339,7 @@ export function useStaffChat() {
   useEffect(() => {
     const init = async () => {
       setLoading(true);
+      await fetchCurrentUserRole();
       const members = await fetchStaffMembers();
       if (members) {
         await fetchConversations(members);
@@ -275,7 +347,7 @@ export function useStaffChat() {
       setLoading(false);
     };
     init();
-  }, [fetchStaffMembers]);
+  }, [fetchStaffMembers, fetchCurrentUserRole]);
 
   return {
     staffMembers,
