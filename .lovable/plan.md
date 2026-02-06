@@ -1,89 +1,121 @@
 
 
-# Fix Staff Chat -- Messages Not Sending
+# Staff Chat Improvements -- UI Redesign, Access for All Staff, and Admin Toggle
 
-## Root Cause
+## Issues Identified
 
-The `messages` table has database CHECK constraints that only allow these values for `sender_type` and `recipient_type`:
-- `'admin'`
-- `'teacher'`
-- `'student'`
-
-The current code sets both fields to `'staff'`, which **violates the constraint** and causes the insert to fail silently. The message never reaches the database.
-
-Additionally, the `user_roles` table stores roles as `'admin'` and `'user'`, but the messages table expects `'admin'` or `'teacher'` -- so a role mapping is needed.
+1. **Ugly UI layout** -- The current chat page needs a cleaner, more polished design with better spacing, rounded cards, and visual hierarchy
+2. **Chat only available to Admin** -- The "Staff Chat" link appears in the sidebar for everyone, but the unread badge query uses `sender_type = 'staff'` which matches nothing in the database (valid values are `admin`, `teacher`, `student`). Teachers can technically access the page but the badge is broken
+3. **Messages not delivered to other staff** -- Messages do send correctly now (using `admin`/`teacher` types), but the sidebar unread badge still filters by the old `'staff'` value, so recipients never see notifications
+4. **No admin control to enable/disable chat** -- Admin should be able to toggle the staff chat feature on or off for individual users
 
 ---
 
-## Fix: Update `src/hooks/useStaffChat.tsx`
+## 1. Fix Sidebar Unread Badge (Bug Fix)
 
-### 1. Track the current user's role for sending
+**File: `src/components/layout/Sidebar.tsx`**
 
-- Fetch the current user's role from `user_roles` during initialization
-- Map `'admin'` to `'admin'` and `'user'` to `'teacher'` for use as the `sender_type` value
-- Store each staff member's mapped role so it can be used as the `recipient_type`
+The sidebar unread count query at line 63-64 still uses `sender_type = 'staff'` and `recipient_type = 'staff'`, which never matches any rows. Fix to use:
+- `.in('sender_type', ['admin', 'teacher'])`  
+- `.in('recipient_type', ['admin', 'teacher'])`
 
-### 2. Fix the `sendMessage` function
-
-Change from:
-```text
-sender_type: 'staff'
-recipient_type: 'staff'
-```
-
-To:
-```text
-sender_type: currentUserRole   (e.g. 'admin' or 'teacher')
-recipient_type: recipientRole  (e.g. 'admin' or 'teacher')
-```
-
-### 3. Fix conversation fetching queries
-
-Instead of filtering by `sender_type = 'staff'` (which matches nothing), filter by:
-- `sender_type` in `('admin', 'teacher')` AND `recipient_type` in `('admin', 'teacher')`
-- Combined with the existing user ID filters
-
-This ensures we only fetch staff-to-staff messages and exclude student messages.
-
-### 4. Fix the realtime subscription filter
-
-Change the realtime channel filter from `sender_type=eq.staff` to listening for both admin and teacher message types relevant to the current user.
-
-### 5. Add error feedback on send failure
-
-Show a toast notification if the message insert fails so the user knows something went wrong.
+This ensures teachers and admins both see unread counts for staff-to-staff messages.
 
 ---
 
-## Files Changed
+## 2. Add `staff_chat` Permission (Admin Toggle)
 
-- **`src/hooks/useStaffChat.tsx`** -- Fix role mapping, query filters, realtime subscription, and error handling (all changes in this one file)
+### Database Migration
+- Add `'staff_chat'` as a new feature option in the permission system (no schema changes needed since `feature` is a text column)
+- The existing `has_permission` function and `user_permissions` table already support arbitrary feature strings
+
+### Permission System Updates
+**File: `src/hooks/usePermissions.tsx`**
+- Add `'staff_chat'` to the `FeatureKey` type union
+
+**File: `src/components/admin/UserPermissionsDialog.tsx`**
+- Add a new entry to the `FEATURES` array: `{ key: 'staff_chat', label: 'Staff Chat', description: 'Send and receive messages with other staff' }`
+
+### Apply Permission Check
+**File: `src/components/layout/Sidebar.tsx`**
+- Wrap the Staff Chat nav link with a permission check: only show if `hasPermission('staff_chat')` returns true
+- Admins automatically have access (the `hasPermission` function already returns true for admins)
+
+**File: `src/pages/StaffChat.tsx`**
+- Add a permission gate: if `hasPermission('staff_chat')` is false, redirect to `/dashboard`
+
+---
+
+## 3. UI Redesign -- Staff Chat Page
+
+**File: `src/pages/StaffChat.tsx`** -- Complete layout improvements:
+
+**Left Panel (Staff List):**
+- Wrap in a `Card` component with proper rounded corners and shadow
+- Add a cleaner header with the title and online count
+- Better search bar styling with rounded input
+- Contact items with improved spacing, larger avatars, online status dots, and cleaner typography
+- Smoother hover states (subtle background change instead of lift effect which can feel jarring in a chat list)
+
+**Right Panel (Chat Area):**
+- Wrap in a `Card` component matching the left panel
+- Cleaner chat header with back button, avatar, name, and role badge
+- Better message bubbles with more rounded corners and improved padding
+- Cleaner empty state with a more visually appealing illustration
+- Input area with a rounded input field and circular send button
+- Overall better spacing between the two panels with a gap instead of just a border
+
+**Responsive improvements:**
+- Full-height layout using `h-[calc(100vh-4rem)]` (already present, keep it)
+- Proper mobile toggle between list and chat views
+- Add a subtle gap between the panels on desktop
+
+---
+
+## 4. Files Changed
+
+| File | Change |
+|------|--------|
+| `src/hooks/usePermissions.tsx` | Add `'staff_chat'` to `FeatureKey` type |
+| `src/components/admin/UserPermissionsDialog.tsx` | Add Staff Chat to the FEATURES list |
+| `src/components/layout/Sidebar.tsx` | Fix unread badge query filters; gate Staff Chat behind permission check |
+| `src/pages/StaffChat.tsx` | Add permission gate + complete UI redesign with Card wrappers, better spacing, cleaner bubbles |
 
 ---
 
 ## Technical Details
 
-### Role Mapping
+### Sidebar Badge Fix
 ```text
-user_roles.role  -->  messages.sender_type / recipient_type
-'admin'          -->  'admin'
-'user'           -->  'teacher'
+Current (broken):
+  .eq('sender_type', 'staff')
+  .eq('recipient_type', 'staff')
+
+Fixed:
+  .in('sender_type', ['admin', 'teacher'])
+  .in('recipient_type', ['admin', 'teacher'])
 ```
 
-### Updated Query Pattern (conversations)
+### Permission Type Update
 ```text
-SELECT * FROM messages
-WHERE sender_type IN ('admin', 'teacher')
-  AND recipient_type IN ('admin', 'teacher')
-  AND (sender_user_id = current_user OR recipient_user_id = current_user)
-ORDER BY created_at DESC
+export type FeatureKey = 
+  | 'students' 
+  | 'sections' 
+  | ... 
+  | 'staff_chat';   // NEW
 ```
 
-### Updated Insert
+### Admin Permission Dialog Addition
 ```text
-INSERT INTO messages (content, sender_user_id, recipient_user_id, sender_type, recipient_type)
-VALUES (content, currentUserId, recipientId, 'admin'|'teacher', 'admin'|'teacher')
+{ key: 'staff_chat', label: 'Staff Chat', description: 'Send and receive messages with other staff' }
 ```
 
-No database migrations are needed -- the table schema and constraints are correct. The fix is entirely in the client-side code.
+### Chat Page Permission Gate
+```text
+if (!permLoading && !hasPermission('staff_chat')) {
+  return <Navigate to="/dashboard" replace />;
+}
+```
+
+No database migration is needed -- the `user_permissions` table accepts any text value for `feature`, and the `has_permission()` function works with arbitrary feature strings. Admins automatically have access to all features.
 
