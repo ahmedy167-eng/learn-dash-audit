@@ -29,6 +29,7 @@ import StudentPortal from "./pages/StudentPortal";
 import StudentQuizzes from "./pages/student/StudentQuizzes";
 import StudentLMS from "./pages/student/StudentLMS";
 import StudentCAProjects from "./pages/student/StudentCAProjects";
+import StaffChat from "./pages/StaffChat";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -67,6 +68,7 @@ function App() {
                     <Route path="/student-portal/quizzes" element={<StudentQuizzes />} />
                     <Route path="/student-portal/lms" element={<StudentLMS />} />
                     <Route path="/student-portal/ca-projects" element={<StudentCAProjects />} />
+                    <Route path="/staff-chat" element={<StaffChat />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
                 </PermissionsProvider>
