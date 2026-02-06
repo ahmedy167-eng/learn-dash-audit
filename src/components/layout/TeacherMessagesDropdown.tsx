@@ -51,6 +51,7 @@ export function TeacherMessagesDropdown() {
           *,
           student:students!messages_sender_student_id_fkey(full_name, student_id)
         `)
+        .eq('sender_type', 'student')
         .or(`recipient_user_id.eq.${user.id},and(recipient_type.eq.admin,recipient_user_id.is.null)`)
         .order('created_at', { ascending: false })
         .limit(20);
