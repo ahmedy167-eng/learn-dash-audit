@@ -55,7 +55,7 @@ export function StudentLayout({ children }: StudentLayoutProps) {
         {/* Logo */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div className={cn("flex items-center gap-2", collapsed && "justify-center w-full")}>
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center transition-transform duration-300 hover:rotate-12">
               <GraduationCap className="w-5 h-5 text-primary-foreground" />
             </div>
             {!collapsed && <span className="font-semibold text-foreground">Student Portal</span>}
@@ -84,7 +84,7 @@ export function StudentLayout({ children }: StudentLayoutProps) {
 
         {/* Student Info */}
         {!collapsed && (
-          <div className="p-4 border-b border-border">
+          <div className="p-4 border-b border-border animate-in">
             <p className="text-sm font-medium text-foreground truncate">{student.full_name}</p>
             <p className="text-xs text-muted-foreground">ID: {student.student_id}</p>
             {student.section_number && (
@@ -95,7 +95,7 @@ export function StudentLayout({ children }: StudentLayoutProps) {
 
         {/* Navigation */}
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
+          {navItems.map((item, index) => {
             const isActive = location.pathname === item.url || 
               (item.url !== '/student-portal' && location.pathname.startsWith(item.url));
             
@@ -104,9 +104,10 @@ export function StudentLayout({ children }: StudentLayoutProps) {
                 key={item.title}
                 to={item.url}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200",
                   collapsed && "justify-center px-2",
-                  isActive && "bg-accent text-accent-foreground font-medium"
+                  isActive && "bg-accent text-accent-foreground font-medium border-l-2 border-primary",
+                  `animate-in stagger-${Math.min(index + 1, 5)}`
                 )}
               >
                 <item.icon className="h-5 w-5 flex-shrink-0" />
@@ -125,7 +126,7 @@ export function StudentLayout({ children }: StudentLayoutProps) {
             variant="ghost"
             onClick={signOut}
             className={cn(
-              "w-full flex items-center gap-3 text-muted-foreground hover:text-destructive",
+              "w-full flex items-center gap-3 text-muted-foreground hover:text-destructive transition-colors",
               collapsed && "justify-center"
             )}
           >

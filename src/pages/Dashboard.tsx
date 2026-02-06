@@ -49,22 +49,17 @@ export default function Dashboard() {
 
   const fetchTeacherProfile = async () => {
     if (!user) return;
-    
-    // Try user_metadata first (set during signup)
     const metaName = user.user_metadata?.full_name;
     if (metaName) {
       setTeacherName(metaName);
       return;
     }
-    
-    // Fallback to profiles table
     try {
       const { data } = await supabase
         .from('profiles')
         .select('full_name')
         .eq('user_id', user.id)
         .single();
-      
       if (data?.full_name) {
         setTeacherName(data.full_name);
       }
@@ -75,21 +70,17 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     if (!user) return;
-    
     try {
-      // Fetch students count - only for current user's students
       const { count: studentsCount } = await supabase
         .from('students')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id);
 
-      // Fetch schedules count (active classes) - only for current user
       const { count: schedulesCount } = await supabase
         .from('schedules')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id);
 
-      // Fetch tasks - only for current user
       const { data: tasksData } = await supabase
         .from('tasks')
         .select('*')
@@ -110,7 +101,6 @@ export default function Dashboard() {
         todayTasks: todayCount,
       });
 
-      // Fetch tasks for display - only for current user
       const { data: allTasksData } = await supabase
         .from('tasks')
         .select('*')
@@ -134,7 +124,6 @@ export default function Dashboard() {
         completed_at: !isCompleted ? new Date().toISOString() : null
       })
       .eq('id', taskId);
-    
     fetchDashboardData();
   };
 
@@ -162,17 +151,17 @@ export default function Dashboard() {
   };
 
   const statsCards = [
-    { title: 'Total Students', value: stats.totalStudents, icon: Users, color: 'bg-orange-500' },
-    { title: 'Active Classes', value: stats.activeClasses, icon: BookOpen, color: 'bg-teal-500' },
-    { title: 'Pending Tasks', value: stats.pendingTasks, icon: CheckSquare, color: 'bg-green-500' },
-    { title: "Today's Tasks", value: stats.todayTasks, icon: Clock, color: 'bg-purple-500' },
+    { title: 'Total Students', value: stats.totalStudents, icon: Users, gradient: 'from-orange-500/20 to-orange-500/5' },
+    { title: 'Active Classes', value: stats.activeClasses, icon: BookOpen, gradient: 'from-teal-500/20 to-teal-500/5' },
+    { title: 'Pending Tasks', value: stats.pendingTasks, icon: CheckSquare, gradient: 'from-green-500/20 to-green-500/5' },
+    { title: "Today's Tasks", value: stats.todayTasks, icon: Clock, gradient: 'from-purple-500/20 to-purple-500/5' },
   ];
 
   return (
     <DashboardLayout>
       <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between animate-in">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
             <p className="text-muted-foreground">
@@ -192,16 +181,16 @@ export default function Dashboard() {
 
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {statsCards.map((stat) => (
-            <Card key={stat.title} className="min-h-[120px]">
+          {statsCards.map((stat, index) => (
+            <Card key={stat.title} className={`min-h-[120px] animate-in stagger-${index + 1}`}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
                     <p className="text-3xl font-bold">{stat.value}</p>
                   </div>
-                  <div className={`p-3 rounded-lg ${stat.color}`}>
-                    <stat.icon className="h-6 w-6 text-white" />
+                  <div className={`p-3 rounded-lg bg-gradient-to-br ${stat.gradient}`}>
+                    <stat.icon className="h-6 w-6 text-foreground" />
                   </div>
                 </div>
               </CardContent>
@@ -212,17 +201,17 @@ export default function Dashboard() {
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Overdue Tasks */}
           {overdueTasks.length > 0 && (
-            <Card className="border-destructive/50">
+            <Card className="border-destructive/50 animate-in">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-destructive">
-                  <AlertTriangle className="h-5 w-5" />
+                  <AlertTriangle className="h-5 w-5 animate-pulse" />
                   Overdue Tasks ({overdueTasks.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   {overdueTasks.slice(0, 5).map((task) => (
-                    <div key={task.id} className="flex items-center justify-between p-3 bg-destructive/10 rounded-lg">
+                    <div key={task.id} className="flex items-center justify-between p-3 bg-destructive/10 rounded-lg transition-colors hover:bg-destructive/15">
                       <div className="flex items-center gap-3">
                         <input
                           type="checkbox"
@@ -246,7 +235,7 @@ export default function Dashboard() {
           )}
 
           {/* Tasks Section */}
-          <Card className={overdueTasks.length === 0 ? 'lg:col-span-2' : ''}>
+          <Card className={overdueTasks.length === 0 ? 'lg:col-span-2 animate-in' : 'animate-in'}>
             <CardHeader className="pb-3">
               <CardTitle>Tasks</CardTitle>
             </CardHeader>
@@ -263,12 +252,7 @@ export default function Dashboard() {
                     <p className="text-muted-foreground text-center py-8">No tasks for today</p>
                   ) : (
                     todayTasks.map((task) => (
-                      <TaskItem 
-                        key={task.id} 
-                        task={task} 
-                        onToggle={toggleTaskComplete}
-                        getPriorityColor={getPriorityColor}
-                      />
+                      <TaskItem key={task.id} task={task} onToggle={toggleTaskComplete} getPriorityColor={getPriorityColor} />
                     ))
                   )}
                 </TabsContent>
@@ -278,12 +262,7 @@ export default function Dashboard() {
                     <p className="text-muted-foreground text-center py-8">No tasks this week</p>
                   ) : (
                     weekTasks.map((task) => (
-                      <TaskItem 
-                        key={task.id} 
-                        task={task} 
-                        onToggle={toggleTaskComplete}
-                        getPriorityColor={getPriorityColor}
-                      />
+                      <TaskItem key={task.id} task={task} onToggle={toggleTaskComplete} getPriorityColor={getPriorityColor} />
                     ))
                   )}
                 </TabsContent>
@@ -293,12 +272,7 @@ export default function Dashboard() {
                     <p className="text-muted-foreground text-center py-8">No completed tasks</p>
                   ) : (
                     completedTasks.slice(0, 5).map((task) => (
-                      <TaskItem 
-                        key={task.id} 
-                        task={task} 
-                        onToggle={toggleTaskComplete}
-                        getPriorityColor={getPriorityColor}
-                      />
+                      <TaskItem key={task.id} task={task} onToggle={toggleTaskComplete} getPriorityColor={getPriorityColor} />
                     ))
                   )}
                 </TabsContent>
@@ -321,7 +295,7 @@ function TaskItem({
   getPriorityColor: (priority: string) => "default" | "destructive" | "secondary" | "outline";
 }) {
   return (
-    <div className="flex items-center justify-between p-3 bg-accent/50 rounded-lg">
+    <div className="flex items-center justify-between p-3 bg-accent/50 rounded-lg transition-colors hover:bg-accent/80">
       <div className="flex items-center gap-3">
         <input
           type="checkbox"

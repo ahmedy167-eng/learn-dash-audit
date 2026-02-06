@@ -56,7 +56,7 @@ const StudentPortal = () => {
     <StudentLayout>
       <div className="p-6 md:p-8">
         {/* Welcome Section */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 animate-in">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">
               Welcome, {student?.full_name}!
@@ -78,10 +78,10 @@ const StudentPortal = () => {
         </div>
 
         {/* Student Info Card */}
-        <Card className="mb-8">
+        <Card className="mb-8 hover-lift animate-in stagger-1">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/5 rounded-full flex items-center justify-center">
                 <User className="w-6 h-6 text-primary" />
               </div>
               <div>
@@ -109,16 +109,16 @@ const StudentPortal = () => {
         </Card>
 
         {/* Notices Panel */}
-        <div className="mb-8">
+        <div className="mb-8 animate-in stagger-2">
           <NoticesPanel />
         </div>
 
         {/* Quick Access Sections */}
-        <h2 className="text-xl font-semibold mb-4">Quick Access</h2>
+        <h2 className="text-xl font-semibold mb-4 animate-in stagger-3">Quick Access</h2>
         <div className="grid gap-4 md:grid-cols-3">
-          {sections.map((section) => (
+          {sections.map((section, index) => (
             <Link key={section.title} to={section.href} className="block h-full">
-              <Card className="h-full flex flex-col hover:border-primary/50 transition-colors cursor-pointer">
+              <Card className={`h-full flex flex-col hover:border-primary/50 transition-all duration-300 cursor-pointer hover-lift animate-in stagger-${index + 3}`}>
                 <CardHeader className="pb-4">
                   <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${section.color}`}>
                     <section.icon className="w-6 h-6" />
