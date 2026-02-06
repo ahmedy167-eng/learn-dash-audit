@@ -1,15 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useStaffChat, StaffMember } from '@/hooks/useStaffChat';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday } from 'date-fns';
-import { Search, Send, MessageCircle, ArrowLeft, Users } from 'lucide-react';
+import { Search, Send, MessageCircle, ArrowLeft, Users, Loader2 } from 'lucide-react';
 
 function getInitials(name: string | null) {
   if (!name) return '?';
@@ -32,8 +35,16 @@ function formatFullTime(dateStr: string) {
   return format(new Date(dateStr), 'h:mm a');
 }
 
+function formatDateLabel(dateStr: string) {
+  const date = new Date(dateStr);
+  if (isToday(date)) return 'Today';
+  if (isYesterday(date)) return 'Yesterday';
+  return format(date, 'MMMM d, yyyy');
+}
+
 export default function StaffChat() {
   const { user } = useAuth();
+  const { hasPermission, loading: permLoading } = usePermissions();
   const {
     staffMembers,
     conversations,
@@ -56,6 +67,11 @@ export default function StaffChat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Permission gate (after all hooks)
+  if (!permLoading && !hasPermission('staff_chat')) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const handleSend = async () => {
     if (!messageInput.trim() || sending) return;
@@ -82,7 +98,7 @@ export default function StaffChat() {
     setSelectedContact(null);
   };
 
-  // Build the display list: contacts with conversations first, then remaining staff
+  // Build display list
   const conversationContactIds = new Set(conversations.map(c => c.contact.user_id));
   const otherStaff = staffMembers.filter(s => !conversationContactIds.has(s.user_id));
 
@@ -105,28 +121,28 @@ export default function StaffChat() {
     groupedMessages[groupedMessages.length - 1].msgs.push(msg);
   }
 
-  function formatDateLabel(dateStr: string) {
-    const date = new Date(dateStr);
-    if (isToday(date)) return 'Today';
-    if (isYesterday(date)) return 'Yesterday';
-    return format(date, 'MMMM d, yyyy');
-  }
-
   return (
     <DashboardLayout>
-      <div className="h-[calc(100vh-4rem)] flex animate-in">
+      <div className="h-[calc(100vh-4rem)] flex gap-3 p-3 animate-in">
         {/* Staff List Panel */}
-        <div
+        <Card
           className={cn(
-            'w-full md:w-80 lg:w-96 border-r border-border flex flex-col bg-card',
+            'w-full md:w-80 lg:w-96 flex flex-col overflow-hidden hover:shadow-soft hover:translate-y-0',
             mobileShowChat && 'hidden md:flex'
           )}
         >
           {/* Search Header */}
           <div className="p-4 border-b border-border space-y-3">
-            <div className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5 text-primary" />
-              <h2 className="font-semibold text-foreground">Staff Chat</h2>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <MessageCircle className="h-4 w-4 text-primary" />
+                </div>
+                <h2 className="font-semibold text-foreground">Staff Chat</h2>
+              </div>
+              <Badge variant="secondary" className="text-xs">
+                {staffMembers.length} staff
+              </Badge>
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -134,7 +150,7 @@ export default function StaffChat() {
                 placeholder="Search staff..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className="pl-9 rounded-full bg-muted/50 border-transparent focus-visible:border-input"
               />
             </div>
           </div>
@@ -142,27 +158,18 @@ export default function StaffChat() {
           {/* Contact List */}
           <ScrollArea className="flex-1">
             {loading ? (
-              <div className="p-4 space-y-3">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="flex items-center gap-3 p-3 animate-pulse">
-                    <div className="w-10 h-10 rounded-full bg-muted" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 w-24 bg-muted rounded" />
-                      <div className="h-3 w-40 bg-muted rounded" />
-                    </div>
-                  </div>
-                ))}
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               </div>
             ) : (
-              <div className="p-2">
+              <div className="p-2 space-y-0.5">
                 {/* Conversations */}
-                {filteredConversations.map((conv, i) => (
+                {filteredConversations.map((conv) => (
                   <button
                     key={conv.contact.user_id}
                     onClick={() => handleSelectContact(conv.contact)}
                     className={cn(
-                      'w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 text-left hover-lift',
-                      `animate-in stagger-${Math.min(i + 1, 5)}`,
+                      'w-full flex items-center gap-3 p-3 rounded-xl transition-colors duration-150 text-left',
                       selectedContact?.user_id === conv.contact.user_id
                         ? 'bg-accent'
                         : 'hover:bg-accent/50'
@@ -178,7 +185,7 @@ export default function StaffChat() {
                         <span className="font-medium text-sm text-foreground truncate">
                           {conv.contact.full_name || 'Unknown'}
                         </span>
-                        <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
+                        <span className="text-[11px] text-muted-foreground flex-shrink-0 ml-2">
                           {formatMessageTime(conv.lastMessageTime)}
                         </span>
                       </div>
@@ -187,7 +194,7 @@ export default function StaffChat() {
                           {conv.lastMessage}
                         </p>
                         {conv.unreadCount > 0 && (
-                          <Badge variant="default" className="h-5 min-w-5 flex items-center justify-center text-xs px-1.5 flex-shrink-0">
+                          <Badge variant="default" className="h-5 min-w-5 flex items-center justify-center text-[10px] px-1.5 flex-shrink-0 rounded-full">
                             {conv.unreadCount}
                           </Badge>
                         )}
@@ -200,20 +207,19 @@ export default function StaffChat() {
                 {filteredOtherStaff.length > 0 && (
                   <>
                     {filteredConversations.length > 0 && (
-                      <div className="flex items-center gap-2 px-3 py-2 mt-2">
+                      <div className="flex items-center gap-2 px-3 py-2.5 mt-2">
                         <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                           Other Staff
                         </span>
                       </div>
                     )}
-                    {filteredOtherStaff.map((member, i) => (
+                    {filteredOtherStaff.map((member) => (
                       <button
                         key={member.user_id}
                         onClick={() => handleSelectContact(member)}
                         className={cn(
-                          'w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 text-left hover-lift',
-                          `animate-in stagger-${Math.min(i + 1, 5)}`,
+                          'w-full flex items-center gap-3 p-3 rounded-xl transition-colors duration-150 text-left',
                           selectedContact?.user_id === member.user_id
                             ? 'bg-accent'
                             : 'hover:bg-accent/50'
@@ -228,9 +234,9 @@ export default function StaffChat() {
                           <span className="font-medium text-sm text-foreground truncate block">
                             {member.full_name || 'Unknown'}
                           </span>
-                          <Badge variant="secondary" className="text-xs mt-0.5">
+                          <span className="text-[11px] text-muted-foreground">
                             {member.role === 'admin' ? 'Admin' : 'Teacher'}
-                          </Badge>
+                          </span>
                         </div>
                       </button>
                     ))}
@@ -238,26 +244,26 @@ export default function StaffChat() {
                 )}
 
                 {filteredConversations.length === 0 && filteredOtherStaff.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
+                  <div className="text-center py-12 text-muted-foreground text-sm">
                     No staff members found
                   </div>
                 )}
               </div>
             )}
           </ScrollArea>
-        </div>
+        </Card>
 
         {/* Chat Thread Panel */}
-        <div
+        <Card
           className={cn(
-            'flex-1 flex flex-col bg-background',
+            'flex-1 flex flex-col overflow-hidden hover:shadow-soft hover:translate-y-0',
             !mobileShowChat && 'hidden md:flex'
           )}
         >
           {selectedContact ? (
             <>
               {/* Chat Header */}
-              <div className="flex items-center gap-3 p-4 border-b border-border bg-card">
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -271,96 +277,104 @@ export default function StaffChat() {
                     {getInitials(selectedContact.full_name)}
                   </AvatarFallback>
                 </Avatar>
-                <div>
-                  <h3 className="font-semibold text-sm text-foreground">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm text-foreground truncate">
                     {selectedContact.full_name || 'Unknown'}
                   </h3>
-                  <Badge variant="secondary" className="text-xs">
+                  <span className="text-[11px] text-muted-foreground">
                     {selectedContact.role === 'admin' ? 'Admin' : 'Teacher'}
-                  </Badge>
+                  </span>
                 </div>
               </div>
 
-              {/* Messages */}
-              <ScrollArea className="flex-1 p-4">
-                {messagesLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-muted-foreground text-sm">Loading messages...</div>
-                  </div>
-                ) : messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                    <MessageCircle className="h-12 w-12 text-muted-foreground/30 mb-3" />
-                    <p className="text-muted-foreground text-sm">
-                      No messages yet. Start the conversation!
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {groupedMessages.map(group => (
-                      <div key={group.date}>
-                        <div className="flex items-center justify-center mb-4">
-                          <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full">
-                            {formatDateLabel(group.date)}
-                          </span>
-                        </div>
-                        <div className="space-y-2">
-                          {group.msgs.map((msg) => {
-                            const isMine = msg.sender_user_id === user?.id;
-                            return (
-                              <div
-                                key={msg.id}
-                                className={cn(
-                                  'flex animate-in',
-                                  isMine ? 'justify-end' : 'justify-start'
-                                )}
-                              >
+              {/* Messages Area */}
+              <ScrollArea className="flex-1">
+                <div className="p-4">
+                  {messagesLoading ? (
+                    <div className="flex items-center justify-center py-16">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                      <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center mb-3">
+                        <MessageCircle className="h-7 w-7 text-muted-foreground/50" />
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        No messages yet. Say hello!
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-5">
+                      {groupedMessages.map(group => (
+                        <div key={group.date}>
+                          <div className="flex items-center justify-center mb-4">
+                            <span className="text-[11px] text-muted-foreground bg-muted px-3 py-1 rounded-full">
+                              {formatDateLabel(group.date)}
+                            </span>
+                          </div>
+                          <div className="space-y-1.5">
+                            {group.msgs.map((msg) => {
+                              const isMine = msg.sender_user_id === user?.id;
+                              return (
                                 <div
+                                  key={msg.id}
                                   className={cn(
-                                    'max-w-[75%] px-4 py-2.5 rounded-2xl text-sm',
-                                    isMine
-                                      ? 'bg-primary text-primary-foreground rounded-br-md'
-                                      : 'bg-muted text-foreground rounded-bl-md'
+                                    'flex',
+                                    isMine ? 'justify-end' : 'justify-start'
                                   )}
                                 >
-                                  <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                                  <p
+                                  <div
                                     className={cn(
-                                      'text-[10px] mt-1',
-                                      isMine ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                                      'max-w-[75%] px-4 py-2.5 text-sm',
+                                      isMine
+                                        ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-lg'
+                                        : 'bg-muted text-foreground rounded-2xl rounded-bl-lg'
                                     )}
                                   >
-                                    {formatFullTime(msg.created_at)}
-                                  </p>
+                                    <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
+                                    <p
+                                      className={cn(
+                                        'text-[10px] mt-1.5',
+                                        isMine ? 'text-primary-foreground/60' : 'text-muted-foreground'
+                                      )}
+                                    >
+                                      {formatFullTime(msg.created_at)}
+                                    </p>
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                    <div ref={messagesEndRef} />
-                  </div>
-                )}
+                      ))}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
+                </div>
               </ScrollArea>
 
               {/* Message Input */}
-              <div className="p-4 border-t border-border bg-card">
+              <div className="px-4 py-3 border-t border-border">
                 <div className="flex items-center gap-2">
                   <Input
                     placeholder="Type a message..."
                     value={messageInput}
                     onChange={e => setMessageInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    className="flex-1"
+                    className="flex-1 rounded-full bg-muted/50 border-transparent focus-visible:border-input"
                     disabled={sending}
                   />
                   <Button
                     size="icon"
                     onClick={handleSend}
                     disabled={!messageInput.trim() || sending}
-                    className="h-10 w-10 flex-shrink-0"
+                    className="h-10 w-10 rounded-full flex-shrink-0"
                   >
-                    <Send className="h-4 w-4" />
+                    {sending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
               </div>
@@ -368,16 +382,16 @@ export default function StaffChat() {
           ) : (
             /* Empty state */
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
                 <MessageCircle className="h-8 w-8 text-primary" />
               </div>
               <h3 className="font-semibold text-foreground mb-1">Staff Chat</h3>
-              <p className="text-muted-foreground text-sm max-w-sm">
-                Select a staff member to start chatting. Messages are delivered in real time.
+              <p className="text-muted-foreground text-sm max-w-xs">
+                Select a colleague from the list to start a conversation.
               </p>
             </div>
           )}
-        </div>
+        </Card>
       </div>
     </DashboardLayout>
   );

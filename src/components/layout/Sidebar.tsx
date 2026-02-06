@@ -60,8 +60,8 @@ export function Sidebar() {
       const { count, error } = await supabase
         .from('messages')
         .select('*', { count: 'exact', head: true })
-        .eq('sender_type', 'staff')
-        .eq('recipient_type', 'staff')
+        .in('sender_type', ['admin', 'teacher'])
+        .in('recipient_type', ['admin', 'teacher'])
         .eq('recipient_user_id', user.id)
         .eq('is_read', false);
 
@@ -153,37 +153,39 @@ export function Sidebar() {
           </NavLink>
         ))}
 
-        {/* Staff Chat */}
-        <NavLink
-          to="/staff-chat"
-          className={cn(
-            "flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200",
-            collapsed && "justify-center px-2"
-          )}
-          activeClassName="bg-accent text-accent-foreground font-medium border-l-2 border-primary"
-        >
-          <div className="relative flex-shrink-0">
-            <MessageCircle className="h-5 w-5" />
-            {unreadChatCount > 0 && (
-              <Badge
-                variant="default"
-                className="absolute -top-2 -right-2 h-4 min-w-4 flex items-center justify-center text-[10px] px-1 py-0"
-              >
-                {unreadChatCount > 9 ? '9+' : unreadChatCount}
-              </Badge>
+        {/* Staff Chat - permission gated */}
+        {(permLoading || hasPermission('staff_chat')) && (
+          <NavLink
+            to="/staff-chat"
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-200",
+              collapsed && "justify-center px-2"
             )}
-          </div>
-          {!collapsed && (
-            <span className="flex items-center gap-2">
-              Staff Chat
+            activeClassName="bg-accent text-accent-foreground font-medium border-l-2 border-primary"
+          >
+            <div className="relative flex-shrink-0">
+              <MessageCircle className="h-5 w-5" />
               {unreadChatCount > 0 && (
-                <Badge variant="default" className="text-xs px-1.5 py-0 h-5">
-                  {unreadChatCount}
+                <Badge
+                  variant="default"
+                  className="absolute -top-2 -right-2 h-4 min-w-4 flex items-center justify-center text-[10px] px-1 py-0"
+                >
+                  {unreadChatCount > 9 ? '9+' : unreadChatCount}
                 </Badge>
               )}
-            </span>
-          )}
-        </NavLink>
+            </div>
+            {!collapsed && (
+              <span className="flex items-center gap-2">
+                Staff Chat
+                {unreadChatCount > 0 && (
+                  <Badge variant="default" className="text-xs px-1.5 py-0 h-5">
+                    {unreadChatCount}
+                  </Badge>
+                )}
+              </span>
+            )}
+          </NavLink>
+        )}
         
         {(permLoading || isAdmin) && (
           <NavLink
