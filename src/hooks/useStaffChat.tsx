@@ -8,7 +8,7 @@ export interface StaffMember {
   full_name: string | null;
   email: string | null;
   role: 'admin' | 'user';
-  messageRole: 'admin' | 'teacher'; // mapped role for messages table
+  messageRole: 'admin' | 'teacher';
 }
 
 export interface StaffMessage {
@@ -42,16 +42,37 @@ export function useStaffChat() {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [totalUnread, setTotalUnread] = useState(0);
   const [currentUserMessageRole, setCurrentUserMessageRole] = useState<'admin' | 'teacher'>('teacher');
+
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const isMountedRef = useRef(true);
+
+  // Refs for mutable state used inside realtime callbacks & effects
+  const userIdRef = useRef<string | null>(null);
+  const staffMembersRef = useRef<StaffMember[]>([]);
+  const selectedContactRef = useRef<StaffMember | null>(null);
+  const currentUserMessageRoleRef = useRef<'admin' | 'teacher'>('teacher');
+
+  // Keep refs in sync
+  useEffect(() => { userIdRef.current = user?.id ?? null; }, [user?.id]);
+  useEffect(() => { staffMembersRef.current = staffMembers; }, [staffMembers]);
+  useEffect(() => { selectedContactRef.current = selectedContact; }, [selectedContact]);
+  useEffect(() => { currentUserMessageRoleRef.current = currentUserMessageRole; }, [currentUserMessageRole]);
+
+  // Cleanup mounted flag
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
 
   // Fetch current user's role for message type mapping
   const fetchCurrentUserRole = useCallback(async () => {
-    if (!user) return;
+    const uid = userIdRef.current;
+    if (!uid) return;
 
     const { data, error } = await supabase
       .from('user_roles')
       .select('role')
-      .eq('user_id', user.id)
+      .eq('user_id', uid)
       .maybeSingle();
 
     if (error) {
@@ -59,13 +80,15 @@ export function useStaffChat() {
       return;
     }
 
+    if (!isMountedRef.current) return;
     const role = (data?.role || 'user') as 'admin' | 'user';
     setCurrentUserMessageRole(mapRoleToMessageType(role));
-  }, [user]);
+  }, []);
 
   // Fetch all staff members with their roles
-  const fetchStaffMembers = useCallback(async () => {
-    if (!user) return;
+  const fetchStaffMembers = useCallback(async (): Promise<StaffMember[] | undefined> => {
+    const uid = userIdRef.current;
+    if (!uid) return;
 
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
@@ -85,10 +108,12 @@ export function useStaffChat() {
       return;
     }
 
+    if (!isMountedRef.current) return;
+
     const roleMap = new Map(roles?.map(r => [r.user_id, r.role]) || []);
 
     const members: StaffMember[] = (profiles || [])
-      .filter(p => p.user_id !== user.id)
+      .filter(p => p.user_id !== uid)
       .map(p => {
         const role = (roleMap.get(p.user_id) || 'user') as 'admin' | 'user';
         return {
@@ -102,20 +127,21 @@ export function useStaffChat() {
 
     setStaffMembers(members);
     return members;
-  }, [user]);
+  }, []);
 
   // Fetch conversation previews (latest message + unread count per contact)
   const fetchConversations = useCallback(async (members?: StaffMember[]) => {
-    if (!user) return;
+    const uid = userIdRef.current;
+    if (!uid) return;
 
-    const staffList = members || staffMembers;
+    const staffList = members || staffMembersRef.current;
 
     const { data: allMessages, error } = await supabase
       .from('messages')
       .select('*')
       .in('sender_type', ['admin', 'teacher'])
       .in('recipient_type', ['admin', 'teacher'])
-      .or(`sender_user_id.eq.${user.id},recipient_user_id.eq.${user.id}`)
+      .or(`sender_user_id.eq.${uid},recipient_user_id.eq.${uid}`)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -123,11 +149,13 @@ export function useStaffChat() {
       return;
     }
 
+    if (!isMountedRef.current) return;
+
     // Group by contact
     const contactMap = new Map<string, { messages: typeof allMessages }>();
     
     for (const msg of allMessages || []) {
-      const contactId = msg.sender_user_id === user.id 
+      const contactId = msg.sender_user_id === uid 
         ? msg.recipient_user_id 
         : msg.sender_user_id;
       
@@ -148,7 +176,7 @@ export function useStaffChat() {
 
       const latest = data.messages[0];
       const unreadCount = data.messages.filter(
-        m => m.recipient_user_id === user.id && !m.is_read
+        m => m.recipient_user_id === uid && !m.is_read
       ).length;
 
       unreadTotal += unreadCount;
@@ -168,11 +196,12 @@ export function useStaffChat() {
 
     setConversations(previews);
     setTotalUnread(unreadTotal);
-  }, [user, staffMembers]);
+  }, []);
 
   // Fetch messages for a specific conversation thread
   const fetchThread = useCallback(async (contactId: string) => {
-    if (!user) return;
+    const uid = userIdRef.current;
+    if (!uid) return;
     setMessagesLoading(true);
 
     const { data, error } = await supabase
@@ -181,22 +210,24 @@ export function useStaffChat() {
       .in('sender_type', ['admin', 'teacher'])
       .in('recipient_type', ['admin', 'teacher'])
       .or(
-        `and(sender_user_id.eq.${user.id},recipient_user_id.eq.${contactId}),and(sender_user_id.eq.${contactId},recipient_user_id.eq.${user.id})`
+        `and(sender_user_id.eq.${uid},recipient_user_id.eq.${contactId}),and(sender_user_id.eq.${contactId},recipient_user_id.eq.${uid})`
       )
       .order('created_at', { ascending: true });
 
     if (error) {
       console.error('Error fetching thread:', error);
-      setMessagesLoading(false);
+      if (isMountedRef.current) setMessagesLoading(false);
       return;
     }
+
+    if (!isMountedRef.current) return;
 
     setMessages(data || []);
     setMessagesLoading(false);
 
     // Mark unread messages as read
     const unreadIds = (data || [])
-      .filter(m => m.recipient_user_id === user.id && !m.is_read)
+      .filter(m => m.recipient_user_id === uid && !m.is_read)
       .map(m => m.id);
 
     if (unreadIds.length > 0) {
@@ -208,18 +239,21 @@ export function useStaffChat() {
       // Refresh conversations to update unread counts
       fetchConversations();
     }
-  }, [user, fetchConversations]);
+  }, [fetchConversations]);
 
   // Send a message
   const sendMessage = useCallback(async (content: string) => {
-    if (!user || !selectedContact || !content.trim()) return;
+    const uid = userIdRef.current;
+    const contact = selectedContactRef.current;
+    const msgRole = currentUserMessageRoleRef.current;
+    if (!uid || !contact || !content.trim()) return;
 
     const { error } = await supabase.from('messages').insert({
       content: content.trim(),
-      sender_user_id: user.id,
-      recipient_user_id: selectedContact.user_id,
-      sender_type: currentUserMessageRole,
-      recipient_type: selectedContact.messageRole,
+      sender_user_id: uid,
+      recipient_user_id: contact.user_id,
+      sender_type: msgRole,
+      recipient_type: contact.messageRole,
     });
 
     if (error) {
@@ -232,7 +266,7 @@ export function useStaffChat() {
       return false;
     }
     return true;
-  }, [user, selectedContact, currentUserMessageRole]);
+  }, []);
 
   // Select a contact and load thread
   const selectContact = useCallback((contact: StaffMember) => {
@@ -240,9 +274,10 @@ export function useStaffChat() {
     fetchThread(contact.user_id);
   }, [fetchThread]);
 
-  // Set up realtime subscription
+  // Set up realtime subscription — depends only on user?.id
   useEffect(() => {
-    if (!user) return;
+    const uid = user?.id;
+    if (!uid) return;
 
     channelRef.current = supabase
       .channel('staff-chat-realtime')
@@ -252,7 +287,7 @@ export function useStaffChat() {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `recipient_user_id=eq.${user.id}`,
+          filter: `recipient_user_id=eq.${uid}`,
         },
         (payload) => {
           const newMsg = payload.new as StaffMessage & { sender_type: string; recipient_type: string };
@@ -263,11 +298,13 @@ export function useStaffChat() {
             return;
           }
 
+          const currentContact = selectedContactRef.current;
+
           // If this message is part of the active conversation, add it
           if (
-            selectedContact &&
-            newMsg.sender_user_id === selectedContact.user_id &&
-            newMsg.recipient_user_id === user.id
+            currentContact &&
+            newMsg.sender_user_id === currentContact.user_id &&
+            newMsg.recipient_user_id === uid
           ) {
             setMessages(prev => [...prev, newMsg]);
             
@@ -289,7 +326,7 @@ export function useStaffChat() {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `sender_user_id=eq.${user.id}`,
+          filter: `sender_user_id=eq.${uid}`,
         },
         (payload) => {
           const newMsg = payload.new as StaffMessage & { sender_type: string; recipient_type: string };
@@ -299,11 +336,13 @@ export function useStaffChat() {
             return;
           }
 
+          const currentContact = selectedContactRef.current;
+
           // If this is our own sent message in the active conversation, add it
           if (
-            selectedContact &&
-            newMsg.sender_user_id === user.id &&
-            newMsg.recipient_user_id === selectedContact.user_id
+            currentContact &&
+            newMsg.sender_user_id === uid &&
+            newMsg.recipient_user_id === currentContact.user_id
           ) {
             setMessages(prev => {
               // Avoid duplicates
@@ -333,21 +372,27 @@ export function useStaffChat() {
         supabase.removeChannel(channelRef.current);
       }
     };
-  }, [user, selectedContact, fetchConversations]);
+  }, [user?.id, fetchConversations]);
 
-  // Initial load
+  // Initial load — depends only on user?.id
   useEffect(() => {
+    const uid = user?.id;
+    if (!uid) {
+      setLoading(false);
+      return;
+    }
+
     const init = async () => {
       setLoading(true);
       await fetchCurrentUserRole();
       const members = await fetchStaffMembers();
-      if (members) {
+      if (members && isMountedRef.current) {
         await fetchConversations(members);
       }
-      setLoading(false);
+      if (isMountedRef.current) setLoading(false);
     };
     init();
-  }, [fetchStaffMembers, fetchCurrentUserRole]);
+  }, [user?.id, fetchStaffMembers, fetchCurrentUserRole, fetchConversations]);
 
   return {
     staffMembers,

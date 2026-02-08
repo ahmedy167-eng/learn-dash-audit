@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -34,16 +34,15 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const fetchPermissions = async () => {
-    if (!user) {
+  const fetchPermissions = useCallback(async () => {
+    const uid = user?.id;
+    if (!uid) {
       setPermissions([]);
       setIsAdmin(false);
       setLoading(false);
       return;
     }
 
-    // Always set loading to true when starting a real fetch
-    // This ensures UI shows permission-gated items while loading
     setLoading(true);
 
     try {
@@ -51,7 +50,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id)
+        .eq('user_id', uid)
         .single();
 
       if (roleError) {
@@ -64,7 +63,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       const { data: permData, error: permError } = await supabase
         .from('user_permissions')
         .select('feature, enabled')
-        .eq('user_id', user.id);
+        .eq('user_id', uid);
 
       if (permError) {
         console.error('Error fetching permissions:', permError);
@@ -76,11 +75,11 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
     fetchPermissions();
-  }, [user]);
+  }, [fetchPermissions]);
 
   const hasPermission = (feature: FeatureKey): boolean => {
     // Admins have access to everything
