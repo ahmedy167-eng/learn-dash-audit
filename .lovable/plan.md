@@ -1,122 +1,78 @@
 
-# Fix "Failed to send a request to the Edge Function" Login Error
+
+# Fix Connectivity Issue: Add Missing API Key Headers
 
 ## Problem
 
-When signing in, the app calls the auth-proxy backend function using `supabase.functions.invoke()`. This method wraps the request and, when it fails, returns the error message **"Failed to send a request to the Edge Function"** instead of the standard "Failed to fetch". 
+All direct `fetch` calls to backend functions are missing the required `apikey` header. The backend API gateway requires this header to route requests to the correct project. Without it, the gateway rejects the request and -- because its error response lacks CORS headers -- the browser reports "Failed to fetch" rather than showing the actual error.
 
-The `isNetworkError` helper only checks for "Failed to fetch", so:
-- The automatic retry logic never triggers
-- The error is not recognized as a connection issue
-- The raw technical error message is shown to the user
+The backend function itself is working correctly (verified via server-side testing). The issue is entirely on the browser side.
 
 ## Solution
 
-Two changes to make authentication more resilient:
+Add the `apikey` header (using the already-configured publishable key) to every `fetch` call that targets a backend function. This is a minimal change across three files.
 
-### 1. Switch from `supabase.functions.invoke` to direct `fetch` calls
+## Changes
 
-The student authentication system (`useStudentApi.tsx`) already uses direct `fetch` calls to the edge function URL and works reliably. We will apply the same pattern to the staff auth proxy calls. This:
-- Eliminates the Supabase SDK as a middleman
-- Gives us direct control over error handling
-- Matches the proven pattern already in use
+### 1. `src/hooks/useAuth.tsx` -- Fix the `proxyFetch` helper
 
-### 2. Expand network error detection
+Add the `apikey` header to the centralized `proxyFetch` function. This covers sign-in, sign-up, sign-out, and session refresh since they all go through this helper.
 
-Update `isNetworkError` to also catch "Failed to send a request" messages, so even if `supabase.functions.invoke` is used elsewhere, the retry logic still works.
-
----
-
-## Files Modified
-
-### `src/hooks/useAuth.tsx`
-
-**Change 1 - `isNetworkError` function (lines 6-14):**
-Add detection for "Failed to send a request" to cover the Supabase SDK error message.
-
-```text
+```
 Before:
-  if (error instanceof Error && error.message.includes('Failed to fetch')) {
-    return true;
-  }
+headers: { 'Content-Type': 'application/json' },
 
 After:
-  if (error instanceof Error && error.message.includes('Failed to fetch')) {
-    return true;
-  }
-  if (error instanceof Error && error.message.includes('Failed to send a request')) {
-    return true;
-  }
+headers: {
+  'Content-Type': 'application/json',
+  'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+},
 ```
 
-**Change 2 - Replace `supabase.functions.invoke` with direct `fetch`:**
+### 2. `src/pages/Auth.tsx` -- Fix the forgot-password fetch
 
-Create a helper constant for the auth proxy URL:
-```text
-const AUTH_PROXY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-proxy`;
+The `handleForgotPassword` function makes its own direct `fetch` call (not through `proxyFetch`). Add the same `apikey` header there.
+
+```
+Before:
+headers: { 'Content-Type': 'application/json' },
+
+After:
+headers: {
+  'Content-Type': 'application/json',
+  'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+},
 ```
 
-Update `signIn` to use direct `fetch`:
-```text
-const response = await fetch(AUTH_PROXY_URL, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ action: 'sign-in', email, password }),
-});
-const data = await response.json();
+### 3. `src/hooks/useStudentApi.tsx` -- Fix student API fetch calls
+
+All student API fetch calls (login, logout, getData, performAction, getTeacher, getRecipients) are also missing the `apikey` header. While the user reported the issue on the staff login page, these calls have the same vulnerability and should be fixed for consistency.
+
+Each `headers` object will be updated from:
+```
+headers: { 'Content-Type': 'application/json' },
+```
+to:
+```
+headers: {
+  'Content-Type': 'application/json',
+  'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+},
 ```
 
-Update `signUp` to use direct `fetch` (same pattern).
+This applies to approximately 6 fetch calls across the file.
 
-Update `signOut` to use direct `fetch` (same pattern).
+## Why This Works
 
-Update `initializeAuth` proxy fallback to use direct `fetch` (same pattern).
-
-### `src/pages/Auth.tsx`
-
-**Change - `handleForgotPassword` function (lines 161-167):**
-
-Replace `supabase.functions.invoke` with direct `fetch`:
-```text
-const response = await fetch(AUTH_PROXY_URL, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    action: 'reset-password',
-    email: resetEmail,
-    redirectUrl: `${window.location.origin}/auth?reset=true`,
-  }),
-});
-const data = await response.json();
-```
-
----
+- The backend API gateway uses the `apikey` header to identify and route requests to the correct project
+- Without it, the gateway rejects the request before it reaches the function
+- The gateway's rejection does not include CORS headers, so the browser sees a cross-origin block and reports "Failed to fetch"
+- Adding the key lets the request pass through the gateway to the function, which already has proper CORS headers configured
 
 ## Technical Details
 
-The key insight is that the student auth system (`useStudentApi.tsx`) works with this exact pattern:
+- The key used (`VITE_SUPABASE_PUBLISHABLE_KEY`) is the public anon key -- it is safe to include in browser requests (this is its intended purpose)
+- No changes are needed to the backend functions themselves
+- No changes to CORS configuration
+- The existing retry logic and error handling remain intact and will work correctly once requests can reach the function
 
-```text
-const STUDENT_AUTH_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/student-auth`;
-
-const response = await fetch(`${STUDENT_AUTH_URL}/login`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ name, studentId }),
-});
-```
-
-This bypasses the Supabase JS SDK entirely and talks directly to the edge function. We are applying the same approach for staff auth.
-
-The direct `fetch` approach will throw a standard `TypeError: Failed to fetch` on network failure, which is already handled by `isNetworkError`. Combined with the expanded error detection, the retry mechanism will work correctly for all failure modes.
-
-### Request flow after fix
-
-```text
-Browser --fetch--> bhspeoledfydylvonobv.supabase.co/functions/v1/auth-proxy
-                   (server-to-server) --> supabase.auth.signInWithPassword()
-                   <-- JSON with session tokens
-Browser --> supabase.auth.setSession() to establish local session
-```
-
-No changes are needed to the edge function itself -- it is correctly deployed and responding (verified by server-side test).
