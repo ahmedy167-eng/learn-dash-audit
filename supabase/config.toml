@@ -2,3 +2,6 @@ project_id = "bhspeoledfydylvonobv"
 
 [functions.student-auth]
 verify_jwt = false
+
+[functions.auth-proxy]
+verify_jwt = false

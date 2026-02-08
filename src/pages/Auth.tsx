@@ -158,15 +158,20 @@ export default function Auth() {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/auth?reset=true`,
+      const { data, error } = await supabase.functions.invoke('auth-proxy', {
+        body: {
+          action: 'reset-password',
+          email: resetEmail,
+          redirectUrl: `${window.location.origin}/auth?reset=true`,
+        },
       });
       
-      if (error) {
-        if (error.message.includes('Failed to fetch')) {
+      if (error || data?.error) {
+        const msg = data?.error || error?.message || 'Failed to send reset email';
+        if (msg.includes('Failed to fetch')) {
           toast.error('Network error. Please check your connection and try again.');
         } else {
-          toast.error(error.message);
+          toast.error(msg);
         }
       } else {
         setResetEmailSent(true);
