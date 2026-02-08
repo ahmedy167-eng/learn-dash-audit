@@ -2,12 +2,17 @@ import { useState, useEffect, useCallback, createContext, useContext, ReactNode 
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+const AUTH_PROXY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-proxy`;
+
 // Helper to detect network-level errors
 export const isNetworkError = (error: unknown): boolean => {
   if (error instanceof TypeError && error.message === 'Failed to fetch') {
     return true;
   }
   if (error instanceof Error && error.message.includes('Failed to fetch')) {
+    return true;
+  }
+  if (error instanceof Error && error.message.includes('Failed to send a request')) {
     return true;
   }
   return false;
@@ -25,6 +30,19 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+async function proxyFetch(body: Record<string, unknown>): Promise<{ data: any; error: Error | null }> {
+  const response = await fetch(AUTH_PROXY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json();
+  if (!response.ok || data?.error) {
+    return { data, error: new Error(data?.error || `Request failed with status ${response.status}`) };
+  }
+  return { data, error: null };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -53,11 +71,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const parsed = JSON.parse(storedSession);
         const refreshToken = parsed?.refresh_token;
         if (refreshToken) {
-          const { data, error } = await supabase.functions.invoke('auth-proxy', {
-            body: { action: 'get-session', refreshToken },
-          });
+          const { data, error } = await proxyFetch({ action: 'get-session', refreshToken });
           if (!isMountedRef.current) return;
-          if (error || data?.error) throw new Error(data?.error || error?.message);
+          if (error) throw error;
 
           // Establish the session locally
           const { error: setErr } = await supabase.auth.setSession({
@@ -131,15 +147,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const redirectUrl = `${window.location.origin}/`;
 
     try {
-      const { data, error } = await supabase.functions.invoke('auth-proxy', {
-        body: { action: 'sign-up', email, password, fullName, redirectUrl },
+      const { data, error } = await proxyFetch({
+        action: 'sign-up', email, password, fullName, redirectUrl,
       });
 
       if (error) {
-        return { error: new Error(error.message || 'Sign up failed') };
-      }
-      if (data?.error) {
-        return { error: new Error(data.error) };
+        return { error };
       }
 
       // If auto-confirm is on, we get a session back → establish it
@@ -161,15 +174,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke('auth-proxy', {
-        body: { action: 'sign-in', email, password },
+      const { data, error } = await proxyFetch({
+        action: 'sign-in', email, password,
       });
 
       if (error) {
-        return { error: new Error(error.message || 'Sign in failed') };
-      }
-      if (data?.error) {
-        return { error: new Error(data.error) };
+        return { error };
       }
 
       // Establish the local session with returned tokens
@@ -194,9 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       const accessToken = session?.access_token;
-      await supabase.functions.invoke('auth-proxy', {
-        body: { action: 'sign-out', accessToken },
-      });
+      await proxyFetch({ action: 'sign-out', accessToken });
     } catch {
       // Best-effort server-side sign out
     }
