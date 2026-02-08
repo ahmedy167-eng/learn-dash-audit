@@ -1,168 +1,144 @@
 
 
-# Fix Connection Issues and Page Loading Delays
+# Fix Login: Route Auth Through Backend Proxy
 
 ## Problem
 
-The console logs show repeated `AuthRetryableFetchError: Failed to fetch` errors when the browser tries to refresh the authentication token. The current code has these issues:
-
-1. **No connection error handling on initial load** -- When `getSession()` fails due to a network issue, the app sets `loading = false` with `user = null`. Every protected page then treats this as "user not logged in" and redirects to the login screen, even though the user may have a valid session stored locally.
-
-2. **No retry logic for initial auth** -- The `initializeAuth` function in `useAuth` tries once and gives up. Unlike the login form (which has retry with backoff), the initial session check has no recovery mechanism.
-
-3. **No distinction between "not logged in" and "network down"** -- The auth context only exposes `user`, `session`, and `loading`. Components like `DashboardLayout` and `Index` cannot tell whether the user is genuinely unauthenticated or if a network failure prevented the session check.
-
-4. **Cascading delays** -- After auth resolves, `usePermissions` sequentially fetches role and then permissions before setting its own `loading = false`, adding visible delay before the sidebar and pages become interactive.
-
----
+All browser requests to the authentication endpoint fail with "Failed to fetch" -- they never reach the server. This happens across multiple browsers, ruling out browser-specific issues. The backend itself is healthy (database queries and server-side tests succeed). The root cause is a network-level block between the user's browser and the authentication API endpoint.
 
 ## Solution
 
-### 1. Add connection error state and retry logic to `useAuth`
+Create a backend function that acts as a proxy for authentication operations. Instead of the browser making direct cross-origin requests to the auth API, requests go through the backend function (which is always reachable because it lives on the same infrastructure). The function then makes server-to-server calls to the auth service, which are not subject to browser network restrictions.
 
-**File: `src/hooks/useAuth.tsx`**
+This is the exact same pattern already used successfully by the `student-auth` function.
 
-- Add a `connectionError` boolean to the auth context
-- Add a `retryConnection` function to the auth context
-- In `initializeAuth`, retry `getSession()` up to 2 times with exponential backoff (1s, 2s)
-- If all retries fail with a network error, set `connectionError = true` (while still setting `loading = false`)
-- When `onAuthStateChange` fires with a valid session (e.g., when network recovers), automatically clear `connectionError`
-- Expose `retryConnection` so the UI can offer a manual retry button
+## What Changes
 
-### 2. Update `DashboardLayout` to handle connection errors
+### 1. New file: Backend function `supabase/functions/auth-proxy/index.ts`
 
-**File: `src/components/layout/DashboardLayout.tsx`**
+A backend function that handles five operations:
+- **sign-in** -- Takes email/password, authenticates server-side, returns session tokens
+- **sign-up** -- Takes email/password/name, creates account server-side, returns session tokens
+- **sign-out** -- Invalidates the current session server-side
+- **reset-password** -- Sends password reset email server-side
+- **get-session** -- Refreshes a session using the refresh token server-side
 
-- Import `connectionError` and `retryConnection` from `useAuth`
-- When `connectionError` is true and `user` is null, show a "Connection issue" screen with a retry button instead of redirecting to `/auth`
-- This prevents the user from being kicked to the login page during transient network failures
+Each operation:
+1. Receives the request from the browser
+2. Creates a Supabase client with the standard (non-admin) key
+3. Calls the auth API server-to-server (no CORS restrictions)
+4. Returns the result with proper CORS headers
 
-### 3. Update `Index` page to handle connection errors
+### 2. Modified: `supabase/config.toml`
 
-**File: `src/pages/Index.tsx`**
+Add the new function configuration with JWT verification disabled (since unauthenticated users need to call it for login/signup).
 
-- Import `connectionError` and `retryConnection` from `useAuth`
-- When `connectionError` is true, show a connection error banner at the top of the landing page with a retry button
-- Do not redirect to dashboard while a connection error is active (the user data might come through when network recovers)
+### 3. Modified: `src/hooks/useAuth.tsx`
 
-### 4. Optimize `usePermissions` to fetch in parallel
+Update `signIn`, `signUp`, and `initializeAuth` to call the backend function instead of the auth API directly:
+- `signIn` calls the proxy with `action: 'sign-in'`, then uses the returned tokens to establish a local session via `supabase.auth.setSession()`
+- `signUp` calls the proxy with `action: 'sign-up'`
+- `initializeAuth` first tries the direct `getSession()` call, and if it fails with a network error, falls back to the proxy with `action: 'get-session'` using any stored refresh token
 
-**File: `src/hooks/usePermissions.tsx`**
+### 4. Modified: `src/pages/Auth.tsx`
 
-- Change `fetchPermissions` to fetch user role and permissions in parallel using `Promise.all` instead of sequentially
-- This reduces the time between auth completing and the dashboard becoming interactive
+Update the password reset handler to call the proxy with `action: 'reset-password'` instead of calling `supabase.auth.resetPasswordForEmail()` directly.
+
+### 5. No changes needed: `src/pages/AdminLogin.tsx`
+
+AdminLogin already uses `useAuth().signIn`, so it automatically benefits from the proxy.
 
 ---
 
 ## Technical Details
 
-### `useAuth.tsx` Changes
+### Edge Function: `auth-proxy`
 
 ```text
-interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  loading: boolean;
-  connectionError: boolean;           // NEW
-  retryConnection: () => Promise<void>; // NEW
-  signUp: ...;
-  signIn: ...;
-  signOut: ...;
+POST /auth-proxy
+Content-Type: application/json
+
+Request body:
+{
+  "action": "sign-in" | "sign-up" | "sign-out" | "reset-password" | "get-session",
+  "email": "...",           // for sign-in, sign-up, reset-password
+  "password": "...",        // for sign-in, sign-up
+  "fullName": "...",        // for sign-up
+  "refreshToken": "...",    // for get-session
+  "accessToken": "...",     // for sign-out
+  "redirectUrl": "..."      // for sign-up, reset-password
 }
 
-// In AuthProvider:
-const [connectionError, setConnectionError] = useState(false);
+Response body (sign-in / sign-up / get-session):
+{
+  "session": {
+    "access_token": "...",
+    "refresh_token": "...",
+    "expires_in": 3600,
+    "token_type": "bearer",
+    "user": { ... }
+  }
+}
+```
 
-// initializeAuth with retry logic:
-const initializeAuth = async () => {
-  const MAX_RETRIES = 2;
-  let lastError: unknown = null;
+The function uses CORS headers matching the existing `student-auth` pattern. It creates a standard Supabase client (not service role) so all normal auth rules apply.
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      if (!isMounted) return;
-      if (error && isNetworkError(error)) throw error;
-      setSession(session);
-      setUser(session?.user ?? null);
-      setConnectionError(false);
-      return; // success
-    } catch (err) {
-      lastError = err;
-      if (attempt < MAX_RETRIES && isNetworkError(err)) {
-        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-      }
+### useAuth.tsx Changes
+
+```text
+// signIn now calls the proxy:
+const signIn = async (email, password) => {
+  const { data, error } = await supabase.functions.invoke('auth-proxy', {
+    body: { action: 'sign-in', email, password }
+  });
+
+  if (error || data?.error) return { error: ... };
+
+  // Establish local session with the returned tokens
+  await supabase.auth.setSession({
+    access_token: data.session.access_token,
+    refresh_token: data.session.refresh_token,
+  });
+
+  return { error: null };
+};
+
+// signUp follows the same pattern with action: 'sign-up'
+// initializeAuth adds a proxy fallback when direct getSession fails
+```
+
+### Auth.tsx Changes
+
+```text
+// Password reset now calls the proxy:
+const handleForgotPassword = async () => {
+  const { data, error } = await supabase.functions.invoke('auth-proxy', {
+    body: {
+      action: 'reset-password',
+      email: resetEmail,
+      redirectUrl: `${window.location.origin}/auth?reset=true`
     }
-  }
-
-  // All retries failed
-  if (isMounted && isNetworkError(lastError)) {
-    setConnectionError(true);
-  }
-};
-
-// In onAuthStateChange: clear connectionError when session arrives
-supabase.auth.onAuthStateChange((_event, session) => {
-  if (!isMounted) return;
-  setSession(session);
-  setUser(session?.user ?? null);
-  if (session) setConnectionError(false);
-});
-
-// retryConnection function:
-const retryConnection = async () => {
-  setLoading(true);
-  setConnectionError(false);
-  // re-run initializeAuth
+  });
+  // Handle response...
 };
 ```
 
-### `DashboardLayout.tsx` Changes
+---
 
+## Request Flow (Before vs After)
+
+**Before (broken):**
 ```text
-const { user, loading, connectionError, retryConnection } = useAuth();
-
-if (loading) { /* spinner */ }
-
-if (connectionError && !user) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center space-y-4 p-6">
-        <WifiOff icon />
-        <h2>Connection Issue</h2>
-        <p>Unable to reach the server. Please check your internet connection.</p>
-        <Button onClick={retryConnection}>Retry Connection</Button>
-      </div>
-    </div>
-  );
-}
-
-if (!user) { return <Navigate to="/auth" replace />; }
+Browser --> bhspeoledfydylvonobv.supabase.co/auth/v1/token
+         X  (Failed to fetch -- request never arrives)
 ```
 
-### `Index.tsx` Changes
-
+**After (fixed):**
 ```text
-const { user, loading, connectionError, retryConnection } = useAuth();
-
-// Don't auto-redirect during connection error
-useEffect(() => {
-  if (!loading && user && !connectionError) {
-    navigate('/dashboard', { replace: true });
-  }
-}, [user, loading, connectionError, navigate]);
-
-// Show connection error banner when applicable
-```
-
-### `usePermissions.tsx` Changes
-
-```text
-// Parallel fetch instead of sequential:
-const [roleResult, permResult] = await Promise.all([
-  supabase.from('user_roles').select('role').eq('user_id', uid).single(),
-  supabase.from('user_permissions').select('feature, enabled').eq('user_id', uid),
-]);
+Browser --> bhspeoledfydylvonobv.supabase.co/functions/v1/auth-proxy
+         --> (server-to-server) supabase.auth.signInWithPassword()
+         <-- session tokens returned to browser
+         --> supabase.auth.setSession() establishes local session
 ```
 
 ---
@@ -171,8 +147,8 @@ const [roleResult, permResult] = await Promise.all([
 
 | File | Change |
 |------|--------|
-| `src/hooks/useAuth.tsx` | Add `connectionError` state, retry logic (up to 2 retries with backoff), `retryConnection` function, auto-clear on session recovery |
-| `src/components/layout/DashboardLayout.tsx` | Show connection error screen with retry button instead of redirecting to `/auth` |
-| `src/pages/Index.tsx` | Show connection error banner, skip dashboard redirect during connection error |
-| `src/hooks/usePermissions.tsx` | Fetch role and permissions in parallel with `Promise.all` |
+| `supabase/functions/auth-proxy/index.ts` | New backend function handling sign-in, sign-up, sign-out, reset-password, and get-session via server-to-server calls |
+| `supabase/config.toml` | Add `[functions.auth-proxy]` with `verify_jwt = false` |
+| `src/hooks/useAuth.tsx` | Route `signIn`, `signUp`, and session refresh through the proxy function; use `setSession()` to establish local sessions |
+| `src/pages/Auth.tsx` | Route password reset through the proxy function |
 
