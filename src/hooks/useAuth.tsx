@@ -33,36 +33,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [connectionError, setConnectionError] = useState(false);
 
   const initializeAuth = useCallback(async (isMountedRef: { current: boolean }) => {
-    const MAX_RETRIES = 2;
-    let lastError: unknown = null;
-
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (!isMountedRef.current) return;
-        if (error && isNetworkError(error)) throw error;
-        setSession(session);
-        setUser(session?.user ?? null);
-        setConnectionError(false);
-        return; // success
-      } catch (err) {
-        lastError = err;
-        if (attempt < MAX_RETRIES && isNetworkError(err)) {
-          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-        }
-      }
+    // First try direct getSession
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (!isMountedRef.current) return;
+      if (error && isNetworkError(error)) throw error;
+      setSession(session);
+      setUser(session?.user ?? null);
+      setConnectionError(false);
+      return;
+    } catch (directErr) {
+      console.warn('[useAuth] Direct getSession failed, trying proxy fallback...', directErr);
     }
 
-    // All retries failed
-    if (isMountedRef.current && isNetworkError(lastError)) {
-      setConnectionError(true);
+    // Fallback: use auth-proxy with stored refresh token
+    try {
+      const storedSession = localStorage.getItem('sb-bhspeoledfydylvonobv-auth-token');
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession);
+        const refreshToken = parsed?.refresh_token;
+        if (refreshToken) {
+          const { data, error } = await supabase.functions.invoke('auth-proxy', {
+            body: { action: 'get-session', refreshToken },
+          });
+          if (!isMountedRef.current) return;
+          if (error || data?.error) throw new Error(data?.error || error?.message);
+
+          // Establish the session locally
+          const { error: setErr } = await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
+          if (!isMountedRef.current) return;
+          if (setErr) throw setErr;
+
+          setConnectionError(false);
+          return;
+        }
+      }
+
+      // No stored session → user is simply logged out
+      if (isMountedRef.current) {
+        setSession(null);
+        setUser(null);
+        setConnectionError(false);
+      }
+    } catch (proxyErr) {
+      console.error('[useAuth] Proxy fallback also failed:', proxyErr);
+      if (isMountedRef.current) {
+        setConnectionError(true);
+      }
     }
   }, []);
 
   useEffect(() => {
     const isMountedRef = { current: true };
 
-    // Listener for ONGOING auth changes (does NOT control loading)
+    // Listener for ONGOING auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (!isMountedRef.current) return;
@@ -72,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     );
 
-    // INITIAL load (controls loading)
+    // INITIAL load
     const runInit = async () => {
       try {
         await initializeAuth(isMountedRef);
@@ -102,19 +129,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName: string) => {
     const redirectUrl = `${window.location.origin}/`;
-    
+
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            full_name: fullName,
-          }
-        }
+      const { data, error } = await supabase.functions.invoke('auth-proxy', {
+        body: { action: 'sign-up', email, password, fullName, redirectUrl },
       });
-      return { error };
+
+      if (error) {
+        return { error: new Error(error.message || 'Sign up failed') };
+      }
+      if (data?.error) {
+        return { error: new Error(data.error) };
+      }
+
+      // If auto-confirm is on, we get a session back → establish it
+      if (data?.session) {
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+      }
+
+      return { error: null };
     } catch (err) {
       if (isNetworkError(err)) {
         return { error: new Error('Network error. Please check your connection and try again.') };
@@ -125,11 +161,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const { data, error } = await supabase.functions.invoke('auth-proxy', {
+        body: { action: 'sign-in', email, password },
       });
-      return { error };
+
+      if (error) {
+        return { error: new Error(error.message || 'Sign in failed') };
+      }
+      if (data?.error) {
+        return { error: new Error(data.error) };
+      }
+
+      // Establish the local session with returned tokens
+      const { error: setErr } = await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+
+      if (setErr) {
+        return { error: setErr };
+      }
+
+      return { error: null };
     } catch (err) {
       if (isNetworkError(err)) {
         return { error: new Error('Network error. Please check your connection and try again.') };
@@ -139,6 +192,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    try {
+      const accessToken = session?.access_token;
+      await supabase.functions.invoke('auth-proxy', {
+        body: { action: 'sign-out', accessToken },
+      });
+    } catch {
+      // Best-effort server-side sign out
+    }
     await supabase.auth.signOut();
   };
 
