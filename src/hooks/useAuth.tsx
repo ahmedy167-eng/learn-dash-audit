@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -17,6 +17,8 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  connectionError: boolean;
+  retryConnection: () => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -28,38 +30,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState(false);
+
+  const initializeAuth = useCallback(async (isMountedRef: { current: boolean }) => {
+    const MAX_RETRIES = 2;
+    let lastError: unknown = null;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (!isMountedRef.current) return;
+        if (error && isNetworkError(error)) throw error;
+        setSession(session);
+        setUser(session?.user ?? null);
+        setConnectionError(false);
+        return; // success
+      } catch (err) {
+        lastError = err;
+        if (attempt < MAX_RETRIES && isNetworkError(err)) {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        }
+      }
+    }
+
+    // All retries failed
+    if (isMountedRef.current && isNetworkError(lastError)) {
+      setConnectionError(true);
+    }
+  }, []);
 
   useEffect(() => {
-    let isMounted = true;
+    const isMountedRef = { current: true };
 
     // Listener for ONGOING auth changes (does NOT control loading)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
-        if (!isMounted) return;
+        if (!isMountedRef.current) return;
         setSession(session);
         setUser(session?.user ?? null);
+        if (session) setConnectionError(false);
       }
     );
 
     // INITIAL load (controls loading)
-    const initializeAuth = async () => {
+    const runInit = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!isMounted) return;
-        setSession(session);
-        setUser(session?.user ?? null);
+        await initializeAuth(isMountedRef);
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMountedRef.current) setLoading(false);
       }
     };
 
-    initializeAuth();
+    runInit();
 
     return () => {
-      isMounted = false;
+      isMountedRef.current = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [initializeAuth]);
+
+  const retryConnection = useCallback(async () => {
+    setLoading(true);
+    setConnectionError(false);
+    const isMountedRef = { current: true };
+    try {
+      await initializeAuth(isMountedRef);
+    } finally {
+      setLoading(false);
+    }
+  }, [initializeAuth]);
 
   const signUp = async (email: string, password: string, fullName: string) => {
     const redirectUrl = `${window.location.origin}/`;
@@ -104,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, connectionError, retryConnection, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

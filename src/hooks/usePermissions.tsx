@@ -46,29 +46,22 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     setLoading(true);
 
     try {
-      // Fetch user role
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', uid)
-        .single();
+      // Fetch role and permissions in parallel
+      const [roleResult, permResult] = await Promise.all([
+        supabase.from('user_roles').select('role').eq('user_id', uid).single(),
+        supabase.from('user_permissions').select('feature, enabled').eq('user_id', uid),
+      ]);
 
-      if (roleError) {
-        console.error('Error fetching role:', roleError);
+      if (roleResult.error) {
+        console.error('Error fetching role:', roleResult.error);
       } else {
-        setIsAdmin(roleData?.role === 'admin');
+        setIsAdmin(roleResult.data?.role === 'admin');
       }
 
-      // Fetch user permissions
-      const { data: permData, error: permError } = await supabase
-        .from('user_permissions')
-        .select('feature, enabled')
-        .eq('user_id', uid);
-
-      if (permError) {
-        console.error('Error fetching permissions:', permError);
+      if (permResult.error) {
+        console.error('Error fetching permissions:', permResult.error);
       } else {
-        setPermissions(permData || []);
+        setPermissions(permResult.data || []);
       }
     } catch (error) {
       console.error('Error in fetchPermissions:', error);
@@ -82,9 +75,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   }, [fetchPermissions]);
 
   const hasPermission = (feature: FeatureKey): boolean => {
-    // Admins have access to everything
     if (isAdmin) return true;
-    
     const permission = permissions.find(p => p.feature === feature);
     return permission?.enabled ?? false;
   };
