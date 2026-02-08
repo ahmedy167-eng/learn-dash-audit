@@ -60,7 +60,10 @@ export function useStudentApi() {
     try {
       const response = await fetch(`${STUDENT_AUTH_URL}/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
         body: JSON.stringify({ name, studentId }),
       });
 
@@ -89,7 +92,10 @@ export function useStudentApi() {
       try {
         await fetch(`${STUDENT_AUTH_URL}/logout`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
           body: JSON.stringify({ sessionToken }),
         });
       } catch (err) {
@@ -113,7 +119,10 @@ export function useStudentApi() {
     try {
       const response = await fetch(`${STUDENT_AUTH_URL}/get-data`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
         body: JSON.stringify({ sessionToken, dataType, filters }),
       });
 
@@ -145,7 +154,10 @@ export function useStudentApi() {
     try {
       const response = await fetch(`${STUDENT_AUTH_URL}/action`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
         body: JSON.stringify({ sessionToken, action, data }),
       });
 
@@ -174,7 +186,10 @@ export function useStudentApi() {
     try {
       const response = await fetch(`${STUDENT_AUTH_URL}/get-teacher`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
         body: JSON.stringify({ sessionToken }),
       });
 
@@ -212,7 +227,10 @@ export function useStudentApi() {
     try {
       const response = await fetch(`${STUDENT_AUTH_URL}/get-recipients`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
         body: JSON.stringify({ sessionToken }),
       });
 
