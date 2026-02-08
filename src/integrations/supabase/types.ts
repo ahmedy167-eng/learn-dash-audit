@@ -1069,6 +1069,53 @@ export type Database = {
         }
         Relationships: []
       }
+      user_sessions_safe: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          id: string | null
+          is_active: boolean | null
+          login_at: string | null
+          logout_at: string | null
+          session_duration_minutes: number | null
+          student_id: string | null
+          user_id: string | null
+          user_type: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          login_at?: string | null
+          logout_at?: string | null
+          session_duration_minutes?: number | null
+          student_id?: string | null
+          user_id?: string | null
+          user_type?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          login_at?: string | null
+          logout_at?: string | null
+          session_duration_minutes?: number | null
+          student_id?: string | null
+          user_id?: string | null
+          user_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_sessions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       has_permission: {

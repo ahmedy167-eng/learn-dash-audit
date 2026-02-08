@@ -25,7 +25,7 @@ export function OnlineUsersPanel() {
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       
       const { data, error } = await supabase
-        .from('user_sessions')
+        .from('user_sessions_safe')
         .select(`
           id,
           user_id,
@@ -77,7 +77,7 @@ export function OnlineUsersPanel() {
     // Subscribe to realtime updates
     const channel = supabase
       .channel('sessions-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_sessions' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_sessions' as any }, () => {
         fetchSessions();
       })
       .subscribe();

@@ -27,7 +27,7 @@ export function SessionAnalytics() {
 
         // Fetch all sessions with duration
         const { data: sessions, error } = await supabase
-          .from('user_sessions')
+          .from('user_sessions_safe')
           .select('login_at, session_duration_minutes')
           .not('session_duration_minutes', 'is', null);
 
