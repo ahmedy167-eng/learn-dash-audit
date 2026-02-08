@@ -34,7 +34,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 async function proxyFetch(body: Record<string, unknown>): Promise<{ data: any; error: Error | null }> {
   const response = await fetch(AUTH_PROXY_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    },
     body: JSON.stringify(body),
   });
   const data = await response.json();
