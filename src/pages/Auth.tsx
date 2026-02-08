@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, isNetworkError } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -158,16 +157,20 @@ export default function Auth() {
 
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('auth-proxy', {
-        body: {
+      const AUTH_PROXY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-proxy`;
+      const response = await fetch(AUTH_PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           action: 'reset-password',
           email: resetEmail,
           redirectUrl: `${window.location.origin}/auth?reset=true`,
-        },
+        }),
       });
+      const data = await response.json();
       
-      if (error || data?.error) {
-        const msg = data?.error || error?.message || 'Failed to send reset email';
+      if (!response.ok || data?.error) {
+        const msg = data?.error || 'Failed to send reset email';
         if (msg.includes('Failed to fetch')) {
           toast.error('Network error. Please check your connection and try again.');
         } else {
