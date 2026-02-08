@@ -1,99 +1,178 @@
 
 
-# Fix Connection Issues and Delayed Sign-In
+# Fix Connection Issues and Page Loading Delays
 
-## Problem Analysis
+## Problem
 
-There are two related issues visible in the screenshots and code:
+The console logs show repeated `AuthRetryableFetchError: Failed to fetch` errors when the browser tries to refresh the authentication token. The current code has these issues:
 
-1. **Delayed/Racy Sign-In** -- The `useAuth` hook has a race condition between `onAuthStateChange` and `getSession`. Both independently set `loading = false`, but there's no coordination. The `onAuthStateChange` listener can fire and set `loading = false` before all required data is ready, or `getSession` can complete first while the listener hasn't fired yet. This creates timing issues where downstream hooks (permissions, staff chat) start fetching data before the user is fully resolved.
+1. **No connection error handling on initial load** -- When `getSession()` fails due to a network issue, the app sets `loading = false` with `user = null`. Every protected page then treats this as "user not logged in" and redirects to the login screen, even though the user may have a valid session stored locally.
 
-2. **Staff Chat Shows "0 staff" After Login** -- The `useStaffChat` hook's initialization depends on `fetchStaffMembers` and `fetchCurrentUserRole` callbacks, which are recreated every time `user` changes. Due to the auth race condition, the `user` object may briefly be `null` before being set, causing the init effect to fire with no user, load empty data, then miss the re-trigger when user finally appears. Additionally, the realtime subscription effect depends on `fetchConversations` which depends on `staffMembers`, causing unnecessary teardown/rebuild cycles.
+2. **No retry logic for initial auth** -- The `initializeAuth` function in `useAuth` tries once and gives up. Unlike the login form (which has retry with backoff), the initial session check has no recovery mechanism.
+
+3. **No distinction between "not logged in" and "network down"** -- The auth context only exposes `user`, `session`, and `loading`. Components like `DashboardLayout` and `Index` cannot tell whether the user is genuinely unauthenticated or if a network failure prevented the session check.
+
+4. **Cascading delays** -- After auth resolves, `usePermissions` sequentially fetches role and then permissions before setting its own `loading = false`, adding visible delay before the sidebar and pages become interactive.
+
+---
 
 ## Solution
 
-### 1. Refactor `useAuth` -- Separate Initial Load from Ongoing Changes
-
-Apply the proven pattern: use `getSession()` for the initial load (controls `loading`), and `onAuthStateChange` for ongoing updates (does NOT control `loading`). Add a mounted flag to prevent state updates after unmount.
+### 1. Add connection error state and retry logic to `useAuth`
 
 **File: `src/hooks/useAuth.tsx`**
 
-- Set up `onAuthStateChange` listener first (for ongoing changes) -- it updates `user`/`session` but does NOT set `loading`
-- Then call `getSession()` for the initial load -- this sets `user`/`session` and ONLY after completion sets `loading = false`
-- Add `isMounted` flag to prevent stale state updates
-- Wrap the initial load in a try/finally to guarantee `loading` becomes `false`
+- Add a `connectionError` boolean to the auth context
+- Add a `retryConnection` function to the auth context
+- In `initializeAuth`, retry `getSession()` up to 2 times with exponential backoff (1s, 2s)
+- If all retries fail with a network error, set `connectionError = true` (while still setting `loading = false`)
+- When `onAuthStateChange` fires with a valid session (e.g., when network recovers), automatically clear `connectionError`
+- Expose `retryConnection` so the UI can offer a manual retry button
 
-### 2. Stabilize `useStaffChat` Hook Dependencies
+### 2. Update `DashboardLayout` to handle connection errors
 
-**File: `src/hooks/useStaffChat.tsx`**
+**File: `src/components/layout/DashboardLayout.tsx`**
 
-- Use a `useRef` to track the user ID instead of depending on the `user` object directly in callbacks, reducing unnecessary re-creations
-- Change the init effect to depend on `user?.id` instead of callback references, ensuring it fires exactly once when the user becomes available
-- Stabilize the realtime subscription by removing `fetchConversations` from the dependency array and using a ref pattern instead
-- Add an `isMounted` guard to prevent state updates after unmount
+- Import `connectionError` and `retryConnection` from `useAuth`
+- When `connectionError` is true and `user` is null, show a "Connection issue" screen with a retry button instead of redirecting to `/auth`
+- This prevents the user from being kicked to the login page during transient network failures
 
-### 3. Stabilize `usePermissions` Hook
+### 3. Update `Index` page to handle connection errors
+
+**File: `src/pages/Index.tsx`**
+
+- Import `connectionError` and `retryConnection` from `useAuth`
+- When `connectionError` is true, show a connection error banner at the top of the landing page with a retry button
+- Do not redirect to dashboard while a connection error is active (the user data might come through when network recovers)
+
+### 4. Optimize `usePermissions` to fetch in parallel
 
 **File: `src/hooks/usePermissions.tsx`**
 
-- Wrap `fetchPermissions` in `useCallback` and depend on `user?.id` rather than the full `user` object
-- Ensure permissions don't refetch unnecessarily on every auth state change
+- Change `fetchPermissions` to fetch user role and permissions in parallel using `Promise.all` instead of sequentially
+- This reduces the time between auth completing and the dashboard becoming interactive
+
+---
 
 ## Technical Details
 
 ### `useAuth.tsx` Changes
 
 ```text
-useEffect(() => {
-  let isMounted = true;
+interface AuthContextType {
+  user: User | null;
+  session: Session | null;
+  loading: boolean;
+  connectionError: boolean;           // NEW
+  retryConnection: () => Promise<void>; // NEW
+  signUp: ...;
+  signIn: ...;
+  signOut: ...;
+}
 
-  // Listener for ONGOING auth changes (does NOT control loading)
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    (event, session) => {
-      if (!isMounted) return;
-      setSession(session);
-      setUser(session?.user ?? null);
-    }
-  );
+// In AuthProvider:
+const [connectionError, setConnectionError] = useState(false);
 
-  // INITIAL load (controls loading)
-  const initializeAuth = async () => {
+// initializeAuth with retry logic:
+const initializeAuth = async () => {
+  const MAX_RETRIES = 2;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error } = await supabase.auth.getSession();
       if (!isMounted) return;
+      if (error && isNetworkError(error)) throw error;
       setSession(session);
       setUser(session?.user ?? null);
-    } finally {
-      if (isMounted) setLoading(false);
+      setConnectionError(false);
+      return; // success
+    } catch (err) {
+      lastError = err;
+      if (attempt < MAX_RETRIES && isNetworkError(err)) {
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+      }
     }
-  };
+  }
 
-  initializeAuth();
+  // All retries failed
+  if (isMounted && isNetworkError(lastError)) {
+    setConnectionError(true);
+  }
+};
 
-  return () => {
-    isMounted = false;
-    subscription.unsubscribe();
-  };
-}, []);
+// In onAuthStateChange: clear connectionError when session arrives
+supabase.auth.onAuthStateChange((_event, session) => {
+  if (!isMounted) return;
+  setSession(session);
+  setUser(session?.user ?? null);
+  if (session) setConnectionError(false);
+});
+
+// retryConnection function:
+const retryConnection = async () => {
+  setLoading(true);
+  setConnectionError(false);
+  // re-run initializeAuth
+};
 ```
 
-### `useStaffChat.tsx` Changes
+### `DashboardLayout.tsx` Changes
 
-- Replace the dependency on callback functions in the init effect with a direct `user?.id` dependency
-- Use a ref for `staffMembers` so `fetchConversations` doesn't need it in its dependency array
-- Use a ref for `selectedContact` in the realtime effect so the subscription doesn't tear down when selecting a contact
-- Stabilize the realtime effect dependencies to `[user?.id]` only
+```text
+const { user, loading, connectionError, retryConnection } = useAuth();
+
+if (loading) { /* spinner */ }
+
+if (connectionError && !user) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="text-center space-y-4 p-6">
+        <WifiOff icon />
+        <h2>Connection Issue</h2>
+        <p>Unable to reach the server. Please check your internet connection.</p>
+        <Button onClick={retryConnection}>Retry Connection</Button>
+      </div>
+    </div>
+  );
+}
+
+if (!user) { return <Navigate to="/auth" replace />; }
+```
+
+### `Index.tsx` Changes
+
+```text
+const { user, loading, connectionError, retryConnection } = useAuth();
+
+// Don't auto-redirect during connection error
+useEffect(() => {
+  if (!loading && user && !connectionError) {
+    navigate('/dashboard', { replace: true });
+  }
+}, [user, loading, connectionError, navigate]);
+
+// Show connection error banner when applicable
+```
 
 ### `usePermissions.tsx` Changes
 
-- Use `useCallback` for `fetchPermissions` with `user?.id` as the dependency
-- Change the effect to depend on `user?.id` instead of the full `user` object
+```text
+// Parallel fetch instead of sequential:
+const [roleResult, permResult] = await Promise.all([
+  supabase.from('user_roles').select('role').eq('user_id', uid).single(),
+  supabase.from('user_permissions').select('feature, enabled').eq('user_id', uid),
+]);
+```
+
+---
 
 ## Files Modified
 
 | File | Change |
 |------|--------|
-| `src/hooks/useAuth.tsx` | Separate initial load from ongoing auth changes; add mounted guard |
-| `src/hooks/useStaffChat.tsx` | Stabilize effect dependencies; use refs for mutable state; depend on `user?.id` |
-| `src/hooks/usePermissions.tsx` | Stabilize `fetchPermissions` callback; depend on `user?.id` |
+| `src/hooks/useAuth.tsx` | Add `connectionError` state, retry logic (up to 2 retries with backoff), `retryConnection` function, auto-clear on session recovery |
+| `src/components/layout/DashboardLayout.tsx` | Show connection error screen with retry button instead of redirecting to `/auth` |
+| `src/pages/Index.tsx` | Show connection error banner, skip dashboard redirect during connection error |
+| `src/hooks/usePermissions.tsx` | Fetch role and permissions in parallel with `Promise.all` |
 
