@@ -6,6 +6,9 @@ const AUTH_PROXY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-p
 
 // Helper to detect network-level errors
 export const isNetworkError = (error: unknown): boolean => {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return true;
+  }
   if (error instanceof TypeError && error.message === 'Failed to fetch') {
     return true;
   }
@@ -64,6 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setConnectionError(false);
       return;
     } catch (directErr) {
+      // AbortError = cancelled (e.g. StrictMode unmount), not a real failure
+      if (directErr instanceof DOMException && directErr.name === 'AbortError') {
+        return;
+      }
       console.warn('[useAuth] Direct getSession failed, trying proxy fallback...', directErr);
     }
 
@@ -99,6 +106,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (proxyErr) {
       console.error('[useAuth] Proxy fallback also failed:', proxyErr);
+      // Clear stale stored session to avoid repeated failures on next load
+      localStorage.removeItem('sb-bhspeoledfydylvonobv-auth-token');
       if (isMountedRef.current) {
         setConnectionError(true);
       }

@@ -2,17 +2,17 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { GraduationCap, ArrowRight, Users, ClipboardList, Calendar, CheckSquare, WifiOff } from 'lucide-react';
+import { GraduationCap, ArrowRight, Users, ClipboardList, Calendar, CheckSquare } from 'lucide-react';
 
 const Index = () => {
-  const { user, loading, connectionError, retryConnection } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && user && !connectionError) {
+    if (!loading && user) {
       navigate('/dashboard', { replace: true });
     }
-  }, [user, loading, connectionError, navigate]);
+  }, [user, loading, navigate]);
 
   if (loading) {
     return (
@@ -31,21 +31,6 @@ const Index = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* Connection Error Banner */}
-      {connectionError && (
-        <div className="bg-destructive/10 border-b border-destructive/20 px-4 py-3">
-          <div className="container mx-auto flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-sm text-destructive">
-              <WifiOff className="w-4 h-4 shrink-0" />
-              <span>Unable to connect to the server. Some features may be unavailable.</span>
-            </div>
-            <Button variant="outline" size="sm" onClick={retryConnection}>
-              Retry
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-lg">
         <div className="container mx-auto flex items-center justify-between px-4 py-4">
