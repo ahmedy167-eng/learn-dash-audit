@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 
 const AUTH_PROXY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/auth-proxy`;
 
+const FETCH_TIMEOUT_MS = 10_000;
+
 // Helper to detect network-level errors
 export const isNetworkError = (error: unknown): boolean => {
   if (error instanceof DOMException && error.name === 'AbortError') {
@@ -21,6 +23,21 @@ export const isNetworkError = (error: unknown): boolean => {
   return false;
 };
 
+// Fetch with an AbortController timeout to fail fast on blocked networks
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs = FETCH_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -35,7 +52,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 async function proxyFetch(body: Record<string, unknown>): Promise<{ data: any; error: Error | null }> {
-  const response = await fetch(AUTH_PROXY_URL, {
+  const response = await fetchWithTimeout(AUTH_PROXY_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -57,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [connectionError, setConnectionError] = useState(false);
 
   const initializeAuth = useCallback(async (isMountedRef: { current: boolean }) => {
-    // First try direct getSession
+    // Attempt 1: Direct SDK getSession
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
       if (!isMountedRef.current) return;
@@ -74,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.warn('[useAuth] Direct getSession failed, trying proxy fallback...', directErr);
     }
 
-    // Fallback: use auth-proxy with stored refresh token
+    // Attempt 2: Auth-proxy with stored refresh token
     try {
       const storedSession = localStorage.getItem('sb-bhspeoledfydylvonobv-auth-token');
       if (storedSession) {
@@ -155,9 +172,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [initializeAuth]);
 
+  // ── Dual-path Sign Up: direct SDK first, then proxy fallback ──
   const signUp = async (email: string, password: string, fullName: string) => {
     const redirectUrl = `${window.location.origin}/`;
 
+    // Attempt 1: Direct SDK
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { full_name: fullName },
+          emailRedirectTo: redirectUrl,
+        },
+      });
+
+      if (error && !isNetworkError(error)) {
+        return { error };
+      }
+
+      if (!error && data) {
+        // If auto-confirm is on, we get a session back
+        if (data.session) {
+          // Session is already established by the SDK
+        }
+        return { error: null };
+      }
+      // If network error from SDK, fall through to proxy
+      console.warn('[useAuth] Direct signUp failed with network error, trying proxy...');
+    } catch (directErr) {
+      if (!isNetworkError(directErr)) {
+        return { error: directErr instanceof Error ? directErr : new Error('An unexpected error occurred') };
+      }
+      console.warn('[useAuth] Direct signUp threw network error, trying proxy...');
+    }
+
+    // Attempt 2: Auth proxy fallback
     try {
       const { data, error } = await proxyFetch({
         action: 'sign-up', email, password, fullName, redirectUrl,
@@ -184,7 +234,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ── Dual-path Sign In: direct SDK first, then proxy fallback ──
   const signIn = async (email: string, password: string) => {
+    // Attempt 1: Direct SDK
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error && !isNetworkError(error)) {
+        return { error };
+      }
+
+      if (!error && data.session) {
+        // Session is already established by the SDK
+        return { error: null };
+      }
+      // If network error, fall through to proxy
+      console.warn('[useAuth] Direct signIn failed with network error, trying proxy...');
+    } catch (directErr) {
+      if (!isNetworkError(directErr)) {
+        return { error: directErr instanceof Error ? directErr : new Error('An unexpected error occurred') };
+      }
+      console.warn('[useAuth] Direct signIn threw network error, trying proxy...');
+    }
+
+    // Attempt 2: Auth proxy fallback
     try {
       const { data, error } = await proxyFetch({
         action: 'sign-in', email, password,
