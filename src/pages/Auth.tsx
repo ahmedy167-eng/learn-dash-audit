@@ -322,10 +322,18 @@ export default function Auth() {
           </Tabs>
           
           {showRetryButton && (
-            <div className="mt-4 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
-              <p className="text-sm text-muted-foreground mb-2 text-center">
-                Connection failed. Please check your internet connection.
+            <div className="mt-4 p-4 bg-destructive/10 rounded-lg border border-destructive/20">
+              <p className="text-sm font-medium text-foreground mb-1 text-center">
+                Connection issue detected
               </p>
+              <p className="text-sm text-muted-foreground mb-2 text-center">
+                Your current network may be blocking access to our servers. Try these steps:
+              </p>
+              <ul className="text-sm text-muted-foreground mb-3 space-y-1 list-disc list-inside">
+                <li>Switch to mobile data or a personal hotspot</li>
+                <li>Connect from a different Wi-Fi network</li>
+                <li>Ask your network administrator to allow access</li>
+              </ul>
               <Button onClick={handleRetry} variant="outline" className="w-full" disabled={isLoading}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                 Retry Connection
