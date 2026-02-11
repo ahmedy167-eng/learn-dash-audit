@@ -722,6 +722,44 @@ export type Database = {
         }
         Relationships: []
       }
+      student_content_updates: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          reference_id: string | null
+          student_id: string
+          title: string
+          update_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          reference_id?: string | null
+          student_id: string
+          title: string
+          update_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          reference_id?: string | null
+          student_id?: string
+          title?: string
+          update_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_content_updates_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_notices: {
         Row: {
           content: string

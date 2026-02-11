@@ -3,6 +3,7 @@ import { useStudentAuth } from '@/hooks/useStudentAuth';
 import { useStudentMessages } from '@/hooks/useStudentMessages';
 import { StudentLayout } from '@/components/student/StudentLayout';
 import { NoticesPanel } from '@/components/student/NoticesPanel';
+import { StudentUpdatesPanel } from '@/components/student/StudentUpdatesPanel';
 import { MessageAdminDialog } from '@/components/student/MessageAdminDialog';
 import { MessageNotificationBadge } from '@/components/student/MessageNotificationBadge';
 import { StudentMessagesDialog } from '@/components/student/StudentMessagesDialog';
@@ -111,6 +112,11 @@ const StudentPortal = () => {
         {/* Notices Panel */}
         <div className="mb-8 animate-in stagger-2">
           <NoticesPanel />
+        </div>
+
+        {/* Recent Updates Panel */}
+        <div className="mb-8 animate-in stagger-3">
+          <StudentUpdatesPanel />
         </div>
 
         {/* Quick Access Sections */}
