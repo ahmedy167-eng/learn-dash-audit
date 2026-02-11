@@ -14,6 +14,7 @@ import { ActivityFeed } from '@/components/admin/ActivityFeed';
 import { MessageInbox } from '@/components/admin/MessageInbox';
 import { SessionAnalytics } from '@/components/admin/SessionAnalytics';
 import { StudentManagement } from '@/components/admin/StudentManagement';
+import { Clock } from '@/components/admin/Clock';
 import { RefreshCw, Shield, Users, Settings, Eye, GraduationCap, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -119,12 +120,15 @@ export default function Admin() {
     <DashboardLayout>
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Shield className="h-6 w-6 text-primary" />
-              Admin Dashboard
-            </h1>
-            <p className="text-muted-foreground">Monitor activity, manage users, and view analytics</p>
+          <div className="flex items-center gap-6">
+            <div>
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <Shield className="h-6 w-6 text-primary" />
+                Admin Dashboard
+              </h1>
+              <p className="text-muted-foreground">Monitor activity, manage users, and view analytics</p>
+            </div>
+            <Clock />
           </div>
           <Button variant="outline" onClick={fetchUsers} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
