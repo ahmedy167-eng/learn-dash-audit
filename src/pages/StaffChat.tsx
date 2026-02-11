@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { useState, useRef, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -394,5 +395,153 @@ export default function StaffChat() {
         </Card>
       </div>
     </DashboardLayout>
+=======
+import { useState, useMemo } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { useStaffList, useStaffConversations, useStaffThread } from '@/hooks/useStaffChat';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { MessageCircle, Search } from 'lucide-react';
+
+export default function StaffChat() {
+  const { user } = useAuth();
+  const userId = user?.id || null;
+
+  const { staff } = useStaffList(userId);
+  const { conversations } = useStaffConversations(userId);
+
+  const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
+  const { messages, sendMessage } = useStaffThread(userId, selectedStaff);
+  const [query, setQuery] = useState('');
+  const [messageInput, setMessageInput] = useState('');
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return staff;
+    return staff.filter(s => s.full_name.toLowerCase().includes(q));
+  }, [staff, query]);
+
+  const convMap = useMemo(() => {
+    const m = new Map<string, any>();
+    (conversations || []).forEach(c => {
+      if (c && c.contactId) m.set(c.contactId, c);
+      else if (c && c.contact_id) m.set(c.contact_id, c);
+    });
+    return m;
+  }, [conversations]);
+
+  const formatTimestamp = (iso?: string | null) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const now = new Date();
+    const sameDay = d.toDateString() === now.toDateString();
+    if (sameDay) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString();
+  };
+
+  const handleSelect = (id: string) => {
+    setSelectedStaff(id);
+  };
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStaff || !messageInput.trim()) return;
+    const input = messageInput.trim();
+    setMessageInput('');
+    await sendMessage(input);
+  };
+
+  return (
+    <div className="h-screen flex bg-background">
+      <div className="w-80 border-r flex flex-col">
+        <div className="p-4 border-b">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5" />
+            <h3 className="font-semibold">Staff Chat</h3>
+          </div>
+          <div className="mt-3">
+            <div className="relative">
+              <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search staff..." />
+              <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            </div>
+          </div>
+        </div>
+
+        <ScrollArea className="flex-1 p-2">
+          <div className="space-y-2">
+            {filtered.map(s => {
+              const conv = convMap.get(s.id);
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => handleSelect(s.id)}
+                  className={`w-full text-left p-2 rounded-lg transform transition-all duration-150 ${selectedStaff === s.id ? 'bg-accent text-accent-foreground shadow-sm' : 'hover:-translate-y-0.5 hover:shadow'} `}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground">
+                      {s.full_name.slice(0,1)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium text-sm truncate">{s.full_name}</div>
+                        <div className="text-xs text-muted-foreground">{formatTimestamp(conv?.lastMessageTime)}</div>
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">{conv?.lastMessage || 'No messages yet'}</div>
+                    </div>
+                    {conv?.unreadCount > 0 && (
+                      <div className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded-full bg-destructive text-destructive-foreground">
+                        {conv.unreadCount}
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </ScrollArea>
+      </div>
+
+      <div className="flex-1 flex flex-col">
+        {selectedStaff ? (
+          <>
+            <div className="p-4 border-b">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground">{(staff.find(s => s.id === selectedStaff)?.full_name || 'U').slice(0,1)}</div>
+                <div>
+                  <div className="font-semibold">{staff.find(s => s.id === selectedStaff)?.full_name}</div>
+                  <div className="text-xs text-muted-foreground">Staff</div>
+                </div>
+              </div>
+            </div>
+
+            <ScrollArea className="flex-1 p-4">
+              <div className="space-y-4">
+                {messages.map(msg => (
+                  <div key={msg.id} className={`flex ${msg.sender_user_id === userId ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[60%] px-3 py-2 rounded-lg ${msg.sender_user_id === userId ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                      <div className="text-sm">{msg.content}</div>
+                      <div className="text-xs opacity-70 mt-1">{new Date(msg.created_at).toLocaleTimeString()}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+
+            <div className="p-4 border-t">
+              <form onSubmit={handleSend} className="flex gap-2">
+                <Input value={messageInput} onChange={e => setMessageInput(e.target.value)} placeholder="Type a message..." />
+                <Button type="submit">Send</Button>
+              </form>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-muted-foreground">Select a staff member to start chatting</p>
+          </div>
+        )}
+      </div>
+    </div>
+>>>>>>> 15607fb (latest clock code)
   );
 }

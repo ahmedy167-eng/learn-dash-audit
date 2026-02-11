@@ -48,7 +48,11 @@ const navItems: NavItem[] = [
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
+<<<<<<< HEAD
   const { user, signOut } = useAuth();
+=======
+  const { signOut, user } = useAuth();
+>>>>>>> 15607fb (latest clock code)
   const { hasPermission, isAdmin, loading: permLoading } = usePermissions();
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
@@ -149,7 +153,12 @@ export function Sidebar() {
             activeClassName="bg-accent text-accent-foreground font-medium border-l-2 border-primary"
           >
             <item.icon className="h-5 w-5 flex-shrink-0" />
-            {!collapsed && <span>{item.title}</span>}
+            {!collapsed && (
+              <div className="flex items-center justify-between w-full">
+                <span>{item.title}</span>
+
+              </div>
+            )}
           </NavLink>
         ))}
 

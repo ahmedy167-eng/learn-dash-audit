@@ -9,7 +9,7 @@ import { MessageNotificationBadge } from '@/components/student/MessageNotificati
 import { StudentMessagesDialog } from '@/components/student/StudentMessagesDialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ClipboardList, BookOpen, FolderOpen, User, MessageSquare } from 'lucide-react';
+import { ClipboardList, BookOpen, FolderOpen, User, MessageSquare, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const StudentPortal = () => {
@@ -50,6 +50,13 @@ const StudentPortal = () => {
       icon: FolderOpen,
       href: '/student-portal/ca-projects',
       color: 'bg-purple-500/10 text-purple-500',
+    },
+    {
+      title: 'Chat',
+      description: 'Message teachers and classmates',
+      icon: MessageCircle,
+      href: '/student-portal/chat',
+      color: 'bg-orange-500/10 text-orange-500',
     },
   ];
 

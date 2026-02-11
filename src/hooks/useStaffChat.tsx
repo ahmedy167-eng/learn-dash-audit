@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+<<<<<<< HEAD
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -365,10 +366,222 @@ export function useStaffChat() {
           fetchConversations();
         }
       )
+=======
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+export interface StaffMessage {
+  id: string;
+  sender_user_id: string | null;
+  recipient_user_id: string | null;
+  sender_type: string | null;
+  recipient_type: string | null;
+  content: string;
+  created_at: string;
+}
+
+export interface StaffProfile {
+  id: string;
+  full_name: string;
+  role?: string;
+}
+
+export function useStaffList(currentUserId: string | null) {
+  const [staff, setStaff] = useState<StaffProfile[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchStaff = useCallback(async () => {
+    if (!currentUserId) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, role')
+        .neq('user_id', currentUserId)
+        .limit(200);
+
+      if (error) throw error;
+
+      setStaff((data || []).map((p: any) => ({ id: p.user_id, full_name: p.full_name || 'Unknown', role: p.role })));
+    } catch (err) {
+      console.error('Failed to fetch staff list', err);
+      toast.error('Failed to load staff list');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUserId]);
+
+  useEffect(() => {
+    fetchStaff();
+  }, [fetchStaff]);
+
+  return { staff, loading, refetch: fetchStaff };
+}
+
+export function useStaffConversations(currentUserId: string | null) {
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchConversations = useCallback(async () => {
+    if (!currentUserId) return;
+    setLoading(true);
+    try {
+      // Try RPC for optimized fetch first
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_staff_conversations', { p_user_id: currentUserId });
+
+      // Regardless of source, we'll normalize entries to include contactId, lastMessage and lastMessageTime
+      let convEntries: Array<any> = [];
+
+      if (!rpcError && rpcData) {
+        convEntries = rpcData;
+      } else {
+        // Fallback: fetch last messages involving current user
+        const { data: msgs } = await supabase
+          .from('messages')
+          .select('*')
+          .or(`sender_user_id.eq.${currentUserId},recipient_user_id.eq.${currentUserId}`)
+          .eq('sender_type', 'staff')
+          .eq('recipient_type', 'staff')
+          .order('created_at', { ascending: false })
+          .limit(1000);
+
+        const grouped: Record<string, any> = {};
+        (msgs || []).forEach((m: any) => {
+          const contactId = m.sender_user_id === currentUserId ? m.recipient_user_id : m.sender_user_id;
+          if (!contactId) return;
+          if (!grouped[contactId]) grouped[contactId] = m;
+        });
+
+        convEntries = Object.entries(grouped).map(([contactId, msg]) => ({ contact_id: contactId, last_message: msg.content, last_message_time: msg.created_at, last_message_obj: msg }));
+      }
+
+      // Fetch read receipts for current user to compute unread counts
+      const { data: receipts } = await supabase
+        .from('message_read_receipts')
+        .select('message_id')
+        .eq('user_id', currentUserId);
+
+      const readIds = new Set((receipts || []).map((r: any) => r.message_id));
+
+      // For each conversation entry compute unread count
+      const enhanced: any[] = [];
+      for (const entry of convEntries) {
+        const contactId = entry.contact_id || entry.contactId || entry.contactid || entry.contact;
+        if (!contactId) continue;
+
+        // last message preview + time
+        const lastMessage = entry.last_message || entry.lastMessage || entry.last_message_obj?.content || null;
+        const lastMessageTime = entry.last_message_time || entry.lastMessage?.created_at || entry.last_message_obj?.created_at || null;
+
+        // Count unread messages from contact to current user
+        // First get messages where recipient_user_id = currentUserId and sender_user_id = contactId
+        let unreadCount = 0;
+        try {
+          let q = supabase
+            .from('messages')
+            .select('id', { count: 'exact', head: true })
+            .eq('recipient_user_id', currentUserId)
+            .eq('sender_user_id', contactId)
+            .eq('sender_type', 'staff')
+            .eq('recipient_type', 'staff');
+
+          // exclude read ids if any
+          const readArray = Array.from(readIds);
+          if (readArray.length > 0) {
+            // Use .not('id', 'in', (...)) format correctly
+            const idList = readArray.map((id: string) => `"${id}"`).join(',');
+            q = q.not('id', 'in', `(${idList})`);
+          }
+
+          const { count, error: countErr } = await q;
+          if (!countErr) unreadCount = count || 0;
+        } catch (e) {
+          // ignore per-contact failures
+          unreadCount = 0;
+        }
+
+        enhanced.push({ contactId, lastMessage, lastMessageTime, unreadCount });
+      }
+
+      setConversations(enhanced);
+    } catch (err) {
+      console.error('Failed to fetch staff conversations', err);
+      setConversations([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUserId]);
+
+  useEffect(() => {
+    fetchConversations();
+  }, [fetchConversations]);
+
+  return { conversations, loading, refetch: fetchConversations };
+}
+
+export function useStaffThread(currentUserId: string | null, otherUserId: string | null) {
+  const [messages, setMessages] = useState<StaffMessage[]>([]);
+  const [loading, setLoading] = useState(false);
+  const channelRef = useRef<any>(null);
+
+  const fetchThread = useCallback(async () => {
+    if (!currentUserId || !otherUserId) {
+      setMessages([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('sender_type', 'staff')
+        .eq('recipient_type', 'staff')
+        .or(`(sender_user_id.eq.${currentUserId},recipient_user_id.eq.${otherUserId}),(sender_user_id.eq.${otherUserId},recipient_user_id.eq.${currentUserId})`)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setMessages(data || []);
+
+      // Mark as read using message_read_receipts if available
+      try {
+        await supabase
+          .from('message_read_receipts')
+          .insert((data || []).filter((m: any) => m.recipient_user_id === currentUserId).map((m: any) => ({ message_id: m.id, user_id: currentUserId })));
+      } catch (e) {
+        // ignore
+      }
+    } catch (err) {
+      console.error('Failed to fetch thread', err);
+      setMessages([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentUserId, otherUserId]);
+
+  useEffect(() => {
+    fetchThread();
+
+    // subscribe to staff messages and update thread
+    if (channelRef.current) {
+      try { channelRef.current.unsubscribe(); } catch (e) {}
+    }
+
+    channelRef.current = supabase
+      .channel('staff-chat')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_type=eq.staff` }, payload => {
+        const m = payload.new as any;
+        if (!m) return;
+        const involves = (m.sender_user_id === currentUserId && m.recipient_user_id === otherUserId) || (m.sender_user_id === otherUserId && m.recipient_user_id === currentUserId);
+        if (involves) {
+          setMessages(prev => [...prev, m]);
+        }
+      })
+>>>>>>> 15607fb (latest clock code)
       .subscribe();
 
     return () => {
       if (channelRef.current) {
+<<<<<<< HEAD
         supabase.removeChannel(channelRef.current);
       }
     };
@@ -406,4 +619,32 @@ export function useStaffChat() {
     sendMessage,
     setSelectedContact,
   };
+=======
+        try { channelRef.current.unsubscribe(); } catch (e) {}
+      }
+    };
+  }, [fetchThread]);
+
+  const sendMessage = useCallback(async (content: string) => {
+    if (!currentUserId || !otherUserId) return false;
+    try {
+      const { error } = await supabase.from('messages').insert({
+        sender_user_id: currentUserId,
+        recipient_user_id: otherUserId,
+        sender_type: 'staff',
+        recipient_type: 'staff',
+        content: content,
+      });
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('Failed to send staff message', err);
+      toast.error('Failed to send message');
+      return false;
+    }
+  }, [currentUserId, otherUserId]);
+
+  return { messages, loading, fetchThread, sendMessage };
+>>>>>>> 15607fb (latest clock code)
 }

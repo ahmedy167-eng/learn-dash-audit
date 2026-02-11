@@ -12,7 +12,8 @@ import {
   LogOut,
   GraduationCap,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  MessageCircle
 } from 'lucide-react';
 
 interface StudentLayoutProps {
@@ -21,6 +22,7 @@ interface StudentLayoutProps {
 
 const navItems = [
   { title: 'Dashboard', url: '/student-portal', icon: LayoutDashboard },
+  { title: 'Chat', url: '/student-portal/chat', icon: MessageCircle },
   { title: 'Quizzes', url: '/student-portal/quizzes', icon: ClipboardList },
   { title: 'LMS Updates', url: '/student-portal/lms', icon: BookOpen },
   { title: 'CA Projects', url: '/student-portal/ca-projects', icon: FolderOpen },
