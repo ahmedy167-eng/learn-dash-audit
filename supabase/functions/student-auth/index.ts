@@ -206,7 +206,7 @@ const validators = {
   // Data type for get-data endpoint
   dataType: (val: unknown): ValidationResult => {
     if (typeof val !== 'string') return { valid: false, error: 'Data type must be a string' }
-       const validTypes = ['profile', 'messages', 'notices', 'quizzes', 'quiz_questions', 'quiz_submissions', 'quiz_results', 'lms_progress', 'ca_projects', 'ca_submissions', 'sections']
+       const validTypes = ['profile', 'messages', 'notices', 'quizzes', 'quiz_questions', 'quiz_submissions', 'quiz_results', 'lms_progress', 'ca_projects', 'ca_submissions', 'sections', 'content_updates']
     if (!validTypes.includes(val)) {
       return { valid: false, error: 'Invalid data type' }
     }
@@ -216,7 +216,7 @@ const validators = {
   // Action type for action endpoint
   actionType: (val: unknown): ValidationResult => {
     if (typeof val !== 'string') return { valid: false, error: 'Action must be a string' }
-    const validActions = ['submit_quiz', 'submit_ca', 'update_ca', 'send_message', 'mark_message_read', 'mark_notice_read', 'mark_all_messages_read']
+    const validActions = ['submit_quiz', 'submit_ca', 'update_ca', 'send_message', 'mark_message_read', 'mark_notice_read', 'mark_all_messages_read', 'mark_update_read', 'mark_all_updates_read']
     if (!validActions.includes(val)) {
       return { valid: false, error: 'Invalid action' }
     }
@@ -243,13 +243,13 @@ interface StudentLoginRequest {
 
 interface StudentDataRequest {
   sessionToken: string
-   dataType: 'profile' | 'messages' | 'notices' | 'quizzes' | 'quiz_questions' | 'quiz_submissions' | 'quiz_results' | 'lms_progress' | 'ca_projects' | 'ca_submissions' | 'sections'
+   dataType: 'profile' | 'messages' | 'notices' | 'quizzes' | 'quiz_questions' | 'quiz_submissions' | 'quiz_results' | 'lms_progress' | 'ca_projects' | 'ca_submissions' | 'sections' | 'content_updates'
   filters?: Record<string, unknown>
 }
 
 interface StudentActionRequest {
   sessionToken: string
-  action: 'submit_quiz' | 'submit_ca' | 'update_ca' | 'send_message' | 'mark_message_read' | 'mark_notice_read' | 'mark_all_messages_read'
+  action: 'submit_quiz' | 'submit_ca' | 'update_ca' | 'send_message' | 'mark_message_read' | 'mark_notice_read' | 'mark_all_messages_read' | 'mark_update_read' | 'mark_all_updates_read'
   data: Record<string, unknown>
 }
 
@@ -785,6 +785,18 @@ Deno.serve(async (req) => {
           break
         }
 
+        case 'content_updates': {
+          const result = await supabaseAdmin
+            .from('student_content_updates')
+            .select('id, update_type, title, reference_id, is_read, created_at')
+            .eq('student_id', studentId)
+            .order('created_at', { ascending: false })
+            .limit(20)
+          data = result.data
+          error = result.error
+          break
+        }
+
         default:
           return new Response(
             JSON.stringify({ error: 'Invalid data type' }),
@@ -1143,6 +1155,51 @@ Deno.serve(async (req) => {
             .select()
             .single()
           result = updateResult.data
+          actionError = updateResult.error
+          break
+        }
+
+        case 'mark_update_read': {
+          const { updateId } = actionData as { updateId: string }
+
+          const updateIdValidation = validators.uuid(updateId)
+          if (!updateIdValidation.valid) {
+            return validationError('Invalid update ID format')
+          }
+
+          // Verify update belongs to this student
+          const { data: contentUpdate } = await supabaseAdmin
+            .from('student_content_updates')
+            .select('id')
+            .eq('id', updateId)
+            .eq('student_id', studentId)
+            .single()
+
+          if (!contentUpdate) {
+            return new Response(
+              JSON.stringify({ error: 'Update not found or unauthorized' }),
+              { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+
+          const updateResult = await supabaseAdmin
+            .from('student_content_updates')
+            .update({ is_read: true })
+            .eq('id', updateId)
+            .select()
+            .single()
+          result = updateResult.data
+          actionError = updateResult.error
+          break
+        }
+
+        case 'mark_all_updates_read': {
+          const updateResult = await supabaseAdmin
+            .from('student_content_updates')
+            .update({ is_read: true })
+            .eq('student_id', studentId)
+            .eq('is_read', false)
+          result = { success: true }
           actionError = updateResult.error
           break
         }
