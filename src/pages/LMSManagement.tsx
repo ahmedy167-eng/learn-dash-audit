@@ -34,6 +34,7 @@ interface LMSProgress {
   unit_name: string;
   points: number;
   is_completed: boolean;
+  skill_type?: string;
   students?: {
     full_name: string;
     student_id: string;
@@ -54,6 +55,7 @@ const LMSManagement = () => {
   const [formUnitName, setFormUnitName] = useState('');
   const [formPoints, setFormPoints] = useState('0');
   const [formIsCompleted, setFormIsCompleted] = useState(false);
+  const [formSkillType, setFormSkillType] = useState('');
   const [editingProgress, setEditingProgress] = useState<LMSProgress | null>(null);
 
   useEffect(() => {
@@ -99,7 +101,7 @@ const LMSManagement = () => {
     : students.filter(s => s.section_id === filterSectionId);
 
   const handleCreate = async () => {
-    if (!user || !formStudentId || !formUnitName.trim()) {
+    if (!user || !formStudentId || !formUnitName.trim() || !formSkillType) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -111,6 +113,7 @@ const LMSManagement = () => {
         unit_name: formUnitName.trim(),
         points: parseInt(formPoints) || 0,
         is_completed: formIsCompleted,
+        skill_type: formSkillType,
         updated_by: user.id,
       });
 
@@ -125,7 +128,7 @@ const LMSManagement = () => {
   };
 
   const handleUpdate = async () => {
-    if (!editingProgress || !formUnitName.trim()) {
+    if (!editingProgress || !formUnitName.trim() || !formSkillType) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -136,6 +139,7 @@ const LMSManagement = () => {
         unit_name: formUnitName.trim(),
         points: parseInt(formPoints) || 0,
         is_completed: formIsCompleted,
+        skill_type: formSkillType,
       })
       .eq('id', editingProgress.id);
 
@@ -170,6 +174,7 @@ const LMSManagement = () => {
     setFormUnitName('');
     setFormPoints('0');
     setFormIsCompleted(false);
+    setFormSkillType('');
     setEditingProgress(null);
   };
 
@@ -179,6 +184,7 @@ const LMSManagement = () => {
     setFormUnitName(prog.unit_name);
     setFormPoints(prog.points.toString());
     setFormIsCompleted(prog.is_completed);
+    setFormSkillType(prog.skill_type || '');
     setDialogOpen(true);
   };
 
@@ -245,6 +251,19 @@ const LMSManagement = () => {
                           {student.full_name} ({student.student_id})
                         </SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Skill Type *</Label>
+                  <Select value={formSkillType} onValueChange={setFormSkillType}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select skill type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="reading-writing">Reading & Writing</SelectItem>
+                      <SelectItem value="listening">Listening</SelectItem>
+                      <SelectItem value="speaking">Speaking</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
