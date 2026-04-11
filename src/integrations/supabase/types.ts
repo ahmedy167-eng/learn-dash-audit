@@ -58,6 +58,65 @@ export type Database = {
           },
         ]
       }
+      admin_conversations: {
+        Row: {
+          admin_id_1: string
+          admin_id_2: string
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          admin_id_1: string
+          admin_id_2: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          admin_id_1?: string
+          admin_id_2?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      admin_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          is_read: boolean
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "admin_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ca_projects: {
         Row: {
           created_at: string
@@ -158,6 +217,124 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      chat_messages: {
+        Row: {
+          attachment_type: string | null
+          attachment_url: string | null
+          content: string
+          conversation_id: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          id: string
+          sender_student_id: string | null
+          sender_user_id: string | null
+        }
+        Insert: {
+          attachment_type?: string | null
+          attachment_url?: string | null
+          content: string
+          conversation_id: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          sender_student_id?: string | null
+          sender_user_id?: string | null
+        }
+        Update: {
+          attachment_type?: string | null
+          attachment_url?: string | null
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          sender_student_id?: string | null
+          sender_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_participants: {
+        Row: {
+          conversation_id: string
+          id: string
+          is_active: boolean
+          joined_at: string
+          last_read_at: string | null
+          role: string
+          student_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          conversation_id: string
+          id?: string
+          is_active?: boolean
+          joined_at?: string
+          last_read_at?: string | null
+          role?: string
+          student_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          conversation_id?: string
+          id?: string
+          is_active?: boolean
+          joined_at?: string
+          last_read_at?: string | null
+          role?: string
+          student_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_participants_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          title: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          title?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          title?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       cover_class_audits: {
         Row: {
@@ -929,6 +1106,38 @@ export type Database = {
         }
         Relationships: []
       }
+      typing_indicators: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          student_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          student_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          student_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "typing_indicators_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_permissions: {
         Row: {
           created_at: string
@@ -1165,6 +1374,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_conversation_participant: {
+        Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
       }
     }

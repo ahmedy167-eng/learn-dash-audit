@@ -95,8 +95,7 @@ export function useConversations(userId: string | null, studentId: string | null
       const { data: participantData, error: participantError } = await supabase
         .from('conversation_participants')
         .select('conversation_id')
-        .or(`user_id.eq.${userId},student_id.eq.${studentId}`)
-        .distinct();
+        .or(`user_id.eq.${userId},student_id.eq.${studentId}`);
 
       if (participantError) {
         console.warn('Error fetching user conversations:', participantError);
