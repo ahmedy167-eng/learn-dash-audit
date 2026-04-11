@@ -48,11 +48,7 @@ const navItems: NavItem[] = [
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-<<<<<<< HEAD
   const { user, signOut } = useAuth();
-=======
-  const { signOut, user } = useAuth();
->>>>>>> 15607fb (latest clock code)
   const { hasPermission, isAdmin, loading: permLoading } = usePermissions();
   const [unreadChatCount, setUnreadChatCount] = useState(0);
 
