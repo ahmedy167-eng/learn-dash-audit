@@ -52,6 +52,7 @@ const StudentCAProjects = () => {
   const { getData, performAction } = useStudentApi();
   const [projects, setProjects] = useState<CAProject[]>([]);
   const [submissions, setSubmissions] = useState<Record<string, CASubmission[]>>({});
+  const [revisions, setRevisions] = useState<Revision[]>([]);
   const [currentContent, setCurrentContent] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
