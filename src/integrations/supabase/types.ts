@@ -399,6 +399,45 @@ export type Database = {
         }
         Relationships: []
       }
+      diary_notes: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          note_date: string
+          note_time: string | null
+          reminder_at: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          weekday: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          note_date?: string
+          note_time?: string | null
+          reminder_at?: string | null
+          title?: string
+          updated_at?: string
+          user_id: string
+          weekday: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          note_date?: string
+          note_time?: string | null
+          reminder_at?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          weekday?: string
+        }
+        Relationships: []
+      }
       lesson_plans: {
         Row: {
           aim_main: string | null
