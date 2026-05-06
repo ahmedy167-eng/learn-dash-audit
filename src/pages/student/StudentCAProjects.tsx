@@ -322,6 +322,16 @@ const StudentCAProjects = () => {
                             />
                           </div>
 
+                          {submission?.feedback_html && (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <MessageSquare className="h-4 w-4 text-primary" />
+                                <span className="font-medium text-sm">Teacher Annotations</span>
+                              </div>
+                              <AnnotatedView html={submission.feedback_html} />
+                            </div>
+                          )}
+
                           {submission?.feedback && (
                             <div className="bg-muted/50 p-4 rounded-lg">
                               <div className="flex items-center gap-2 mb-2">
