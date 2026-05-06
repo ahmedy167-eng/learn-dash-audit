@@ -399,41 +399,107 @@ export type Database = {
         }
         Relationships: []
       }
+      diary_links: {
+        Row: {
+          created_at: string
+          id: string
+          linked_note_id: string
+          note_id: string
+          relevance: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          linked_note_id: string
+          note_id: string
+          relevance?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          linked_note_id?: string
+          note_id?: string
+          relevance?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diary_links_linked_note_id_fkey"
+            columns: ["linked_note_id"]
+            isOneToOne: false
+            referencedRelation: "diary_notes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "diary_links_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "diary_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       diary_notes: {
         Row: {
+          ai_action_items: Json | null
+          ai_summary: string | null
+          ai_tags: string[]
+          category: string
           content: string | null
           created_at: string
           id: string
+          is_pinned: boolean
+          mood: string | null
+          mood_emoji: string | null
           note_date: string
           note_time: string | null
           reminder_at: string | null
           title: string
           updated_at: string
           user_id: string
+          voice_url: string | null
           weekday: string
         }
         Insert: {
+          ai_action_items?: Json | null
+          ai_summary?: string | null
+          ai_tags?: string[]
+          category?: string
           content?: string | null
           created_at?: string
           id?: string
+          is_pinned?: boolean
+          mood?: string | null
+          mood_emoji?: string | null
           note_date?: string
           note_time?: string | null
           reminder_at?: string | null
           title?: string
           updated_at?: string
           user_id: string
+          voice_url?: string | null
           weekday: string
         }
         Update: {
+          ai_action_items?: Json | null
+          ai_summary?: string | null
+          ai_tags?: string[]
+          category?: string
           content?: string | null
           created_at?: string
           id?: string
+          is_pinned?: boolean
+          mood?: string | null
+          mood_emoji?: string | null
           note_date?: string
           note_time?: string | null
           reminder_at?: string | null
           title?: string
           updated_at?: string
           user_id?: string
+          voice_url?: string | null
           weekday?: string
         }
         Relationships: []
