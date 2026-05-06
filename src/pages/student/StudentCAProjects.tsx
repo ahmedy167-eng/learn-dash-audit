@@ -15,6 +15,7 @@ import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { AnnotatedView } from '@/components/ca/AnnotatedView';
 
 interface CAProject {
   id: string;
