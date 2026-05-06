@@ -89,37 +89,55 @@ export function DiarySidebar({ notes, category, onCategory, selectedDate, onDate
         <Plus className="h-4 w-4" /> New Entry
       </Button>
 
-      {/* Mini calendar */}
-      <div className="rounded-xl border border-border/50 p-2 bg-card/50">
-        <Calendar
-          mode="single"
-          selected={selectedDate}
-          onSelect={onDate}
-          className="p-0"
-          components={{
-            DayContent: ({ date }) => {
-              const key = date.toISOString().slice(0, 10);
-              const meta = dateMeta.get(key);
-              const isToday = key === today;
-              return (
-                <div
-                  className="relative flex flex-col items-center justify-center w-full h-full"
-                  title={meta ? `${meta.count} ${meta.count === 1 ? 'entry' : 'entries'}` : undefined}
-                >
-                  <span className={cn('text-[13px]', isToday && 'font-semibold')}>{date.getDate()}</span>
-                  {meta && (
-                    <span className="absolute -bottom-0.5 flex gap-0.5">
-                      {meta.colors.map((c, i) => (
-                        <span key={i} className="h-1 w-1 rounded-full" style={{ background: c }} />
-                      ))}
-                    </span>
-                  )}
-                </div>
-              );
-            },
-          }}
-        />
-      </div>
+      {/* Calendar popover trigger */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="w-full flex items-center justify-between gap-2 px-4 h-12 rounded-xl border border-border/50 bg-card/60 hover:bg-card transition-colors text-left"
+          >
+            <span className="flex items-center gap-2.5 min-w-0">
+              <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="font-display-diary text-sm truncate">
+                {format(selectedDate ?? new Date(), 'MMMM yyyy')}
+              </span>
+            </span>
+            <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-auto p-0 pointer-events-auto">
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={onDate}
+            initialFocus
+            className="p-3 pointer-events-auto"
+            components={{
+              DayContent: ({ date }) => {
+                const key = date.toISOString().slice(0, 10);
+                const meta = dateMeta.get(key);
+                const isToday = key === today;
+                return (
+                  <div
+                    className="relative flex flex-col items-center justify-center w-full h-full"
+                    title={meta ? `${meta.count} ${meta.count === 1 ? 'entry' : 'entries'}` : undefined}
+                  >
+                    <span className={cn('text-[13px]', isToday && 'font-semibold')}>{date.getDate()}</span>
+                    {meta && (
+                      <span className="absolute -bottom-0.5 flex gap-0.5">
+                        {meta.colors.map((c, i) => (
+                          <span key={i} className="h-1 w-1 rounded-full" style={{ background: c }} />
+                        ))}
+                      </span>
+                    )}
+                  </div>
+                );
+              },
+            }}
+          />
+        </PopoverContent>
+      </Popover>
+
 
       {/* Categories */}
       <div className="space-y-1">
