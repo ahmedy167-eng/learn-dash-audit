@@ -174,6 +174,7 @@ export type Database = {
         Row: {
           content: string | null
           feedback: string | null
+          feedback_html: string | null
           id: string
           project_id: string
           stage: string
@@ -184,6 +185,7 @@ export type Database = {
         Insert: {
           content?: string | null
           feedback?: string | null
+          feedback_html?: string | null
           id?: string
           project_id: string
           stage: string
@@ -194,6 +196,7 @@ export type Database = {
         Update: {
           content?: string | null
           feedback?: string | null
+          feedback_html?: string | null
           id?: string
           project_id?: string
           stage?: string

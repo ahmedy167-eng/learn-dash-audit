@@ -1,0 +1,1 @@
+ALTER TABLE public.ca_submissions ADD COLUMN IF NOT EXISTS feedback_html TEXT;
