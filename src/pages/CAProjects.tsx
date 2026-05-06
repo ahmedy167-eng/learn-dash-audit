@@ -61,6 +61,7 @@ interface CASubmission {
   stage: string;
   content: string | null;
   feedback: string | null;
+  feedback_html: string | null;
   submitted_at: string;
   students?: {
     id: string;
