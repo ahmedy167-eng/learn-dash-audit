@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { AnnotatableText } from '@/components/ca/AnnotatableText';
 
 // Helper function to get a signed URL for private bucket files
 const getSignedPdfUrl = async (filePath: string): Promise<string | null> => {
@@ -60,6 +61,7 @@ interface CASubmission {
   stage: string;
   content: string | null;
   feedback: string | null;
+  feedback_html: string | null;
   submitted_at: string;
   students?: {
     id: string;
@@ -309,6 +311,19 @@ const CAProjects = () => {
       if (selectedProject) {
         fetchSubmissions(selectedProject.id);
       }
+    }
+  };
+
+  const saveFeedbackHtml = async (submissionId: string, html: string) => {
+    const sanitized = sanitizeHtml(html);
+    // Optimistic update
+    setSubmissions(prev => prev.map(s => s.id === submissionId ? { ...s, feedback_html: sanitized } : s));
+    const { error } = await supabase
+      .from('ca_submissions')
+      .update({ feedback_html: sanitized })
+      .eq('id', submissionId);
+    if (error) {
+      toast.error('Failed to save annotation');
     }
   };
 
@@ -850,10 +865,13 @@ const CAProjects = () => {
                                 </CardHeader>
                                 <CardContent className="space-y-3">
                                   {submission.content && (
-                                    <div className="bg-muted/50 p-3 rounded text-sm">
-                                      <div 
-                                        className="prose prose-sm max-w-none"
-                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(submission.content) }}
+                                    <div className="space-y-1">
+                                      <p className="text-xs font-medium text-muted-foreground">
+                                        Student writing — select text to tag with Sp, WW, Gr…
+                                      </p>
+                                      <AnnotatableText
+                                        html={submission.feedback_html || submission.content}
+                                        onChange={(html) => saveFeedbackHtml(submission.id, html)}
                                       />
                                     </div>
                                   )}

@@ -14,9 +14,9 @@ export function sanitizeHtml(html: string | null | undefined): string {
       'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
       'ul', 'ol', 'li',
       'blockquote', 'pre', 'code',
-      'a', 'span', 'div',
+      'a', 'span', 'div', 'mark',
     ],
-    ALLOWED_ATTR: ['href', 'target', 'rel', 'class'],
+    ALLOWED_ATTR: ['href', 'target', 'rel', 'class', 'data-abbr', 'data-comment', 'data-id'],
     ALLOW_DATA_ATTR: false,
     // Remove any script tags and event handlers
     FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input'],

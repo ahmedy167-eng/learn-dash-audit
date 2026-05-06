@@ -15,6 +15,7 @@ import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { AnnotatedView } from '@/components/ca/AnnotatedView';
 
 interface CAProject {
   id: string;
@@ -33,6 +34,7 @@ interface CASubmission {
   stage: string;
   content: string | null;
   feedback: string | null;
+  feedback_html: string | null;
   submitted_at: string;
 }
 
@@ -319,6 +321,16 @@ const StudentCAProjects = () => {
                               placeholder={`Enter your ${stage.label.toLowerCase()} here...`}
                             />
                           </div>
+
+                          {submission?.feedback_html && (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <MessageSquare className="h-4 w-4 text-primary" />
+                                <span className="font-medium text-sm">Teacher Annotations</span>
+                              </div>
+                              <AnnotatedView html={submission.feedback_html} />
+                            </div>
+                          )}
 
                           {submission?.feedback && (
                             <div className="bg-muted/50 p-4 rounded-lg">
