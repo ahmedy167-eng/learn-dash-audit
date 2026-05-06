@@ -25,6 +25,29 @@ export default function Diary() {
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [tab, setTab] = useState('timeline');
+  const [categorizing, setCategorizing] = useState(false);
+
+  const handleAutoCategorize = async () => {
+    if (categorizing || !notes.length) return;
+    setCategorizing(true);
+    const t = toast.loading(`Categorizing ${notes.length} entries…`);
+    let done = 0, failed = 0;
+    for (const n of notes) {
+      try {
+        const { data, error } = await supabase.functions.invoke('diary-ai', {
+          body: { action: 'categorize', title: n.title, content: n.content || '' },
+        });
+        if (error) throw error;
+        const cat = (data as any)?.category;
+        if (cat && cat !== n.category) await update(n.id, { category: cat } as any);
+        done++;
+      } catch { failed++; }
+      toast.loading(`Categorizing ${done + failed}/${notes.length}…`, { id: t });
+    }
+    toast.success(`Done — ${done} categorized${failed ? `, ${failed} failed` : ''}`, { id: t });
+    setCategorizing(false);
+  };
+
 
   const filtered = useMemo(() => notes.filter(n => {
     if (category !== 'All' && n.category !== category) return false;
