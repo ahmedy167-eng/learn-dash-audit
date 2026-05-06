@@ -9,7 +9,8 @@ import { CategoryChip } from './CategoryChip';
 import { MoodPicker } from './MoodPicker';
 import { VoiceRecorder } from './VoiceRecorder';
 import { DiaryCategory } from '@/lib/diary-meta';
-import { Bell, FileDown, FileText, Save, Trash2, Loader2, BellRing, Pin, Maximize2, Minimize2, Sparkles } from 'lucide-react';
+import { Bell, FileDown, FileText, Save, Trash2, Loader2, BellRing, Pin, Maximize2, Minimize2, Sparkles, Clock } from 'lucide-react';
+import { format } from 'date-fns';
 import { downloadNoteDocx, downloadNotePdf, downloadReminderIcs } from '@/lib/diary-export';
 
 interface Props {
@@ -37,7 +38,7 @@ export function DiaryEditor({ note, onChange, onSave, onDelete, onReflect, savin
     }, 1500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [note.title, note.content, note.mood, note.category, note.note_date, note.note_time, note.reminder_at, note.is_pinned]);
+  }, [note.title, note.content, note.mood, note.category, note.note_date, note.reminder_at, note.is_pinned]);
 
   const update = (p: Partial<DiaryNote>) => {
     dirtyRef.current = true;
@@ -98,14 +99,9 @@ export function DiaryEditor({ note, onChange, onSave, onDelete, onReflect, savin
                 className="h-8 w-auto text-sm"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-xs text-muted-foreground">Time</Label>
-              <Input
-                type="time"
-                value={note.note_time || ''}
-                onChange={e => update({ note_time: e.target.value })}
-                className="h-8 w-auto text-sm"
-              />
+            <div className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md bg-muted/40 border border-border/40 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              <span>{format(new Date(note.created_at || Date.now()), 'MMM d, h:mm a')}</span>
             </div>
           </div>
 
