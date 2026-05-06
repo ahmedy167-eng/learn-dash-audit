@@ -147,6 +147,8 @@ export default function Diary() {
             onNew={handleNew}
             onAnalytics={() => setAnalyticsOpen(true)}
             onSearch={() => setSearchOpen(true)}
+            onAutoCategorize={handleAutoCategorize}
+            categorizing={categorizing}
           />
 
           <div className="min-w-0 fade-in-up stagger-d-1">
