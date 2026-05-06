@@ -27,9 +27,10 @@ export function AIAssistantPanel({ note, notes, onReflect, reflecting }: Props) 
     : [];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 fade-in-up stagger-d-2">
       {/* Daily Reflection */}
-      <Card className="glass-diary p-5 glow-soft border-0">
+      <Card className="glass-diary p-5 glow-soft border-0 relative overflow-hidden">
+        <span aria-hidden className="pointer-events-none absolute -top-10 -right-10 h-32 w-32 rounded-full opacity-30 blur-2xl" style={{ background: 'hsl(var(--diary-glow))' }} />
         <div className="flex items-center gap-2 mb-3">
           <div className="h-8 w-8 rounded-xl flex items-center justify-center"
                style={{ background: 'linear-gradient(135deg, hsl(var(--diary-accent)), hsl(var(--diary-glow)))' }}>
