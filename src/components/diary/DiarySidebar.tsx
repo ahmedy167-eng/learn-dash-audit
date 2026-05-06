@@ -190,6 +190,19 @@ export function DiarySidebar({ notes, category, onCategory, selectedDate, onDate
           <BarChart3 className="icon h-3.5 w-3.5" /> Insights
         </Button>
       </div>
+
+      {onAutoCategorize && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onAutoCategorize}
+          disabled={categorizing}
+          className="w-full gap-1.5 h-9 rounded-lg"
+        >
+          {categorizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+          {categorizing ? 'Categorizing…' : 'Auto-categorize entries'}
+        </Button>
+      )}
     </aside>
   );
 }
