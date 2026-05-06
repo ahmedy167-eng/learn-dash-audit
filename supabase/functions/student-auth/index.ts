@@ -243,7 +243,7 @@ interface StudentLoginRequest {
 
 interface StudentDataRequest {
   sessionToken: string
-   dataType: 'profile' | 'messages' | 'notices' | 'quizzes' | 'quiz_questions' | 'quiz_submissions' | 'quiz_results' | 'lms_progress' | 'ca_projects' | 'ca_submissions' | 'sections' | 'content_updates'
+   dataType: 'profile' | 'messages' | 'notices' | 'quizzes' | 'quiz_questions' | 'quiz_submissions' | 'quiz_results' | 'lms_progress' | 'ca_projects' | 'ca_submissions' | 'ca_revisions' | 'sections' | 'content_updates'
   filters?: Record<string, unknown>
 }
 
