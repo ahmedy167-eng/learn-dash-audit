@@ -216,6 +216,44 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ filters }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    if (input.action === "categorize") {
+      const { title, content } = input;
+      const text = `${title}\n\n${content}`.trim();
+      if (!text) {
+        return new Response(JSON.stringify({ category: "Personal" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const result = await callAI({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [
+          { role: "system", content: `Classify a diary entry into exactly one category from: ${CATEGORIES.join(", ")}. Choose the most appropriate based on the title and content.` },
+          { role: "user", content: text.slice(0, 4000) },
+        ],
+        tools: [{
+          type: "function",
+          function: {
+            name: "categorize",
+            description: "Pick the single best category",
+            parameters: {
+              type: "object",
+              properties: {
+                category: { type: "string", description: `One of: ${CATEGORIES.join(", ")}` },
+              },
+              required: ["category"],
+              additionalProperties: false,
+            },
+          },
+        }],
+        tool_choice: { type: "function", function: { name: "categorize" } },
+      });
+      const tc = result.choices?.[0]?.message?.tool_calls?.[0];
+      let args: any = null;
+      try { args = tc ? JSON.parse(tc.function.arguments) : null; } catch { args = null; }
+      const category = args && typeof args.category === "string" && (CATEGORIES as readonly string[]).includes(args.category)
+        ? args.category
+        : "Personal";
+      return new Response(JSON.stringify({ category }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     return new Response(JSON.stringify({ error: "Unknown action" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     if (e instanceof Response) return e;
