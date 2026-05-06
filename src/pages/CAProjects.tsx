@@ -20,6 +20,7 @@ import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { AnnotatableText } from '@/components/ca/AnnotatableText';
+import { RevisionHistory, type Revision } from '@/components/ca/RevisionHistory';
 
 // Helper function to get a signed URL for private bucket files
 const getSignedPdfUrl = async (filePath: string): Promise<string | null> => {
