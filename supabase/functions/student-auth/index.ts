@@ -206,7 +206,7 @@ const validators = {
   // Data type for get-data endpoint
   dataType: (val: unknown): ValidationResult => {
     if (typeof val !== 'string') return { valid: false, error: 'Data type must be a string' }
-       const validTypes = ['profile', 'messages', 'notices', 'quizzes', 'quiz_questions', 'quiz_submissions', 'quiz_results', 'lms_progress', 'ca_projects', 'ca_submissions', 'sections', 'content_updates']
+       const validTypes = ['profile', 'messages', 'notices', 'quizzes', 'quiz_questions', 'quiz_submissions', 'quiz_results', 'lms_progress', 'ca_projects', 'ca_submissions', 'ca_revisions', 'sections', 'content_updates']
     if (!validTypes.includes(val)) {
       return { valid: false, error: 'Invalid data type' }
     }
