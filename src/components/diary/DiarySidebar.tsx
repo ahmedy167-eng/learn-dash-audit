@@ -4,7 +4,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { CATEGORY_META, DIARY_CATEGORIES, DiaryCategory, computeStreak, moodColor, moodEmoji } from '@/lib/diary-meta';
 import { useAuth } from '@/hooks/useAuth';
 import { DiaryNote } from '@/hooks/useDiary';
-import { Flame, Plus, Sparkles, BarChart3, Search, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
+import { Flame, Plus, Sparkles, BarChart3, Search, Calendar as CalendarIcon, ChevronDown, Wand2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -19,9 +19,11 @@ interface Props {
   onNew: () => void;
   onAnalytics: () => void;
   onSearch: () => void;
+  onAutoCategorize?: () => void;
+  categorizing?: boolean;
 }
 
-export function DiarySidebar({ notes, category, onCategory, selectedDate, onDate, onNew, onAnalytics, onSearch }: Props) {
+export function DiarySidebar({ notes, category, onCategory, selectedDate, onDate, onNew, onAnalytics, onSearch, onAutoCategorize, categorizing }: Props) {
   const { user } = useAuth();
   const initials = (user?.email || 'U').slice(0, 2).toUpperCase();
   const streak = useMemo(() => computeStreak([...new Set(notes.map(n => n.note_date))]), [notes]);
@@ -188,6 +190,19 @@ export function DiarySidebar({ notes, category, onCategory, selectedDate, onDate
           <BarChart3 className="icon h-3.5 w-3.5" /> Insights
         </Button>
       </div>
+
+      {onAutoCategorize && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onAutoCategorize}
+          disabled={categorizing}
+          className="w-full gap-1.5 h-9 rounded-lg"
+        >
+          {categorizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+          {categorizing ? 'Categorizing…' : 'Auto-categorize entries'}
+        </Button>
+      )}
     </aside>
   );
 }

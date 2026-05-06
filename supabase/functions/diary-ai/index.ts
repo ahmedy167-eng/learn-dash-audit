@@ -21,7 +21,13 @@ const SearchSchema = z.object({
   query: z.string().trim().min(1, "query required").max(500),
 });
 
-const RequestSchema = z.discriminatedUnion("action", [ReflectSchema, TranscribeSchema, SearchSchema]);
+const CategorizeSchema = z.object({
+  action: z.literal("categorize"),
+  title: z.string().trim().max(200).optional().default(""),
+  content: z.string().trim().max(8000).optional().default(""),
+});
+
+const RequestSchema = z.discriminatedUnion("action", [ReflectSchema, TranscribeSchema, SearchSchema, CategorizeSchema]);
 
 // Output sanitizer: enforce mood/category enum membership; coerce invalid → empty
 function sanitizeFilters(f: any) {
@@ -208,6 +214,44 @@ Deno.serve(async (req) => {
       try { args = tc ? JSON.parse(tc.function.arguments) : null; } catch { args = null; }
       const filters = sanitizeFilters(args);
       return new Response(JSON.stringify({ filters }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (input.action === "categorize") {
+      const { title, content } = input;
+      const text = `${title}\n\n${content}`.trim();
+      if (!text) {
+        return new Response(JSON.stringify({ category: "Personal" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const result = await callAI({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [
+          { role: "system", content: `Classify a diary entry into exactly one category from: ${CATEGORIES.join(", ")}. Choose the most appropriate based on the title and content.` },
+          { role: "user", content: text.slice(0, 4000) },
+        ],
+        tools: [{
+          type: "function",
+          function: {
+            name: "categorize",
+            description: "Pick the single best category",
+            parameters: {
+              type: "object",
+              properties: {
+                category: { type: "string", description: `One of: ${CATEGORIES.join(", ")}` },
+              },
+              required: ["category"],
+              additionalProperties: false,
+            },
+          },
+        }],
+        tool_choice: { type: "function", function: { name: "categorize" } },
+      });
+      const tc = result.choices?.[0]?.message?.tool_calls?.[0];
+      let args: any = null;
+      try { args = tc ? JSON.parse(tc.function.arguments) : null; } catch { args = null; }
+      const category = args && typeof args.category === "string" && (CATEGORIES as readonly string[]).includes(args.category)
+        ? args.category
+        : "Personal";
+      return new Response(JSON.stringify({ category }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ error: "Unknown action" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
