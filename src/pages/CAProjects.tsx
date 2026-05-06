@@ -325,6 +325,7 @@ const CAProjects = () => {
     if (error) {
       toast.error('Failed to save annotation');
     }
+  };
 
   const resetForm = () => {
     setFormTitle('');
