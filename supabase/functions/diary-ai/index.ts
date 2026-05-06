@@ -99,15 +99,24 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const body = await req.json();
-    const action = body.action as string;
+    let rawBody: unknown;
+    try {
+      rawBody = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
-    if (action === "reflect") {
-      const content: string = (body.content || "").toString().slice(0, 8000);
-      const title: string = (body.title || "").toString().slice(0, 200);
-      if (!content.trim()) {
-        return new Response(JSON.stringify({ error: "content required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+    const parsed = RequestSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return new Response(
+        JSON.stringify({ error: "Invalid request", details: parsed.error.flatten() }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    const input = parsed.data;
+
+    if (input.action === "reflect") {
+      const { title, content } = input;
 
       const result = await callAI({
         model: "google/gemini-3-flash-preview",
@@ -124,7 +133,7 @@ Deno.serve(async (req) => {
               type: "object",
               properties: {
                 summary: { type: "string", description: "1-2 sentence summary" },
-                mood: { type: "string", enum: ["happy", "calm", "productive", "stressed", "tired", "neutral"] },
+                mood: { type: "string", description: `One of: ${MOODS.join(", ")}` },
                 mood_emoji: { type: "string", description: "Single emoji matching mood" },
                 action_items: { type: "array", items: { type: "string" }, description: "Up to 5 actionable items" },
                 tags: { type: "array", items: { type: "string" }, description: "Up to 6 short topic tags" },
@@ -140,16 +149,14 @@ Deno.serve(async (req) => {
       });
 
       const tc = result.choices?.[0]?.message?.tool_calls?.[0];
-      const args = tc ? JSON.parse(tc.function.arguments) : null;
-      return new Response(JSON.stringify({ reflection: args }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      let args: any = null;
+      try { args = tc ? JSON.parse(tc.function.arguments) : null; } catch { args = null; }
+      const reflection = sanitizeReflection(args);
+      return new Response(JSON.stringify({ reflection }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    if (action === "transcribe") {
-      const audio_base64: string = body.audio_base64;
-      const mime: string = body.mime || "audio/webm";
-      if (!audio_base64) {
-        return new Response(JSON.stringify({ error: "audio_base64 required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+    if (input.action === "transcribe") {
+      const { audio_base64, mime } = input;
       const result = await callAI({
         model: "google/gemini-2.5-flash",
         messages: [
@@ -163,19 +170,16 @@ Deno.serve(async (req) => {
           },
         ],
       });
-      const text = result.choices?.[0]?.message?.content || "";
+      const text = (result.choices?.[0]?.message?.content || "").toString().slice(0, 20000);
       return new Response(JSON.stringify({ transcript: text }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    if (action === "search") {
-      const query: string = (body.query || "").toString().slice(0, 500);
-      if (!query.trim()) {
-        return new Response(JSON.stringify({ error: "query required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+    if (input.action === "search") {
+      const { query } = input;
       const result = await callAI({
         model: "google/gemini-3-flash-preview",
         messages: [
-          { role: "system", content: "Convert a natural-language diary search into structured filters." },
+          { role: "system", content: "Convert a natural-language diary search into structured filters. Use empty string when a field is not specified." },
           { role: "user", content: query },
         ],
         tools: [{
@@ -186,8 +190,8 @@ Deno.serve(async (req) => {
             parameters: {
               type: "object",
               properties: {
-                mood: { type: "string", description: "One of: happy, calm, productive, stressed, tired, neutral. Empty string if unspecified." },
-                category: { type: "string", description: "One of: Personal, Teaching, Meetings, Ideas, Tasks, Research. Empty string if unspecified." },
+                mood: { type: "string", description: `One of: ${MOODS.join(", ")}. Empty string if unspecified.` },
+                category: { type: "string", description: `One of: ${CATEGORIES.join(", ")}. Empty string if unspecified.` },
                 keywords: { type: "array", items: { type: "string" } },
                 date_from: { type: "string", description: "YYYY-MM-DD or empty" },
                 date_to: { type: "string", description: "YYYY-MM-DD or empty" },
@@ -200,8 +204,10 @@ Deno.serve(async (req) => {
         tool_choice: { type: "function", function: { name: "to_filters" } },
       });
       const tc = result.choices?.[0]?.message?.tool_calls?.[0];
-      const args = tc ? JSON.parse(tc.function.arguments) : null;
-      return new Response(JSON.stringify({ filters: args }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      let args: any = null;
+      try { args = tc ? JSON.parse(tc.function.arguments) : null; } catch { args = null; }
+      const filters = sanitizeFilters(args);
+      return new Response(JSON.stringify({ filters }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ error: "Unknown action" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
