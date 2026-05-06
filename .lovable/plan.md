@@ -1,21 +1,22 @@
-## Issue
+## Goal
+Replace the always-open inline mini-calendar in `DiarySidebar` with a clean trigger button (matching the uploaded screenshot) that opens the full calendar in a popover below.
 
-In the diary sidebar's mini calendar, the prev/next chevron arrows appear vertically misaligned with the "May 2026" caption label. This is caused by `src/components/ui/calendar.tsx`:
+## Root Cause of Current Misalignment
+The shadcn `Calendar` caption uses absolutely-positioned prev/next buttons. Inside the narrow sidebar (`~260px`), they collide with the centered month label and the day-grid padding, so the arrows appear pushed off / overlapping. Rendering the calendar in a wider popover (auto width) fixes alignment automatically.
 
-- `caption` uses `pt-1`, shifting the centered label down
-- `nav_button_previous` / `nav_button_next` are positioned `absolute left-1` / `right-1` with no vertical anchor, so they sit at the top of the caption row instead of being centered against the label
+## Changes
 
-## Fix
+### `src/components/diary/DiarySidebar.tsx`
+1. Import `Popover`, `PopoverTrigger`, `PopoverContent` from `@/components/ui/popover` and `CalendarIcon` from `lucide-react`.
+2. Replace the current "Mini calendar" block (lines 90–120) with a Popover:
+   - **Trigger**: a full-width button styled like the screenshot — left side shows current month label (e.g. `May 2026`, derived from `selectedDate ?? new Date()` via `format(d, 'MMMM yyyy')` from `date-fns`), right side shows a `CalendarIcon`. Uses the existing `glass-diary` / rounded-xl border styling so it blends with sibling cards.
+   - **PopoverContent**: `align="start"`, `className="w-auto p-0 pointer-events-auto"`, contains the existing `<Calendar>` with the same `DayContent` custom renderer (mood dots preserved).
+3. Keep `mode="single"`, `selected`, `onSelect` wiring unchanged so date filtering behavior is identical.
 
-Edit `src/components/ui/calendar.tsx` only — a tiny, surgical change. No other files affected.
+### No other files need changes
+- The earlier `calendar.tsx` arrow-alignment fix stays in place and will render correctly inside the wider popover.
+- No data/logic changes.
 
-1. Vertically center the nav buttons inside the caption row by anchoring them to the middle:
-   - `nav_button_previous`: `"absolute left-1 top-1/2 -translate-y-1/2"`
-   - `nav_button_next`: `"absolute right-1 top-1/2 -translate-y-1/2"`
-2. Optionally remove `pt-1` from `caption` (replace with `py-1`) so the label and arrows share the same baseline.
-
-This keeps the shadcn calendar API intact and fixes alignment everywhere the calendar is used (diary sidebar, date pickers, etc.) without visual regressions.
-
-## Files
-
-- `src/components/ui/calendar.tsx` — adjust `caption`, `nav_button_previous`, `nav_button_next` class strings.
+## Visual Result
+- Sidebar gets a compact, premium "May 2026 [icon]" pill instead of a 280px calendar grid.
+- Tapping it drops a full calendar popover below with properly aligned prev/next arrows and the existing mood-color dots.

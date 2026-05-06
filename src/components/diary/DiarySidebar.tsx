@@ -4,9 +4,11 @@ import { Calendar } from '@/components/ui/calendar';
 import { CATEGORY_META, DIARY_CATEGORIES, DiaryCategory, computeStreak, moodColor, moodEmoji } from '@/lib/diary-meta';
 import { useAuth } from '@/hooks/useAuth';
 import { DiaryNote } from '@/hooks/useDiary';
-import { Flame, Plus, Sparkles, BarChart3, Search } from 'lucide-react';
+import { Flame, Plus, Sparkles, BarChart3, Search, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMemo } from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
 
 interface Props {
   notes: DiaryNote[];
