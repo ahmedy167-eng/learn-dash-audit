@@ -763,6 +763,27 @@ Deno.serve(async (req) => {
           break
         }
 
+        case 'ca_revisions': {
+          // Get all submission ids for this student, then revisions
+          const { data: subs } = await supabaseAdmin
+            .from('ca_submissions')
+            .select('id')
+            .eq('student_id', studentId)
+          const ids = (subs || []).map(s => s.id)
+          if (ids.length === 0) {
+            data = []
+          } else {
+            const result = await supabaseAdmin
+              .from('ca_submission_revisions')
+              .select('id, submission_id, round_number, content_snapshot, feedback_html_snapshot, created_at')
+              .in('submission_id', ids)
+              .order('round_number', { ascending: true })
+            data = result.data
+            error = result.error
+          }
+          break
+        }
+
         case 'sections': {
           // Get student's section info
           const { data: student } = await supabaseAdmin
