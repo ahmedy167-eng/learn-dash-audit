@@ -6,6 +6,7 @@ import { History } from 'lucide-react';
 
 export interface Revision {
   id: string;
+  submission_id: string;
   round_number: number;
   content_snapshot: string | null;
   feedback_html_snapshot: string | null;
