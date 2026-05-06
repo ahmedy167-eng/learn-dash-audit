@@ -865,10 +865,13 @@ const CAProjects = () => {
                                 </CardHeader>
                                 <CardContent className="space-y-3">
                                   {submission.content && (
-                                    <div className="bg-muted/50 p-3 rounded text-sm">
-                                      <div 
-                                        className="prose prose-sm max-w-none"
-                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(submission.content) }}
+                                    <div className="space-y-1">
+                                      <p className="text-xs font-medium text-muted-foreground">
+                                        Student writing — select text to tag with Sp, WW, Gr…
+                                      </p>
+                                      <AnnotatableText
+                                        html={submission.feedback_html || submission.content}
+                                        onChange={(html) => saveFeedbackHtml(submission.id, html)}
                                       />
                                     </div>
                                   )}
