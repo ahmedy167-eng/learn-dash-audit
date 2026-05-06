@@ -126,7 +126,7 @@ export default function Diary() {
             onSearch={() => setSearchOpen(true)}
           />
 
-          <div className="min-w-0">
+          <div className="min-w-0 fade-in-up stagger-d-1">
             <Tabs value={tab} onValueChange={setTab}>
               <TabsList className="glass-diary">
                 <TabsTrigger value="timeline">Timeline</TabsTrigger>
