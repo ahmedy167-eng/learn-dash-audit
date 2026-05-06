@@ -1,4 +1,59 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { z } from "https://esm.sh/zod@3.23.8";
+
+const MOODS = ["happy", "calm", "productive", "stressed", "tired", "neutral"] as const;
+const CATEGORIES = ["Personal", "Teaching", "Meetings", "Ideas", "Tasks", "Research"] as const;
+
+const ReflectSchema = z.object({
+  action: z.literal("reflect"),
+  title: z.string().trim().max(200).optional().default(""),
+  content: z.string().trim().min(1, "content required").max(8000),
+});
+
+const TranscribeSchema = z.object({
+  action: z.literal("transcribe"),
+  audio_base64: z.string().min(1, "audio_base64 required").max(15_000_000),
+  mime: z.string().trim().max(100).optional().default("audio/webm"),
+});
+
+const SearchSchema = z.object({
+  action: z.literal("search"),
+  query: z.string().trim().min(1, "query required").max(500),
+});
+
+const RequestSchema = z.discriminatedUnion("action", [ReflectSchema, TranscribeSchema, SearchSchema]);
+
+// Output sanitizer: enforce mood/category enum membership; coerce invalid → empty
+function sanitizeFilters(f: any) {
+  if (!f || typeof f !== "object") return null;
+  const mood = typeof f.mood === "string" && (MOODS as readonly string[]).includes(f.mood) ? f.mood : "";
+  const category = typeof f.category === "string" && (CATEGORIES as readonly string[]).includes(f.category) ? f.category : "";
+  const keywords = Array.isArray(f.keywords)
+    ? f.keywords.filter((k: unknown) => typeof k === "string" && k.trim().length > 0).slice(0, 10).map((k: string) => k.trim().slice(0, 80))
+    : [];
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+  const date_from = typeof f.date_from === "string" && dateRe.test(f.date_from) ? f.date_from : "";
+  const date_to = typeof f.date_to === "string" && dateRe.test(f.date_to) ? f.date_to : "";
+  return { mood, category, keywords, date_from, date_to };
+}
+
+function sanitizeReflection(r: any) {
+  if (!r || typeof r !== "object") return null;
+  const mood = typeof r.mood === "string" && (MOODS as readonly string[]).includes(r.mood) ? r.mood : "neutral";
+  return {
+    summary: typeof r.summary === "string" ? r.summary.slice(0, 500) : "",
+    mood,
+    mood_emoji: typeof r.mood_emoji === "string" ? r.mood_emoji.slice(0, 8) : "✨",
+    action_items: Array.isArray(r.action_items)
+      ? r.action_items.filter((x: unknown) => typeof x === "string").slice(0, 5).map((x: string) => x.slice(0, 200))
+      : [],
+    tags: Array.isArray(r.tags)
+      ? r.tags.filter((x: unknown) => typeof x === "string").slice(0, 6).map((x: string) => x.slice(0, 40))
+      : [],
+    productivity_score: typeof r.productivity_score === "number" ? Math.max(0, Math.min(100, r.productivity_score)) : 0,
+    insight: typeof r.insight === "string" ? r.insight.slice(0, 300) : "",
+  };
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
