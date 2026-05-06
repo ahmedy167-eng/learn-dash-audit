@@ -314,6 +314,18 @@ const CAProjects = () => {
     }
   };
 
+  const saveFeedbackHtml = async (submissionId: string, html: string) => {
+    const sanitized = sanitizeHtml(html);
+    // Optimistic update
+    setSubmissions(prev => prev.map(s => s.id === submissionId ? { ...s, feedback_html: sanitized } : s));
+    const { error } = await supabase
+      .from('ca_submissions')
+      .update({ feedback_html: sanitized })
+      .eq('id', submissionId);
+    if (error) {
+      toast.error('Failed to save annotation');
+    }
+
   const resetForm = () => {
     setFormTitle('');
     setFormDescription('');
