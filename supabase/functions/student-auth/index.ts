@@ -975,10 +975,10 @@ Deno.serve(async (req) => {
             return validationError(contentValidation.error!)
           }
 
-          // Verify the submission belongs to this student
+          // Verify the submission belongs to this student and load current feedback
           const { data: existing } = await supabaseAdmin
             .from('ca_submissions')
-            .select('id')
+            .select('id, content, feedback_html')
             .eq('id', submissionId)
             .eq('student_id', studentId)
             .single()
@@ -990,9 +990,32 @@ Deno.serve(async (req) => {
             )
           }
 
+          // If there are existing teacher annotations, snapshot them as a revision
+          // before the student's resubmission clears them.
+          if (existing.feedback_html && existing.feedback_html.length > 0) {
+            const { data: lastRev } = await supabaseAdmin
+              .from('ca_submission_revisions')
+              .select('round_number')
+              .eq('submission_id', submissionId)
+              .order('round_number', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            const nextRound = (lastRev?.round_number ?? 0) + 1
+            await supabaseAdmin.from('ca_submission_revisions').insert([{
+              submission_id: submissionId,
+              round_number: nextRound,
+              content_snapshot: existing.content,
+              feedback_html_snapshot: existing.feedback_html,
+            }])
+          }
+
           const updateResult = await supabaseAdmin
             .from('ca_submissions')
-            .update({ content, updated_at: new Date().toISOString() })
+            .update({
+              content,
+              feedback_html: null,
+              updated_at: new Date().toISOString(),
+            })
             .eq('id', submissionId)
             .select()
             .single()
