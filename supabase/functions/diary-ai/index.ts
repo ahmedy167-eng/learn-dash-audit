@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
       const { title, content } = input;
 
       const result = await callAI({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: "You are a thoughtful journaling assistant. Analyze the diary entry and return structured reflection." },
           { role: "user", content: `Title: ${title}\n\nEntry:\n${content}` },
@@ -196,7 +196,7 @@ Deno.serve(async (req) => {
     if (input.action === "search") {
       const { query } = input;
       const result = await callAI({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: "Convert a natural-language diary search into structured filters. Use empty string when a field is not specified." },
           { role: "user", content: query },
