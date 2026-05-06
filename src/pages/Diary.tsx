@@ -103,12 +103,14 @@ export default function Diary() {
   return (
     <DashboardLayout>
       <AmbientBackground />
-      <div className="relative p-4 md:p-6">
+      <div className="relative diary-bg-wash p-4 md:p-6">
         {/* Header */}
-        <div className="mb-6 flex items-end justify-between gap-4 flex-wrap">
+        <div className="mb-8 flex items-end justify-between gap-4 flex-wrap fade-in-up">
           <div>
             <h1 className="font-serif-diary text-4xl md:text-5xl tracking-tight">Diary</h1>
-            <p className="text-muted-foreground mt-1">A quieter place to think — with a little help from AI.</p>
+            <p className="font-serif-diary italic text-muted-foreground mt-2 text-sm md:text-base">
+              A quieter place to think — with a little help from AI.
+            </p>
           </div>
         </div>
 
