@@ -1,0 +1,2 @@
+ALTER TABLE public.student_content_updates DROP CONSTRAINT student_content_updates_update_type_check;
+ALTER TABLE public.student_content_updates ADD CONSTRAINT student_content_updates_update_type_check CHECK (update_type = ANY (ARRAY['quiz'::text, 'lms'::text, 'ca_project'::text, 'ca_feedback'::text]));
