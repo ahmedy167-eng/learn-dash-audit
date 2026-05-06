@@ -19,7 +19,8 @@ import {
   HelpCircle,
   GraduationCap,
   Shield,
-  MessageCircle
+  MessageCircle,
+  NotebookPen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
   { title: 'Quizzes', url: '/quizzes', icon: ClipboardList },
   { title: 'LMS Management', url: '/lms-management', icon: BookOpen },
   { title: 'CA Projects', url: '/ca-projects', icon: FolderOpen },
+  { title: 'Diary', url: '/diary', icon: NotebookPen },
 ];
 
 export function Sidebar() {

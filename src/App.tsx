@@ -32,6 +32,7 @@ const StudentQuizzes = lazy(() => import("./pages/student/StudentQuizzes"));
 const StudentLMS = lazy(() => import("./pages/student/StudentLMS"));
 const StudentCAProjects = lazy(() => import("./pages/student/StudentCAProjects"));
 const StaffChat = lazy(() => import("./pages/StaffChat"));
+const Diary = lazy(() => import("./pages/Diary"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -78,6 +79,7 @@ function App() {
                       <Route path="/student-portal/lms" element={<StudentLMS />} />
                       <Route path="/student-portal/ca-projects" element={<StudentCAProjects />} />
                       <Route path="/staff-chat" element={<StaffChat />} />
+                      <Route path="/diary" element={<Diary />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </Suspense>
