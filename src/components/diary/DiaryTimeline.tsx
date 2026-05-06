@@ -51,10 +51,11 @@ export function DiaryTimeline({ notes, selectedId, onSelect }: { notes: DiaryNot
         {grouped.map(([date, items]) => (
           <motion.div key={date} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
             <div className="flex items-center gap-3">
-              <div className="font-serif-diary text-sm uppercase tracking-wider text-muted-foreground">
+              <div className="font-serif-diary italic text-sm text-muted-foreground/90">
                 {new Date(date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
               </div>
-              <div className="flex-1 h-px bg-gradient-to-r from-border to-transparent" />
+              <div className="flex-1 h-px bg-gradient-to-r from-border via-border/50 to-transparent" />
+              <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">{items.length} {items.length === 1 ? 'entry' : 'entries'}</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {items.map(n => (
