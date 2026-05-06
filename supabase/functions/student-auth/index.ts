@@ -206,7 +206,7 @@ const validators = {
   // Data type for get-data endpoint
   dataType: (val: unknown): ValidationResult => {
     if (typeof val !== 'string') return { valid: false, error: 'Data type must be a string' }
-       const validTypes = ['profile', 'messages', 'notices', 'quizzes', 'quiz_questions', 'quiz_submissions', 'quiz_results', 'lms_progress', 'ca_projects', 'ca_submissions', 'sections', 'content_updates']
+       const validTypes = ['profile', 'messages', 'notices', 'quizzes', 'quiz_questions', 'quiz_submissions', 'quiz_results', 'lms_progress', 'ca_projects', 'ca_submissions', 'ca_revisions', 'sections', 'content_updates']
     if (!validTypes.includes(val)) {
       return { valid: false, error: 'Invalid data type' }
     }
@@ -243,7 +243,7 @@ interface StudentLoginRequest {
 
 interface StudentDataRequest {
   sessionToken: string
-   dataType: 'profile' | 'messages' | 'notices' | 'quizzes' | 'quiz_questions' | 'quiz_submissions' | 'quiz_results' | 'lms_progress' | 'ca_projects' | 'ca_submissions' | 'sections' | 'content_updates'
+   dataType: 'profile' | 'messages' | 'notices' | 'quizzes' | 'quiz_questions' | 'quiz_submissions' | 'quiz_results' | 'lms_progress' | 'ca_projects' | 'ca_submissions' | 'ca_revisions' | 'sections' | 'content_updates'
   filters?: Record<string, unknown>
 }
 
@@ -763,6 +763,27 @@ Deno.serve(async (req) => {
           break
         }
 
+        case 'ca_revisions': {
+          // Get all submission ids for this student, then revisions
+          const { data: subs } = await supabaseAdmin
+            .from('ca_submissions')
+            .select('id')
+            .eq('student_id', studentId)
+          const ids = (subs || []).map(s => s.id)
+          if (ids.length === 0) {
+            data = []
+          } else {
+            const result = await supabaseAdmin
+              .from('ca_submission_revisions')
+              .select('id, submission_id, round_number, content_snapshot, feedback_html_snapshot, created_at')
+              .in('submission_id', ids)
+              .order('round_number', { ascending: true })
+            data = result.data
+            error = result.error
+          }
+          break
+        }
+
         case 'sections': {
           // Get student's section info
           const { data: student } = await supabaseAdmin
@@ -954,10 +975,10 @@ Deno.serve(async (req) => {
             return validationError(contentValidation.error!)
           }
 
-          // Verify the submission belongs to this student
+          // Verify the submission belongs to this student and load current feedback
           const { data: existing } = await supabaseAdmin
             .from('ca_submissions')
-            .select('id')
+            .select('id, content, feedback_html')
             .eq('id', submissionId)
             .eq('student_id', studentId)
             .single()
@@ -969,9 +990,32 @@ Deno.serve(async (req) => {
             )
           }
 
+          // If there are existing teacher annotations, snapshot them as a revision
+          // before the student's resubmission clears them.
+          if (existing.feedback_html && existing.feedback_html.length > 0) {
+            const { data: lastRev } = await supabaseAdmin
+              .from('ca_submission_revisions')
+              .select('round_number')
+              .eq('submission_id', submissionId)
+              .order('round_number', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            const nextRound = (lastRev?.round_number ?? 0) + 1
+            await supabaseAdmin.from('ca_submission_revisions').insert([{
+              submission_id: submissionId,
+              round_number: nextRound,
+              content_snapshot: existing.content,
+              feedback_html_snapshot: existing.feedback_html,
+            }])
+          }
+
           const updateResult = await supabaseAdmin
             .from('ca_submissions')
-            .update({ content, updated_at: new Date().toISOString() })
+            .update({
+              content,
+              feedback_html: null,
+              updated_at: new Date().toISOString(),
+            })
             .eq('id', submissionId)
             .select()
             .single()

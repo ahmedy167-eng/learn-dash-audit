@@ -170,6 +170,41 @@ export type Database = {
           },
         ]
       }
+      ca_submission_revisions: {
+        Row: {
+          content_snapshot: string | null
+          created_at: string
+          feedback_html_snapshot: string | null
+          id: string
+          round_number: number
+          submission_id: string
+        }
+        Insert: {
+          content_snapshot?: string | null
+          created_at?: string
+          feedback_html_snapshot?: string | null
+          id?: string
+          round_number: number
+          submission_id: string
+        }
+        Update: {
+          content_snapshot?: string | null
+          created_at?: string
+          feedback_html_snapshot?: string | null
+          id?: string
+          round_number?: number
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ca_submission_revisions_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "ca_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ca_submissions: {
         Row: {
           content: string | null

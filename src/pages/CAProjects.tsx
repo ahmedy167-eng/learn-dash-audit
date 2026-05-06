@@ -20,6 +20,7 @@ import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { AnnotatableText } from '@/components/ca/AnnotatableText';
+import { RevisionHistory, type Revision } from '@/components/ca/RevisionHistory';
 
 // Helper function to get a signed URL for private bucket files
 const getSignedPdfUrl = async (filePath: string): Promise<string | null> => {
@@ -89,6 +90,7 @@ const CAProjects = () => {
   const [projects, setProjects] = useState<CAProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<CAProject | null>(null);
   const [submissions, setSubmissions] = useState<CASubmission[]>([]);
+  const [revisions, setRevisions] = useState<Revision[]>([]);
   const [sectionStudents, setSectionStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingProjectId, setUploadingProjectId] = useState<string | null>(null);
@@ -156,8 +158,41 @@ const CAProjects = () => {
       toast.error('Failed to load submissions');
     } else {
       setSubmissions(data || []);
+      // Fetch revisions for all these submissions
+      const ids = (data || []).map(s => s.id);
+      if (ids.length > 0) {
+        const { data: revs } = await supabase
+          .from('ca_submission_revisions')
+          .select('id, submission_id, round_number, content_snapshot, feedback_html_snapshot, created_at')
+          .in('submission_id', ids)
+          .order('round_number', { ascending: true });
+        setRevisions(revs || []);
+      } else {
+        setRevisions([]);
+      }
     }
   };
+
+  // Realtime: when a student updates their submission for the open project, refetch
+  useEffect(() => {
+    if (!selectedProject?.id) return;
+    const channel = supabase
+      .channel(`teacher-ca-${selectedProject.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ca_submissions', filter: `project_id=eq.${selectedProject.id}` },
+        (payload) => {
+          const newRow = payload.new as { content?: string | null } | null;
+          const oldRow = payload.old as { content?: string | null } | null;
+          if (newRow?.content && newRow.content !== oldRow?.content) {
+            toast.info('A student resubmitted their work.');
+          }
+          fetchSubmissions(selectedProject.id);
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [selectedProject?.id]);
 
   const fetchSectionStudents = async (sectionId: string) => {
     const { data, error } = await supabase
@@ -875,6 +910,10 @@ const CAProjects = () => {
                                       />
                                     </div>
                                   )}
+                                  {(() => {
+                                    const subRevs = revisions.filter(r => r.submission_id === submission.id);
+                                    return subRevs.length > 0 ? <RevisionHistory revisions={subRevs} /> : null;
+                                  })()}
                                   {submission.feedback && (
                                     <div className="bg-primary/5 p-3 rounded text-sm border border-primary/20">
                                       <p className="font-medium mb-1 text-primary">Your Feedback:</p>
