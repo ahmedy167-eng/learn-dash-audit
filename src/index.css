@@ -163,38 +163,98 @@ All colors MUST be HSL.
 }
 
 @layer utilities {
-  .font-serif-diary { font-family: var(--font-serif); }
+  .font-serif-diary { font-family: var(--font-serif); letter-spacing: -0.01em; }
   .font-display-diary { font-family: var(--font-display); }
   .glass-diary {
-    background: hsl(var(--card) / 0.65);
-    backdrop-filter: blur(20px) saturate(140%);
-    -webkit-backdrop-filter: blur(20px) saturate(140%);
-    border: 1px solid hsl(var(--border) / 0.6);
+    background: linear-gradient(180deg, hsl(var(--card) / 0.78), hsl(var(--card) / 0.55));
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
+    border: 1px solid hsl(var(--border) / 0.55);
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.5),
+      0 1px 2px hsl(0 0% 0% / 0.04),
+      0 8px 30px -12px hsl(220 40% 20% / 0.12);
+  }
+  .dark .glass-diary {
+    background: linear-gradient(180deg, hsl(var(--card) / 0.6), hsl(var(--card) / 0.4));
+    box-shadow:
+      inset 0 1px 0 hsl(0 0% 100% / 0.06),
+      0 8px 30px -12px hsl(0 0% 0% / 0.5);
   }
   .paper-texture {
     background-color: hsl(var(--paper));
-    background-image:
-      linear-gradient(hsl(var(--paper-line) / 0.35) 1px, transparent 1px);
+    background-image: linear-gradient(hsl(var(--paper-line) / 0.35) 1px, transparent 1px);
     background-size: 100% 28px;
   }
   .glow-soft {
-    box-shadow:
-      0 10px 40px -15px hsl(var(--diary-glow) / 0.45),
-      0 0 0 1px hsl(var(--border) / 0.6);
+    box-shadow: 0 10px 40px -15px hsl(var(--diary-glow) / 0.45), 0 0 0 1px hsl(var(--border) / 0.6);
   }
   .notebook-shadow {
     box-shadow:
-      0 30px 60px -30px hsl(0 0% 0% / 0.25),
-      0 18px 36px -18px hsl(0 0% 0% / 0.18);
+      0 1px 2px hsl(0 0% 0% / 0.04),
+      0 12px 28px -16px hsl(220 40% 20% / 0.18),
+      0 30px 60px -30px hsl(0 0% 0% / 0.18);
   }
   .ambient-blob {
     position: absolute;
     border-radius: 9999px;
-    filter: blur(80px);
+    filter: blur(90px);
     opacity: 0.5;
     pointer-events: none;
     animation: float-blob 18s ease-in-out infinite;
   }
+  .btn-premium {
+    position: relative;
+    background: linear-gradient(135deg, hsl(var(--diary-accent)), hsl(var(--diary-glow)));
+    color: white;
+    transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease, filter 0.2s ease;
+    box-shadow:
+      0 1px 0 hsl(0 0% 100% / 0.25) inset,
+      0 8px 20px -8px hsl(var(--diary-accent) / 0.55);
+  }
+  .btn-premium:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+    box-shadow:
+      0 1px 0 hsl(0 0% 100% / 0.3) inset,
+      0 14px 30px -10px hsl(var(--diary-accent) / 0.65),
+      0 0 0 4px hsl(var(--diary-glow) / 0.18);
+  }
+  .btn-premium:active { transform: translateY(0) scale(0.98); }
+  .gradient-ring { position: relative; }
+  .gradient-ring::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, var(--ring-from, hsl(var(--diary-accent))), var(--ring-to, hsl(var(--diary-glow))));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0.55;
+    transition: opacity 0.3s ease;
+  }
+  .gradient-ring:hover::before { opacity: 1; }
+  .diary-bg-wash {
+    background:
+      radial-gradient(1200px 600px at 10% -10%, hsl(var(--diary-glow) / 0.10), transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, hsl(var(--diary-accent) / 0.08), transparent 55%),
+      radial-gradient(800px 600px at 50% 120%, hsl(var(--mood-calm) / 0.08), transparent 60%);
+  }
+  .sidebar-item {
+    position: relative;
+    overflow: hidden;
+    transition: background-color 0.2s ease, transform 0.2s ease, color 0.2s ease;
+  }
+  .sidebar-item:hover { transform: translateX(2px); }
+  .sidebar-item .icon { transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
+  .sidebar-item:hover .icon { transform: scale(1.15) rotate(-6deg); }
+  .fade-in-up { animation: fade-in-up-diary 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .stagger-d-1 { animation-delay: 0.05s; }
+  .stagger-d-2 { animation-delay: 0.15s; }
+  .stagger-d-3 { animation-delay: 0.25s; }
 }
 
 @keyframes float-blob {
@@ -205,5 +265,9 @@ All colors MUST be HSL.
 @keyframes notebook-open {
   0% { opacity: 0; transform: perspective(1200px) rotateY(-12deg) translateY(8px); }
   100% { opacity: 1; transform: perspective(1200px) rotateY(0) translateY(0); }
+}
+@keyframes fade-in-up-diary {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 .animate-notebook-open { animation: notebook-open 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }

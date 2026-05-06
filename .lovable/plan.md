@@ -1,122 +1,85 @@
+# Diary UI/UX Polish
 
-# Premium AI Diary Transformation
+Pure visual refinement of the existing diary at `/diary`. No layout restructure, no new features, no data changes.
 
-Upgrade the existing `/diary` page from a basic CRUD notebook into a luxurious, AI-powered journaling experience. We'll keep the existing `diary_notes` table and exports (PDF/Word/ICS) and build everything else around them.
+## 1. Global tokens & utilities (`src/index.css`)
 
-## Scope (Phase 1 — shippable in one pass)
+Add reusable utilities so polish stays consistent and themable:
 
-To stay under build limits and deliver a polished result, we ship a complete v1 covering the **core experience + AI + mood + analytics + voice + search + reminders**. A few "nice-to-have" items (ambient music, multi-theme selector beyond light/dark, onboarding screens, weather widget) are flagged as Phase 2.
+- `.glass-diary` — upgrade to layered glass: subtle top-highlight inset, soft outer shadow, dual gradient surface (light/dark variants).
+- `.btn-premium` — gradient fill (accent → glow), inset highlight, hover lift + glow ring, active scale-down.
+- `.gradient-ring` — animated gradient border via mask trick, driven by `--ring-from` / `--ring-to` CSS vars (per-category color).
+- `.diary-bg-wash` — very soft multi-radial gradient background for the page.
+- `.sidebar-item` — hover slide + icon scale/rotate.
+- `.notebook-shadow` — refined layered shadow (1px hairline + close + far).
+- `.fade-in-up` keyframe for staggered card entrance.
 
----
+## 2. Page shell (`src/pages/Diary.tsx`)
 
-## 1. Database changes (migration)
+- Wrap content in `diary-bg-wash` for a soft global gradient.
+- Increase header spacing; add subtle muted serif tagline.
+- Add staggered `fade-in-up` to the three columns on mount.
 
-Extend `diary_notes`:
-- `category` text (Personal | Teaching | Meetings | Ideas | Tasks | Research) — default 'Personal'
-- `mood` text (happy | calm | productive | stressed | tired | neutral) — nullable
-- `mood_emoji` text — nullable
-- `ai_summary` text — nullable
-- `ai_action_items` jsonb — nullable
-- `ai_tags` text[] — default '{}'
-- `voice_url` text — nullable (path in storage bucket)
-- `is_pinned` boolean — default false
+## 3. Cards (`src/components/diary/PaperCard.tsx`)
 
-New table `diary_links` for smart memory linking:
-- `id`, `note_id`, `linked_note_id`, `relevance` numeric, `created_at`
-- RLS: user can read links where they own both notes
+- Replace plain border with `gradient-ring` driven by category accent (per-card CSS vars).
+- Stronger title typography (serif, larger, tighter tracking); softer secondary text color.
+- Hover: lift `-y-4` + scale `1.01`, deeper shadow, accent stripe widens slightly.
+- Active: dual-tone gradient ring + glow.
+- Tighter, more generous internal spacing (p-5, mb-3); tag chips with subtle border + bg gradient.
 
-New private storage bucket `diary-voice` (signed URLs only, owner-only access).
+## 4. Sidebar (`src/components/diary/DiarySidebar.tsx`)
 
-## 2. New edge function: `diary-ai`
+- Apply `.sidebar-item` to category buttons (hover slide + icon spring).
+- Active category: gradient pill background (`color → transparent`) plus left accent bar with glow.
+- Streak/Mood tiles: gradient background, inner highlight, tiny pulsing flame icon for streak.
+- "New Entry" button uses `.btn-premium`.
+- Tools row gets soft hover background & icon scale.
+- Section headings: smaller uppercase tracking, more whitespace between groups.
 
-Single function with three actions (POST `{ action, ... }`):
-- `reflect` — given note content, returns `{ summary, mood, mood_emoji, action_items[], tags[], productivity_score }`. Uses Lovable AI (`google/gemini-3-flash-preview`) via tool-calling for structured JSON.
-- `transcribe` — accepts base64 audio, returns transcript (Gemini multimodal).
-- `search` — natural language query → SQL filter hints (mood, category, date range, keywords) returned as JSON; client applies them to a Supabase query.
+## 5. Calendar
 
-Uses `LOVABLE_API_KEY` (already configured). Validates JWT, validates input with Zod-style checks, handles 429/402 with friendly errors.
+- Replace single dot with up-to-3 colored dots per day (one per distinct mood/category that day).
+- Today: ring + soft glow background.
+- Selected day: filled gradient (accent → glow).
+- Day cell hover: scale-105 + tooltip-style title attribute showing entry count.
+- Improve cell typography (font-medium, slightly larger).
 
-## 3. Page architecture
+## 6. Right panel (`src/components/diary/AIAssistantPanel.tsx`)
 
-Replace `src/pages/Diary.tsx` with a 3-column layout:
+- Each card: full glass-diary + subtle category-tinted gradient overlay.
+- AI Reflection: prominent gradient icon badge (already present) + small animated sparkle pulse; section labels in uppercase tracking; action items as styled chips with hover.
+- Add subtle staggered fade-in on mount via framer-motion.
+- Daily quote card: serif italic enlarged, decorative quote glyph in corner with very low opacity.
 
-```text
-┌──────────┬─────────────────────────┬──────────┐
-│ Sidebar  │   Editor / Timeline     │ AI Panel │
-│ (260px)  │   (flex-1)              │ (320px)  │
-└──────────┴─────────────────────────┴──────────┘
-```
+## 7. Typography
 
-Collapses to single column on tablet/mobile via Sheet drawers.
+- Titles: `font-serif-diary text-lg/xl` with `tracking-tight`.
+- Body/preview: `text-sm leading-relaxed text-muted-foreground/85`.
+- Section labels: `text-[10px] uppercase tracking-[0.14em] text-muted-foreground`.
 
-### Left sidebar (`DiarySidebar.tsx`)
-- Avatar + name + streak counter ("🔥 7 day streak" — computed from distinct `note_date`)
-- Today's mood pill
-- Mini month calendar with dots on days with notes (uses existing shadcn `Calendar`)
-- Categories list with counts and active glow
-- Floating "+ New Entry" button (gradient, soft glow)
+## 8. Buttons (global within diary)
 
-### Center (`DiaryEditor.tsx` + `DiaryTimeline.tsx`)
-- Tabs: **Today** (focused editor) / **Timeline** (all notes as paper cards) / **Focus** (distraction-free fullscreen)
-- Editor: Playfair Display title input, paper-textured writing area, autosave indicator, mood selector (emoji row), category chip, reminder bell, voice record button
-- Timeline: vertical timeline with date dividers, paper-card notes showing title/category icon/mood emoji/preview/AI tags
-- Smooth Framer Motion page/card transitions, "notebook page flip" animation on open
+- All primary CTAs use `.btn-premium`.
+- Secondary buttons get `hover:bg-muted/60` + `hover:shadow-sm` and `active:scale-[0.98]`.
 
-### Right AI panel (`AIAssistantPanel.tsx`)
-- **AI Reflection** card — summary + mood + action items for selected note (button: "Reflect with AI" → calls `diary-ai`)
-- **Today's insights** — count, productivity score, dominant mood
-- **On This Day** — notes from same date in prior weeks/months
-- **Linked Memories** — related notes from `diary_links`
-- **Daily quote** (rotating curated list, no API needed)
+## 9. Micro-interactions
 
-## 4. Other new routes/components
+- Card hover: spring lift via existing framer-motion.
+- Button hover: glow ring (CSS).
+- Sidebar item hover: translateX + icon rotate.
+- Calendar hover: scale + dot bounce.
+- Page-load: staggered column fade-in.
 
-- `DiaryAnalytics.tsx` (modal/dialog from sidebar) — mood trend line, productivity heatmap (recharts), category breakdown pie, most productive weekday
-- `DiarySearch.tsx` — command palette (Cmd+K) with natural-language search via `diary-ai` `search` action
-- `VoiceRecorder.tsx` — MediaRecorder → upload to `diary-voice` bucket → call `diary-ai` `transcribe` → append transcript to note content
-- `MoodPicker.tsx`, `CategoryChip.tsx`, `PaperCard.tsx`, `AmbientBackground.tsx` (animated gradient blobs)
+## Files to edit
 
-## 5. Design system additions
+- `src/index.css` — new utilities & keyframes
+- `src/pages/Diary.tsx` — wash + stagger
+- `src/components/diary/PaperCard.tsx` — gradient ring, typography, hover
+- `src/components/diary/DiarySidebar.tsx` — hover effects, gradient tiles, calendar dots
+- `src/components/diary/AIAssistantPanel.tsx` — stacked glass cards, polish
+- `src/components/diary/DiaryTimeline.tsx` — date divider styling, stagger
 
-In `src/index.css`:
-- Add notebook color tokens: `--paper`, `--paper-line`, `--ink`, mood accents (`--mood-happy`, `--mood-calm`, etc.) — all HSL
-- Dark mode: deep charcoal `--background: 220 18% 7%`, soft glow shadows
-- Add `--font-serif: 'Playfair Display'`, `--font-display: 'Plus Jakarta Sans'`, body Inter
-- Load fonts via Google Fonts link in `index.html`
-- Utilities: `.glass` (backdrop-blur + translucent bg), `.paper-texture` (SVG noise data-URI), `.glow-soft`, `.notebook-shadow`
-- Framer Motion animations: page fade-slide, card hover-lift, sticky-note tilt
+## Out of scope
 
-## 6. Reminders
-
-Keep existing `.ics` download. Add in-app floating reminder toast (uses existing sonner) when a note's `reminder_at` is within next 10 min — checked via interval on dashboard mount.
-
-## 7. Sidebar nav
-
-Update icon for "Diary" entry to convey premium feel (keep `NotebookPen`); no other nav changes.
-
----
-
-## Technical notes
-
-- Add deps: `framer-motion`, `recharts` (already present? will check; if so, reuse)
-- All AI calls go through the edge function — never client-side
-- Voice notes use `MediaRecorder` API → `audio/webm` → base64 to edge function for transcription (no separate STT key needed; Gemini handles audio)
-- Search: client builds Supabase query from AI-returned filters (safer than free-form SQL)
-- All new tables/buckets get strict RLS (`auth.uid() = user_id`)
-- Existing PDF/Word/ICS export keeps working — extended to include mood + AI summary
-
----
-
-## Phase 2 (not in this pass)
-
-Onboarding tour, weather widget, ambient music toggle, multi-theme selector beyond light/dark, Google Calendar 2-way sync, shareable public journal pages.
-
----
-
-## Files
-
-**New:** `supabase/functions/diary-ai/index.ts`, `src/pages/Diary.tsx` (rewrite), `src/components/diary/DiarySidebar.tsx`, `DiaryEditor.tsx`, `DiaryTimeline.tsx`, `AIAssistantPanel.tsx`, `DiaryAnalytics.tsx`, `DiarySearch.tsx`, `VoiceRecorder.tsx`, `MoodPicker.tsx`, `PaperCard.tsx`, `AmbientBackground.tsx`, `src/hooks/useDiary.tsx`, `src/lib/diary-streak.ts`
-
-**Edited:** `src/index.css`, `index.html` (fonts), `src/lib/diary-export.ts` (include mood/AI), one migration SQL file
-
-**Deps added:** `framer-motion` (and `recharts` if not present)
+No changes to data hooks, edge functions, routes, or feature behavior.
