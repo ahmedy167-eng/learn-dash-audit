@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { AnnotatedView } from '@/components/ca/AnnotatedView';
+import { RevisionHistory, type Revision } from '@/components/ca/RevisionHistory';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CAProject {
   id: string;
