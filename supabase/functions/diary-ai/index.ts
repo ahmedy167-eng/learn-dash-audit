@@ -131,8 +131,8 @@ Deno.serve(async (req) => {
             parameters: {
               type: "object",
               properties: {
-                mood: { type: "string", enum: ["happy", "calm", "productive", "stressed", "tired", "neutral", ""] },
-                category: { type: "string", enum: ["Personal", "Teaching", "Meetings", "Ideas", "Tasks", "Research", ""] },
+                mood: { type: "string", description: "One of: happy, calm, productive, stressed, tired, neutral. Empty string if unspecified." },
+                category: { type: "string", description: "One of: Personal, Teaching, Meetings, Ideas, Tasks, Research. Empty string if unspecified." },
                 keywords: { type: "array", items: { type: "string" } },
                 date_from: { type: "string", description: "YYYY-MM-DD or empty" },
                 date_to: { type: "string", description: "YYYY-MM-DD or empty" },
