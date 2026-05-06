@@ -70,15 +70,28 @@ const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-async function callAI(body: unknown) {
-  const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+async function callAI(body: unknown, timeoutMs = 120_000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  let r: Response;
+  try {
+    r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+  } catch (err) {
+    clearTimeout(t);
+    if ((err as any)?.name === "AbortError") {
+      throw new Response(JSON.stringify({ error: "AI request timed out. Please try again." }), { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    throw err;
+  }
+  clearTimeout(t);
   if (r.status === 429) throw new Response(JSON.stringify({ error: "Rate limit reached. Please try again shortly." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   if (r.status === 402) throw new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings → Workspace → Usage." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   if (!r.ok) {
