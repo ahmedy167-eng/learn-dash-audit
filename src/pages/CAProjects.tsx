@@ -910,6 +910,10 @@ const CAProjects = () => {
                                       />
                                     </div>
                                   )}
+                                  {(() => {
+                                    const subRevs = revisions.filter(r => r.submission_id === submission.id);
+                                    return subRevs.length > 0 ? <RevisionHistory revisions={subRevs} /> : null;
+                                  })()}
                                   {submission.feedback && (
                                     <div className="bg-primary/5 p-3 rounded text-sm border border-primary/20">
                                       <p className="font-medium mb-1 text-primary">Your Feedback:</p>
