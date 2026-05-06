@@ -21,7 +21,13 @@ const SearchSchema = z.object({
   query: z.string().trim().min(1, "query required").max(500),
 });
 
-const RequestSchema = z.discriminatedUnion("action", [ReflectSchema, TranscribeSchema, SearchSchema]);
+const CategorizeSchema = z.object({
+  action: z.literal("categorize"),
+  title: z.string().trim().max(200).optional().default(""),
+  content: z.string().trim().max(8000).optional().default(""),
+});
+
+const RequestSchema = z.discriminatedUnion("action", [ReflectSchema, TranscribeSchema, SearchSchema, CategorizeSchema]);
 
 // Output sanitizer: enforce mood/category enum membership; coerce invalid → empty
 function sanitizeFilters(f: any) {
