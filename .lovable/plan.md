@@ -1,22 +1,21 @@
 ## Goal
-Replace the always-open inline mini-calendar in `DiarySidebar` with a clean trigger button (matching the uploaded screenshot) that opens the full calendar in a popover below.
+Remove the manual **Time** picker from the diary entry editor and replace it with an automatic, read-only timestamp.
 
-## Root Cause of Current Misalignment
-The shadcn `Calendar` caption uses absolutely-positioned prev/next buttons. Inside the narrow sidebar (`~260px`), they collide with the centered month label and the day-grid padding, so the arrows appear pushed off / overlapping. Rendering the calendar in a wider popover (auto width) fixes alignment automatically.
+## Where
+`src/components/diary/DiaryEditor.tsx` — the meta row currently has two inputs: a `Date` picker and a `Time` picker (`note.note_time`).
 
 ## Changes
+1. Delete the `Time` `<Input type="time">` block from the meta row.
+2. In its place, render a small read-only timestamp chip showing when the entry was created/last updated, e.g.:
+   - `Clock` icon + `format(new Date(note.created_at), 'h:mm a')`
+   - Subtle muted styling (`text-xs text-muted-foreground`), no input affordance.
+3. Keep the `Date` picker as-is (users still pick which day the entry belongs to).
+4. Stop writing `note_time` from the editor. The field stays in the DB schema untouched (no data/logic changes), it just isn't user-editable anymore.
+5. Remove `note_time` from the autosave dependency array since it's no longer edited here.
 
-### `src/components/diary/DiarySidebar.tsx`
-1. Import `Popover`, `PopoverTrigger`, `PopoverContent` from `@/components/ui/popover` and `CalendarIcon` from `lucide-react`.
-2. Replace the current "Mini calendar" block (lines 90–120) with a Popover:
-   - **Trigger**: a full-width button styled like the screenshot — left side shows current month label (e.g. `May 2026`, derived from `selectedDate ?? new Date()` via `format(d, 'MMMM yyyy')` from `date-fns`), right side shows a `CalendarIcon`. Uses the existing `glass-diary` / rounded-xl border styling so it blends with sibling cards.
-   - **PopoverContent**: `align="start"`, `className="w-auto p-0 pointer-events-auto"`, contains the existing `<Calendar>` with the same `DayContent` custom renderer (mood dots preserved).
-3. Keep `mode="single"`, `selected`, `onSelect` wiring unchanged so date filtering behavior is identical.
+## Out of scope
+- No DB migrations, no changes to `useDiary`, no changes to export logic.
+- Sidebar, timeline, and PaperCard untouched.
 
-### No other files need changes
-- The earlier `calendar.tsx` arrow-alignment fix stays in place and will render correctly inside the wider popover.
-- No data/logic changes.
-
-## Visual Result
-- Sidebar gets a compact, premium "May 2026 [icon]" pill instead of a 280px calendar grid.
-- Tapping it drops a full calendar popover below with properly aligned prev/next arrows and the existing mood-color dots.
+## File to edit
+- `src/components/diary/DiaryEditor.tsx`
