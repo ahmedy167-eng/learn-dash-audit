@@ -164,7 +164,12 @@ export function AnnotatableText({ html, onChange, readOnly = false }: Annotatabl
         <div
           className="absolute z-50 bg-popover border border-border shadow-lg rounded-lg p-3 w-80"
           style={{ top: toolbar.top, left: Math.min(toolbar.left, (containerRef.current?.clientWidth ?? 400) - 320) }}
-          onMouseDown={(e) => e.preventDefault()}
+          onMouseDown={(e) => {
+            const t = e.target as HTMLElement;
+            if (!t.closest('input, textarea, button, [contenteditable="true"]')) {
+              e.preventDefault();
+            }
+          }}
         >
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-muted-foreground">
