@@ -70,15 +70,28 @@ const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-async function callAI(body: unknown) {
-  const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+async function callAI(body: unknown, timeoutMs = 120_000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  let r: Response;
+  try {
+    r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    });
+  } catch (err) {
+    clearTimeout(t);
+    if ((err as any)?.name === "AbortError") {
+      throw new Response(JSON.stringify({ error: "AI request timed out. Please try again." }), { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    throw err;
+  }
+  clearTimeout(t);
   if (r.status === 429) throw new Response(JSON.stringify({ error: "Rate limit reached. Please try again shortly." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   if (r.status === 402) throw new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings → Workspace → Usage." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   if (!r.ok) {
@@ -125,7 +138,7 @@ Deno.serve(async (req) => {
       const { title, content } = input;
 
       const result = await callAI({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: "You are a thoughtful journaling assistant. Analyze the diary entry and return structured reflection." },
           { role: "user", content: `Title: ${title}\n\nEntry:\n${content}` },
@@ -183,7 +196,7 @@ Deno.serve(async (req) => {
     if (input.action === "search") {
       const { query } = input;
       const result = await callAI({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: "Convert a natural-language diary search into structured filters. Use empty string when a field is not specified." },
           { role: "user", content: query },
