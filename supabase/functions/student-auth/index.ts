@@ -755,7 +755,7 @@ Deno.serve(async (req) => {
           } else {
             const result = await supabaseAdmin
               .from('ca_submissions')
-              .select('id, project_id, stage, content, feedback, submitted_at')
+              .select('id, project_id, stage, content, feedback, feedback_html, submitted_at')
               .eq('student_id', studentId)
             data = result.data
             error = result.error
