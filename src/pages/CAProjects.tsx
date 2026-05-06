@@ -90,6 +90,7 @@ const CAProjects = () => {
   const [projects, setProjects] = useState<CAProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<CAProject | null>(null);
   const [submissions, setSubmissions] = useState<CASubmission[]>([]);
+  const [revisions, setRevisions] = useState<Revision[]>([]);
   const [sectionStudents, setSectionStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadingProjectId, setUploadingProjectId] = useState<string | null>(null);
