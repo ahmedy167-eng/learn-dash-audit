@@ -158,8 +158,41 @@ const CAProjects = () => {
       toast.error('Failed to load submissions');
     } else {
       setSubmissions(data || []);
+      // Fetch revisions for all these submissions
+      const ids = (data || []).map(s => s.id);
+      if (ids.length > 0) {
+        const { data: revs } = await supabase
+          .from('ca_submission_revisions')
+          .select('id, submission_id, round_number, content_snapshot, feedback_html_snapshot, created_at')
+          .in('submission_id', ids)
+          .order('round_number', { ascending: true });
+        setRevisions(revs || []);
+      } else {
+        setRevisions([]);
+      }
     }
   };
+
+  // Realtime: when a student updates their submission for the open project, refetch
+  useEffect(() => {
+    if (!selectedProject?.id) return;
+    const channel = supabase
+      .channel(`teacher-ca-${selectedProject.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ca_submissions', filter: `project_id=eq.${selectedProject.id}` },
+        (payload) => {
+          const newRow = payload.new as { content?: string | null } | null;
+          const oldRow = payload.old as { content?: string | null } | null;
+          if (newRow?.content && newRow.content !== oldRow?.content) {
+            toast.info('A student resubmitted their work.');
+          }
+          fetchSubmissions(selectedProject.id);
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [selectedProject?.id]);
 
   const fetchSectionStudents = async (sectionId: string) => {
     const { data, error } = await supabase
