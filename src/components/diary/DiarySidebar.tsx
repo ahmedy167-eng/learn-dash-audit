@@ -19,9 +19,11 @@ interface Props {
   onNew: () => void;
   onAnalytics: () => void;
   onSearch: () => void;
+  onAutoCategorize?: () => void;
+  categorizing?: boolean;
 }
 
-export function DiarySidebar({ notes, category, onCategory, selectedDate, onDate, onNew, onAnalytics, onSearch }: Props) {
+export function DiarySidebar({ notes, category, onCategory, selectedDate, onDate, onNew, onAnalytics, onSearch, onAutoCategorize, categorizing }: Props) {
   const { user } = useAuth();
   const initials = (user?.email || 'U').slice(0, 2).toUpperCase();
   const streak = useMemo(() => computeStreak([...new Set(notes.map(n => n.note_date))]), [notes]);
