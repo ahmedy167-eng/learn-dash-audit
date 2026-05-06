@@ -67,15 +67,26 @@ const StudentCAProjects = () => {
   }, [student]);
 
   // Poll for updates every 30 seconds since we can't use realtime without auth
+  // Realtime subscription: when teacher annotates or anything changes on this student's submissions, refetch
   useEffect(() => {
-    if (!student?.section_id) return;
-
-    const interval = setInterval(() => {
-      fetchProjects();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [student?.section_id]);
+    if (!student?.id) return;
+    const channel = supabase
+      .channel('student-ca-submissions')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ca_submissions', filter: `student_id=eq.${student.id}` },
+        (payload) => {
+          const newRow = payload.new as { feedback_html?: string | null } | null;
+          const oldRow = payload.old as { feedback_html?: string | null } | null;
+          if (newRow?.feedback_html && newRow.feedback_html !== oldRow?.feedback_html) {
+            toast.success('Your teacher left new feedback. Review the highlighted text.');
+          }
+          fetchProjects();
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [student?.id]);
 
   const fetchProjects = async () => {
     if (!student?.section_id) {
@@ -89,7 +100,7 @@ const StudentCAProjects = () => {
       toast.error('Failed to load CA projects');
     } else {
       setProjects(data || []);
-      
+
       // Fetch submissions for all projects
       if (data && data.length > 0 && student) {
         const { data: submissionsData } = await getData<CASubmission[]>('ca_submissions');
@@ -102,6 +113,10 @@ const StudentCAProjects = () => {
           submissionsMap[sub.project_id].push(sub);
         });
         setSubmissions(submissionsMap);
+
+        // Fetch revisions for all submissions
+        const { data: revsData } = await getData<Revision[]>('ca_revisions');
+        setRevisions(revsData || []);
       }
     }
     setLoading(false);
