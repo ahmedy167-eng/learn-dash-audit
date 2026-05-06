@@ -350,6 +350,11 @@ const StudentCAProjects = () => {
                             </div>
                           )}
 
+                          {submission && (() => {
+                            const subRevs = revisions.filter(r => r.submission_id === submission.id);
+                            return subRevs.length > 0 ? <RevisionHistory revisions={subRevs} /> : null;
+                          })()}
+
                           {submission?.feedback && (
                             <div className="bg-muted/50 p-4 rounded-lg">
                               <div className="flex items-center gap-2 mb-2">
