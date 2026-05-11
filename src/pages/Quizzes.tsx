@@ -1077,6 +1077,24 @@ const Quizzes = () => {
                           </SelectContent>
                         </Select>
                       </div>
+                       {selectedQuiz?.quiz_type === 'listening' && (
+                        <div className="space-y-2">
+                          <Label>Skill / Tag *</Label>
+                          <Select value={skill || 'detail'} onValueChange={setSkill}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select skill" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="main_idea">Main Idea</SelectItem>
+                              <SelectItem value="detail">Detail</SelectItem>
+                              <SelectItem value="inference">Inference</SelectItem>
+                              <SelectItem value="vocabulary">Vocabulary</SelectItem>
+                              <SelectItem value="purpose">Purpose / Tone</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground">Used to group results into improvement areas</p>
+                        </div>
+                       )}
                        <div className="space-y-2">
                          <Label>Explanation (Optional)</Label>
                          <Textarea 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
 import { useStudentApi } from '@/hooks/useStudentApi';
 import { StudentLayout } from '@/components/student/StudentLayout';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
- import { ClipboardList, CheckCircle, XCircle, ArrowLeft, Loader2, Trophy, Lightbulb, FileText } from 'lucide-react';
+ import { ClipboardList, CheckCircle, XCircle, ArrowLeft, Loader2, Trophy, Lightbulb, FileText, Headphones, Play, Lock, Target } from 'lucide-react';
  import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 
@@ -18,6 +18,7 @@ interface Quiz {
   is_active: boolean;
   quiz_type?: string;
   reading_passage?: string | null;
+  max_plays?: number | null;
 }
 
 interface QuizQuestion {
@@ -30,6 +31,7 @@ interface QuizQuestion {
   option_c: string;
   option_d: string;
   correct_answer?: string;
+  skill?: string | null;
 }
 
 interface QuizSubmission {
@@ -51,6 +53,7 @@ interface QuizSubmission {
    correct_answer: string;
    is_correct: boolean;
    explanation: string | null;
+   skill?: string | null;
  }
  
  interface QuizResultsData {
@@ -77,6 +80,12 @@ const StudentQuizzes = () => {
    const [showResults, setShowResults] = useState(false);
    const [quizResults, setQuizResults] = useState<QuizResultsData | null>(null);
    const [loadingResults, setLoadingResults] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [playCount, setPlayCount] = useState(0);
+  const [hasFinishedFirstPlay, setHasFinishedFirstPlay] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     fetchQuizzes();
@@ -101,6 +110,22 @@ const StudentQuizzes = () => {
   const fetchQuizDetails = async (quiz: Quiz) => {
     setSelectedQuiz(quiz);
     setLoading(true);
+    setAudioUrl(null);
+    setPlayCount(0);
+    setHasFinishedFirstPlay(false);
+    setIsPlaying(false);
+
+    // For listening quizzes, fetch signed audio URL
+    if (quiz.quiz_type === 'listening') {
+      setAudioLoading(true);
+      const { data: audioData, error: audioErr } = await getData<{ signedUrl: string }>('quiz_audio', { quizId: quiz.id });
+      if (audioErr || !audioData?.signedUrl) {
+        toast.error('Failed to load audio');
+      } else {
+        setAudioUrl(audioData.signedUrl);
+      }
+      setAudioLoading(false);
+    }
 
     // Fetch questions
     const { data: questionsData, error: questionsError } = await getData<QuizQuestion[]>('quiz_questions', { quizId: quiz.id });
@@ -125,9 +150,23 @@ const StudentQuizzes = () => {
         }
       });
       setSubmissions(submissionsMap);
+      // If student already submitted at least one, treat first play as already done (re-entry)
+      if (Object.keys(submissionsMap).length > 0) {
+        setHasFinishedFirstPlay(true);
+      }
     }
 
     setLoading(false);
+  };
+
+  const handlePlayAudio = () => {
+    if (!audioRef.current || !selectedQuiz) return;
+    const max = selectedQuiz.max_plays;
+    if (max != null && playCount >= max) {
+      toast.error(`You have reached the listening limit (${max} ${max === 1 ? 'play' : 'plays'})`);
+      return;
+    }
+    audioRef.current.play().catch(() => toast.error('Could not play audio'));
   };
 
   const handleAnswerChange = (questionId: string, answer: string) => {
@@ -165,12 +204,19 @@ const StudentQuizzes = () => {
   };
 
   const goBack = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
     setSelectedQuiz(null);
     setQuestions([]);
     setSubmissions({});
     setCurrentAnswers({});
      setShowResults(false);
      setQuizResults(null);
+    setAudioUrl(null);
+    setPlayCount(0);
+    setHasFinishedFirstPlay(false);
+    setIsPlaying(false);
   };
  
    // Check if all questions are answered
@@ -266,6 +312,58 @@ const StudentQuizzes = () => {
                </CardContent>
              </Card>
  
+             {/* Skill / Improvement Areas Breakdown (listening) */}
+             {selectedQuiz.quiz_type === 'listening' && quizResults.results && quizResults.results.some(r => r.skill) && (() => {
+               const skillLabels: Record<string, string> = {
+                 main_idea: 'Main Idea',
+                 detail: 'Detail',
+                 inference: 'Inference',
+                 vocabulary: 'Vocabulary',
+                 purpose: 'Purpose / Tone',
+               };
+               const buckets = new Map<string, { correct: number; total: number }>();
+               quizResults.results.forEach(r => {
+                 const key = r.skill || 'other';
+                 const b = buckets.get(key) || { correct: 0, total: 0 };
+                 b.total += 1;
+                 if (r.is_correct) b.correct += 1;
+                 buckets.set(key, b);
+               });
+               const rows = Array.from(buckets.entries()).map(([k, v]) => ({
+                 key: k,
+                 label: skillLabels[k] || k,
+                 correct: v.correct,
+                 total: v.total,
+                 pct: Math.round((v.correct / v.total) * 100),
+               })).sort((a, b) => a.pct - b.pct);
+               return (
+                 <Card className="mb-6 border-purple-200 dark:border-purple-800">
+                   <CardHeader className="pb-3">
+                     <CardTitle className="text-base flex items-center gap-2">
+                       <Target className="h-4 w-4 text-purple-600" /> Areas to improve
+                     </CardTitle>
+                     <CardDescription>Performance grouped by skill. Skills below 60% are flagged as focus areas.</CardDescription>
+                   </CardHeader>
+                   <CardContent className="space-y-3">
+                     {rows.map(row => (
+                       <div key={row.key} className="space-y-1">
+                         <div className="flex items-center justify-between text-sm">
+                           <span className="font-medium">{row.label}</span>
+                           <span className="flex items-center gap-2">
+                             <span className="text-muted-foreground">{row.correct}/{row.total}</span>
+                             <Badge variant={row.pct < 60 ? 'destructive' : row.pct < 80 ? 'secondary' : 'default'}>
+                               {row.pct}%{row.pct < 60 ? ' · Focus' : ''}
+                             </Badge>
+                           </span>
+                         </div>
+                         <Progress value={row.pct} className="h-2" />
+                       </div>
+                     ))}
+                   </CardContent>
+                 </Card>
+               );
+             })()}
+
              {/* Question Results */}
              <div className="space-y-4">
                <h2 className="text-lg font-semibold">Question Review</h2>
@@ -371,6 +469,11 @@ const StudentQuizzes = () => {
                   <FileText className="h-3 w-3 mr-1" /> Reading
                 </Badge>
               )}
+              {selectedQuiz.quiz_type === 'listening' && (
+                <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-200">
+                  <Headphones className="h-3 w-3 mr-1" /> Listening
+                </Badge>
+              )}
             </h1>
             {selectedQuiz.description && (
               <p className="text-muted-foreground mt-1">{selectedQuiz.description}</p>
@@ -392,6 +495,69 @@ const StudentQuizzes = () => {
             </Card>
           )}
 
+          {selectedQuiz.quiz_type === 'listening' && (
+            <Card className="mb-6 sticky top-2 z-10 bg-purple-50/70 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800 backdrop-blur">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                  <Headphones className="h-4 w-4" /> Listening Audio
+                </CardTitle>
+                <CardDescription>
+                  {selectedQuiz.max_plays
+                    ? `You can listen up to ${selectedQuiz.max_plays} ${selectedQuiz.max_plays === 1 ? 'time' : 'times'}.`
+                    : 'You can replay the audio as many times as you want after the first full play.'}
+                  {' '}Questions unlock when the first play finishes.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {audioLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading audio...
+                  </div>
+                ) : audioUrl ? (
+                  <>
+                    <audio
+                      ref={audioRef}
+                      src={audioUrl}
+                      controls
+                      controlsList="nodownload noplaybackrate"
+                      onPlay={() => {
+                        const max = selectedQuiz.max_plays;
+                        if (max != null && playCount >= max && audioRef.current) {
+                          audioRef.current.pause();
+                          audioRef.current.currentTime = 0;
+                          toast.error(`You have reached the listening limit (${max} ${max === 1 ? 'play' : 'plays'})`);
+                          setIsPlaying(false);
+                          return;
+                        }
+                        setIsPlaying(true);
+                      }}
+                      onPause={() => setIsPlaying(false)}
+                      onEnded={() => {
+                        setIsPlaying(false);
+                        setPlayCount((c) => c + 1);
+                        setHasFinishedFirstPlay(true);
+                      }}
+                      className="w-full"
+                    />
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        Plays used: <strong>{playCount}</strong>
+                        {selectedQuiz.max_plays ? ` / ${selectedQuiz.max_plays}` : ''}
+                      </span>
+                      {!hasFinishedFirstPlay && !isPlaying && (
+                        <Button size="sm" variant="secondary" onClick={handlePlayAudio}>
+                          <Play className="h-3 w-3 mr-1" /> Start listening
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-destructive">Audio is not available.</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -401,6 +567,16 @@ const StudentQuizzes = () => {
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
                 <p className="text-muted-foreground">No questions in this quiz yet</p>
+              </CardContent>
+            </Card>
+          ) : selectedQuiz.quiz_type === 'listening' && !hasFinishedFirstPlay ? (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                <Lock className="h-10 w-10 text-muted-foreground mb-3" />
+                <p className="font-medium">Questions are locked</p>
+                <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                  Listen to the audio above all the way through. Questions will appear once the first play finishes.
+                </p>
               </CardContent>
             </Card>
           ) : (
@@ -518,7 +694,19 @@ const StudentQuizzes = () => {
             {quizzes.map((quiz) => (
               <Card key={quiz.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => fetchQuizDetails(quiz)}>
                 <CardHeader>
-                  <CardTitle className="text-lg">{quiz.title}</CardTitle>
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-lg">{quiz.title}</CardTitle>
+                    {quiz.quiz_type === 'listening' && (
+                      <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-200 shrink-0">
+                        <Headphones className="h-3 w-3 mr-1" /> Listening
+                      </Badge>
+                    )}
+                    {quiz.quiz_type === 'reading' && (
+                      <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-200 shrink-0">
+                        <FileText className="h-3 w-3 mr-1" /> Reading
+                      </Badge>
+                    )}
+                  </div>
                   {quiz.description && (
                     <CardDescription>{quiz.description}</CardDescription>
                   )}
