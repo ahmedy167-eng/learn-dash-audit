@@ -204,12 +204,19 @@ const StudentQuizzes = () => {
   };
 
   const goBack = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
     setSelectedQuiz(null);
     setQuestions([]);
     setSubmissions({});
     setCurrentAnswers({});
      setShowResults(false);
      setQuizResults(null);
+    setAudioUrl(null);
+    setPlayCount(0);
+    setHasFinishedFirstPlay(false);
+    setIsPlaying(false);
   };
  
    // Check if all questions are answered
