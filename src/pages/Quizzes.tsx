@@ -37,6 +37,8 @@ interface Quiz {
   description: string | null;
   is_active: boolean;
   created_at: string;
+  quiz_type?: string;
+  reading_passage?: string | null;
   sections?: Section;
 }
 
