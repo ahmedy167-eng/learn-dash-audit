@@ -653,6 +653,7 @@ const Quizzes = () => {
     setFormAudioScript(quiz.audio_script || '');
     setFormVoiceId(quiz.voice_id || ELEVEN_VOICES[0].id);
     setFormMaxPlays(quiz.max_plays == null ? 'unlimited' : String(quiz.max_plays));
+    setFormDifficulty(((quiz.difficulty as Difficulty) || 'intermediate'));
     setDialogOpen(true);
   };
 
