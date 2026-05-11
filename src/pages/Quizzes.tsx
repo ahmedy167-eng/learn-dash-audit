@@ -120,6 +120,7 @@ const Quizzes = () => {
   const [formAudioScript, setFormAudioScript] = useState('');
   const [formVoiceId, setFormVoiceId] = useState(ELEVEN_VOICES[0].id);
   const [formMaxPlays, setFormMaxPlays] = useState<string>('2');
+  const [formDifficulty, setFormDifficulty] = useState<Difficulty>('intermediate');
   const [generatingAI, setGeneratingAI] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
 
