@@ -1016,6 +1016,20 @@ const Quizzes = () => {
                               <Headphones className="h-3 w-3 mr-1" /> Listening
                             </Badge>
                           )}
+                          {quiz.difficulty && (
+                            <Badge
+                              variant="outline"
+                              className={`text-xs capitalize ${
+                                quiz.difficulty === 'easy'
+                                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-200'
+                                  : quiz.difficulty === 'advanced'
+                                  ? 'bg-rose-500/10 text-rose-600 border-rose-200'
+                                  : 'bg-amber-500/10 text-amber-600 border-amber-200'
+                              }`}
+                            >
+                              {quiz.difficulty}
+                            </Badge>
+                          )}
                         </div>
                         {quiz.description && (
                           <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{quiz.description}</p>
