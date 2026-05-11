@@ -44,6 +44,7 @@ interface Quiz {
   max_plays?: number | null;
   voice_id?: string | null;
   difficulty?: string;
+  transcript_visibility?: 'never' | 'after_audio' | 'always' | null;
   sections?: Section;
 }
 
@@ -120,6 +121,7 @@ const Quizzes = () => {
   const [formAudioScript, setFormAudioScript] = useState('');
   const [formVoiceId, setFormVoiceId] = useState(ELEVEN_VOICES[0].id);
   const [formMaxPlays, setFormMaxPlays] = useState<string>('2');
+  const [formTranscriptVisibility, setFormTranscriptVisibility] = useState<'never' | 'after_audio' | 'always'>('never');
   const [formDifficulty, setFormDifficulty] = useState<Difficulty>('intermediate');
   const [generatingAI, setGeneratingAI] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);

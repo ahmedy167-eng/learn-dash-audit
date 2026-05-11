@@ -541,7 +541,7 @@ Deno.serve(async (req) => {
           if (student?.section_id) {
              const result = await supabaseAdmin
               .from('quizzes')
-              .select('id, title, description, is_active, created_at, quiz_type, reading_passage, max_plays, audio_url')
+              .select('id, title, description, is_active, created_at, quiz_type, reading_passage, max_plays, audio_url, audio_script, transcript_visibility')
               .eq('section_id', student.section_id)
               .eq('is_active', true)
               .order('created_at', { ascending: false })
@@ -549,8 +549,12 @@ Deno.serve(async (req) => {
             const filtered = (result.data || []).filter((q: any) =>
               q.quiz_type !== 'listening' || !!q.audio_url
             )
-            // Strip audio_url from response (signed URL fetched separately)
-            data = filtered.map(({ audio_url, ...rest }: any) => rest)
+            // Strip audio_url; strip audio_script if not allowed for students
+            data = filtered.map(({ audio_url, audio_script, transcript_visibility, ...rest }: any) => ({
+              ...rest,
+              transcript_visibility: transcript_visibility || 'never',
+              audio_script: (transcript_visibility === 'always' || transcript_visibility === 'after_audio') ? audio_script : null,
+            }))
             error = result.error
           } else {
             data = []
