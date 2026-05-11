@@ -312,9 +312,11 @@ const Quizzes = () => {
         section_id: formSectionId,
         title: formTitle.trim(),
         description: formDescription.trim() || null,
-        is_active: formIsActive,
+        is_active: formQuizType === 'listening' ? false : formIsActive,
         quiz_type: formQuizType,
         reading_passage: formQuizType === 'reading' ? formReadingPassage.trim() : null,
+        audio_script: formQuizType === 'listening' ? formAudioScript.trim() : null,
+        voice_id: formQuizType === 'listening' ? formVoiceId : null,
         max_plays: formQuizType === 'listening' ? (formMaxPlays === 'unlimited' ? null : Number(formMaxPlays)) : null,
       })
       .select('*, sections(id, name, section_number)')
@@ -336,6 +338,7 @@ const Quizzes = () => {
     } else if (formQuizType === 'listening') {
       const ok = await generateListeningQuiz(data.id, formAudioScript.trim(), formQuestionCount, formVoiceId);
       if (ok) {
+        await supabase.from('quizzes').update({ is_active: formIsActive }).eq('id', data.id);
         setSelectedQuiz(data as Quiz);
         await fetchQuestions(data.id);
       }
