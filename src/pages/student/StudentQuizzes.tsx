@@ -417,6 +417,11 @@ const StudentQuizzes = () => {
                   <FileText className="h-3 w-3 mr-1" /> Reading
                 </Badge>
               )}
+              {selectedQuiz.quiz_type === 'listening' && (
+                <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-200">
+                  <Headphones className="h-3 w-3 mr-1" /> Listening
+                </Badge>
+              )}
             </h1>
             {selectedQuiz.description && (
               <p className="text-muted-foreground mt-1">{selectedQuiz.description}</p>
@@ -434,6 +439,59 @@ const StudentQuizzes = () => {
                 <p className="text-sm md:text-base whitespace-pre-wrap font-serif leading-relaxed">
                   {selectedQuiz.reading_passage}
                 </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {selectedQuiz.quiz_type === 'listening' && (
+            <Card className="mb-6 sticky top-2 z-10 bg-purple-50/70 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800 backdrop-blur">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                  <Headphones className="h-4 w-4" /> Listening Audio
+                </CardTitle>
+                <CardDescription>
+                  {selectedQuiz.max_plays
+                    ? `You can listen up to ${selectedQuiz.max_plays} ${selectedQuiz.max_plays === 1 ? 'time' : 'times'}.`
+                    : 'You can replay the audio as many times as you want after the first full play.'}
+                  {' '}Questions unlock when the first play finishes.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {audioLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading audio...
+                  </div>
+                ) : audioUrl ? (
+                  <>
+                    <audio
+                      ref={audioRef}
+                      src={audioUrl}
+                      controls
+                      controlsList="nodownload noplaybackrate"
+                      onPlay={() => setIsPlaying(true)}
+                      onPause={() => setIsPlaying(false)}
+                      onEnded={() => {
+                        setIsPlaying(false);
+                        setPlayCount((c) => c + 1);
+                        setHasFinishedFirstPlay(true);
+                      }}
+                      className="w-full"
+                    />
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        Plays used: <strong>{playCount}</strong>
+                        {selectedQuiz.max_plays ? ` / ${selectedQuiz.max_plays}` : ''}
+                      </span>
+                      {!hasFinishedFirstPlay && !isPlaying && (
+                        <Button size="sm" variant="secondary" onClick={handlePlayAudio}>
+                          <Play className="h-3 w-3 mr-1" /> Start listening
+                        </Button>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-destructive">Audio is not available.</p>
+                )}
               </CardContent>
             </Card>
           )}
