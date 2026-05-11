@@ -430,12 +430,25 @@ const Quizzes = () => {
 
   const handleRegenerate = async () => {
     if (!selectedQuiz) return;
-    if (!confirm('This will delete existing questions and generate new ones from the passage. Continue?')) return;
-    await supabase.from('quiz_questions').delete().eq('quiz_id', selectedQuiz.id);
-    const passage = selectedQuiz.reading_passage || '';
-    if (!passage) { toast.error('No passage on this quiz'); return; }
-    const ok = await generateReadingQuestions(selectedQuiz.id, passage, formQuestionCount);
-    if (ok) await fetchQuestions(selectedQuiz.id);
+    if (selectedQuiz.quiz_type === 'reading') {
+      if (!confirm('This will delete existing questions and generate new ones from the passage. Continue?')) return;
+      await supabase.from('quiz_questions').delete().eq('quiz_id', selectedQuiz.id);
+      const passage = selectedQuiz.reading_passage || '';
+      if (!passage) { toast.error('No passage on this quiz'); return; }
+      const ok = await generateReadingQuestions(selectedQuiz.id, passage, formQuestionCount);
+      if (ok) await fetchQuestions(selectedQuiz.id);
+    } else if (selectedQuiz.quiz_type === 'listening') {
+      if (!confirm('This will regenerate the audio AND replace all questions. Continue?')) return;
+      await supabase.from('quiz_questions').delete().eq('quiz_id', selectedQuiz.id);
+      const script = selectedQuiz.audio_script || '';
+      if (!script) { toast.error('No script on this quiz'); return; }
+      const voice = selectedQuiz.voice_id || ELEVEN_VOICES[0].id;
+      const ok = await generateListeningQuiz(selectedQuiz.id, script, formQuestionCount, voice);
+      if (ok) {
+        await fetchQuestions(selectedQuiz.id);
+        await fetchData();
+      }
+    }
   };
 
   const handleUpdateQuiz = async () => {
@@ -503,6 +516,7 @@ const Quizzes = () => {
         option_d: optionD.trim(),
         correct_answer: correctAnswer,
          explanation: explanation.trim() || null,
+         skill: selectedQuiz.quiz_type === 'listening' ? (skill || 'detail') : null,
       });
 
     if (error) {
@@ -532,6 +546,7 @@ const Quizzes = () => {
         option_d: optionD.trim(),
         correct_answer: correctAnswer,
          explanation: explanation.trim() || null,
+         skill: selectedQuiz?.quiz_type === 'listening' ? (skill || 'detail') : null,
       })
       .eq('id', editingQuestion.id);
 
@@ -569,6 +584,9 @@ const Quizzes = () => {
     setFormQuizType('standard');
     setFormReadingPassage('');
     setFormQuestionCount(10);
+    setFormAudioScript('');
+    setFormVoiceId(ELEVEN_VOICES[0].id);
+    setFormMaxPlays('2');
     setEditingQuiz(null);
   };
 
@@ -582,6 +600,7 @@ const Quizzes = () => {
     setCorrectAnswer('');
     setEditingQuestion(null);
      setExplanation('');
+     setSkill('');
   };
 
   const openEditQuiz = (quiz: Quiz) => {
@@ -590,8 +609,11 @@ const Quizzes = () => {
     setFormDescription(quiz.description || '');
     setFormSectionId(quiz.section_id);
     setFormIsActive(quiz.is_active);
-    setFormQuizType((quiz.quiz_type as 'standard' | 'reading') || 'standard');
+    setFormQuizType((quiz.quiz_type as 'standard' | 'reading' | 'listening') || 'standard');
     setFormReadingPassage(quiz.reading_passage || '');
+    setFormAudioScript(quiz.audio_script || '');
+    setFormVoiceId(quiz.voice_id || ELEVEN_VOICES[0].id);
+    setFormMaxPlays(quiz.max_plays == null ? 'unlimited' : String(quiz.max_plays));
     setDialogOpen(true);
   };
 
@@ -605,6 +627,7 @@ const Quizzes = () => {
     setOptionD(question.option_d);
     setCorrectAnswer(question.correct_answer);
      setExplanation(question.explanation || '');
+     setSkill(question.skill || '');
     setQuestionDialogOpen(true);
   };
 
