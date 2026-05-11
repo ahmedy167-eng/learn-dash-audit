@@ -119,12 +119,14 @@ const StudentQuizzes = () => {
     if (quiz.quiz_type === 'listening') {
       setAudioLoading(true);
       const { data: audioData, error: audioErr } = await getData<{ signedUrl: string }>('quiz_audio', { quizId: quiz.id });
-      if (audioErr || !audioData?.signedUrl) {
-        toast.error('Failed to load audio');
-      } else {
-        setAudioUrl(audioData.signedUrl);
-      }
       setAudioLoading(false);
+      if (audioErr || !audioData?.signedUrl) {
+        toast.error('This listening quiz is not ready yet. Please check back later.');
+        setSelectedQuiz(null);
+        setLoading(false);
+        return;
+      }
+      setAudioUrl(audioData.signedUrl);
     }
 
     // Fetch questions
