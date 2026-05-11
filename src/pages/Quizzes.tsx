@@ -465,6 +465,7 @@ const Quizzes = () => {
         description: formDescription.trim() || null,
         is_active: formIsActive,
         reading_passage: formQuizType === 'reading' ? formReadingPassage.trim() : null,
+        max_plays: formQuizType === 'listening' ? (formMaxPlays === 'unlimited' ? null : Number(formMaxPlays)) : null,
       })
       .eq('id', editingQuiz.id);
 
