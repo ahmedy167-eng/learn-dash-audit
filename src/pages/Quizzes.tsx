@@ -43,8 +43,11 @@ interface Quiz {
   audio_script?: string | null;
   max_plays?: number | null;
   voice_id?: string | null;
+  difficulty?: string;
   sections?: Section;
 }
+
+type Difficulty = 'easy' | 'intermediate' | 'advanced';
 
 interface QuizQuestion {
   id: string;
@@ -117,6 +120,7 @@ const Quizzes = () => {
   const [formAudioScript, setFormAudioScript] = useState('');
   const [formVoiceId, setFormVoiceId] = useState(ELEVEN_VOICES[0].id);
   const [formMaxPlays, setFormMaxPlays] = useState<string>('2');
+  const [formDifficulty, setFormDifficulty] = useState<Difficulty>('intermediate');
   const [generatingAI, setGeneratingAI] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
 
@@ -305,6 +309,8 @@ const Quizzes = () => {
       return;
     }
 
+    const clampedCount = Math.max(10, Math.min(25, Number(formQuestionCount) || 10));
+
     const { data, error } = await supabase
       .from('quizzes')
       .insert({
@@ -314,11 +320,12 @@ const Quizzes = () => {
         description: formDescription.trim() || null,
         is_active: formQuizType === 'listening' ? false : formIsActive,
         quiz_type: formQuizType,
+        difficulty: formDifficulty,
         reading_passage: formQuizType === 'reading' ? formReadingPassage.trim() : null,
         audio_script: formQuizType === 'listening' ? formAudioScript.trim() : null,
         voice_id: formQuizType === 'listening' ? formVoiceId : null,
         max_plays: formQuizType === 'listening' ? (formMaxPlays === 'unlimited' ? null : Number(formMaxPlays)) : null,
-      })
+      } as any)
       .select('*, sections(id, name, section_number)')
       .single();
 
@@ -330,13 +337,13 @@ const Quizzes = () => {
     toast.success('Quiz created successfully');
 
     if (formQuizType === 'reading') {
-      const ok = await generateReadingQuestions(data.id, formReadingPassage.trim(), formQuestionCount);
+      const ok = await generateReadingQuestions(data.id, formReadingPassage.trim(), clampedCount, formDifficulty);
       if (ok) {
         setSelectedQuiz(data as Quiz);
         await fetchQuestions(data.id);
       }
     } else if (formQuizType === 'listening') {
-      const ok = await generateListeningQuiz(data.id, formAudioScript.trim(), formQuestionCount, formVoiceId);
+      const ok = await generateListeningQuiz(data.id, formAudioScript.trim(), clampedCount, formVoiceId, formDifficulty);
       if (ok) {
         await supabase.from('quizzes').update({ is_active: formIsActive }).eq('id', data.id);
         setSelectedQuiz(data as Quiz);
@@ -351,7 +358,7 @@ const Quizzes = () => {
     fetchData();
   };
 
-  const generateListeningQuiz = async (quizId: string, script: string, count: number, voiceId: string): Promise<boolean> => {
+  const generateListeningQuiz = async (quizId: string, script: string, count: number, voiceId: string, difficulty: Difficulty = 'intermediate'): Promise<boolean> => {
     setGeneratingAI(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -363,7 +370,7 @@ const Quizzes = () => {
           Authorization: `Bearer ${session.access_token}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
-        body: JSON.stringify({ script, count, voice_id: voiceId, quiz_id: quizId }),
+        body: JSON.stringify({ script, count, voice_id: voiceId, quiz_id: quizId, difficulty }),
       });
       const json = await res.json();
       if (!res.ok) { toast.error(json.error || 'Audio/AI generation failed'); return false; }
@@ -391,7 +398,7 @@ const Quizzes = () => {
     }
   };
 
-  const generateReadingQuestions = async (quizId: string, passage: string, count: number): Promise<boolean> => {
+  const generateReadingQuestions = async (quizId: string, passage: string, count: number, difficulty: Difficulty = 'intermediate'): Promise<boolean> => {
     setGeneratingAI(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -403,7 +410,7 @@ const Quizzes = () => {
           Authorization: `Bearer ${session.access_token}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
-        body: JSON.stringify({ passage, count }),
+        body: JSON.stringify({ passage, count, difficulty }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -435,12 +442,14 @@ const Quizzes = () => {
 
   const handleRegenerate = async () => {
     if (!selectedQuiz) return;
+    const clampedCount = Math.max(10, Math.min(25, Number(formQuestionCount) || 10));
+    const diff = (selectedQuiz.difficulty as Difficulty) || formDifficulty;
     if (selectedQuiz.quiz_type === 'reading') {
       if (!confirm('This will delete existing questions and generate new ones from the passage. Continue?')) return;
       await supabase.from('quiz_questions').delete().eq('quiz_id', selectedQuiz.id);
       const passage = selectedQuiz.reading_passage || '';
       if (!passage) { toast.error('No passage on this quiz'); return; }
-      const ok = await generateReadingQuestions(selectedQuiz.id, passage, formQuestionCount);
+      const ok = await generateReadingQuestions(selectedQuiz.id, passage, clampedCount, diff);
       if (ok) await fetchQuestions(selectedQuiz.id);
     } else if (selectedQuiz.quiz_type === 'listening') {
       if (!confirm('This will regenerate the audio AND replace all questions. Continue?')) return;
@@ -448,7 +457,7 @@ const Quizzes = () => {
       const script = selectedQuiz.audio_script || '';
       if (!script) { toast.error('No script on this quiz'); return; }
       const voice = selectedQuiz.voice_id || ELEVEN_VOICES[0].id;
-      const ok = await generateListeningQuiz(selectedQuiz.id, script, formQuestionCount, voice);
+      const ok = await generateListeningQuiz(selectedQuiz.id, script, clampedCount, voice, diff);
       if (ok) {
         await fetchQuestions(selectedQuiz.id);
         await fetchData();
@@ -469,6 +478,7 @@ const Quizzes = () => {
     const scriptChanged = formQuizType === 'listening' && formAudioScript.trim() !== (editingQuiz.audio_script || '').trim();
     const voiceChanged = formQuizType === 'listening' && formVoiceId !== (editingQuiz.voice_id || '');
     const needsRegen = scriptChanged || voiceChanged;
+    const clampedCount = Math.max(10, Math.min(25, Number(formQuestionCount) || 10));
 
     const { error } = await supabase
       .from('quizzes')
@@ -477,11 +487,12 @@ const Quizzes = () => {
         title: formTitle.trim(),
         description: formDescription.trim() || null,
         is_active: needsRegen ? false : formIsActive,
+        difficulty: formDifficulty,
         reading_passage: formQuizType === 'reading' ? formReadingPassage.trim() : null,
         audio_script: formQuizType === 'listening' ? formAudioScript.trim() : null,
         voice_id: formQuizType === 'listening' ? formVoiceId : null,
         max_plays: formQuizType === 'listening' ? (formMaxPlays === 'unlimited' ? null : Number(formMaxPlays)) : null,
-      })
+      } as any)
       .eq('id', editingQuiz.id);
 
     if (error) {
@@ -491,7 +502,7 @@ const Quizzes = () => {
 
     if (needsRegen) {
       await supabase.from('quiz_questions').delete().eq('quiz_id', editingQuiz.id);
-      const ok = await generateListeningQuiz(editingQuiz.id, formAudioScript.trim(), formQuestionCount, formVoiceId);
+      const ok = await generateListeningQuiz(editingQuiz.id, formAudioScript.trim(), clampedCount, formVoiceId, formDifficulty);
       if (ok) {
         await supabase.from('quizzes').update({ is_active: formIsActive }).eq('id', editingQuiz.id);
       } else {
@@ -614,6 +625,7 @@ const Quizzes = () => {
     setFormAudioScript('');
     setFormVoiceId(ELEVEN_VOICES[0].id);
     setFormMaxPlays('2');
+    setFormDifficulty('intermediate');
     setEditingQuiz(null);
   };
 
@@ -641,6 +653,7 @@ const Quizzes = () => {
     setFormAudioScript(quiz.audio_script || '');
     setFormVoiceId(quiz.voice_id || ELEVEN_VOICES[0].id);
     setFormMaxPlays(quiz.max_plays == null ? 'unlimited' : String(quiz.max_plays));
+    setFormDifficulty(((quiz.difficulty as Difficulty) || 'intermediate'));
     setDialogOpen(true);
   };
 
@@ -765,6 +778,21 @@ const Quizzes = () => {
                 <div className="space-y-2">
                   <Label>Description</Label>
                   <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="Optional description" rows={2} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Difficulty</Label>
+                  <Select value={formDifficulty} onValueChange={(v) => setFormDifficulty(v as Difficulty)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="easy">Easy</SelectItem>
+                      <SelectItem value="intermediate">Intermediate</SelectItem>
+                      <SelectItem value="advanced">Advanced</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Controls how challenging AI-generated questions will be.
+                  </p>
                 </div>
 
                 {formQuizType === 'reading' && (
@@ -986,6 +1014,20 @@ const Quizzes = () => {
                           {quiz.quiz_type === 'listening' && (
                             <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-600 border-purple-200">
                               <Headphones className="h-3 w-3 mr-1" /> Listening
+                            </Badge>
+                          )}
+                          {quiz.difficulty && (
+                            <Badge
+                              variant="outline"
+                              className={`text-xs capitalize ${
+                                quiz.difficulty === 'easy'
+                                  ? 'bg-emerald-500/10 text-emerald-600 border-emerald-200'
+                                  : quiz.difficulty === 'advanced'
+                                  ? 'bg-rose-500/10 text-rose-600 border-rose-200'
+                                  : 'bg-amber-500/10 text-amber-600 border-amber-200'
+                              }`}
+                            >
+                              {quiz.difficulty}
                             </Badge>
                           )}
                         </div>

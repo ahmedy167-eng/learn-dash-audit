@@ -20,7 +20,14 @@ const RequestSchema = z.object({
   count: z.number().int().min(10).max(25),
   voice_id: z.string().min(1).max(100),
   quiz_id: z.string().uuid(),
+  difficulty: z.enum(["easy", "intermediate", "advanced"]).default("intermediate"),
 });
+
+const DIFFICULTY_GUIDE: Record<string, string> = {
+  easy: "Use simple vocabulary and direct/literal questions (mostly detail and main_idea). Distractors should be clearly wrong.",
+  intermediate: "Mix detail, inference, and vocabulary questions with moderately plausible distractors.",
+  advanced: "Emphasize inference, nuanced vocabulary, and author's purpose. Distractors must be highly plausible and require careful listening.",
+};
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -63,7 +70,7 @@ async function generateAudio(script: string, voiceId: string): Promise<ArrayBuff
   }
 }
 
-async function generateQuestions(script: string, count: number) {
+async function generateQuestions(script: string, count: number, difficulty: string = "intermediate") {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 90_000);
   try {
@@ -79,11 +86,11 @@ async function generateQuestions(script: string, count: number) {
           {
             role: "system",
             content:
-              "You generate multiple-choice listening-comprehension questions strictly grounded in a provided audio script. Each question must be answerable from the script alone. Vary skill types and tag each question with one of: main_idea, detail, inference, vocabulary, purpose. Provide exactly 4 distinct plausible options and one correct answer letter (A/B/C/D). Include a 1-2 sentence explanation citing the script.",
+              `You generate multiple-choice listening-comprehension questions strictly grounded in a provided audio script. Each question must be answerable from the script alone. Vary skill types and tag each question with one of: main_idea, detail, inference, vocabulary, purpose. Provide exactly 4 distinct plausible options and one correct answer letter (A/B/C/D). Include a 1-2 sentence explanation citing the script.\n\nDIFFICULTY (${difficulty}): ${DIFFICULTY_GUIDE[difficulty] ?? DIFFICULTY_GUIDE.intermediate}`,
           },
           {
             role: "user",
-            content: `Generate exactly ${count} listening-comprehension MCQs from this script.\n\nSCRIPT:\n${script}`,
+            content: `Generate exactly ${count} listening-comprehension MCQs from this script at ${difficulty} difficulty.\n\nSCRIPT:\n${script}`,
           },
         ],
         tools: [{
@@ -177,7 +184,7 @@ Deno.serve(async (req) => {
     if (!parsed.success) {
       return jsonResponse({ error: "Invalid request", details: parsed.error.flatten() }, 400);
     }
-    const { script, count, voice_id, quiz_id } = parsed.data;
+    const { script, count, voice_id, quiz_id, difficulty } = parsed.data;
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -208,15 +215,15 @@ Deno.serve(async (req) => {
     }
 
     // 3. Generate questions
-    const questions = await generateQuestions(script, count);
+    const questions = await generateQuestions(script, count, difficulty);
     if (questions.length === 0) {
       return jsonResponse({ error: "AI returned no usable questions. Try again." }, 502);
     }
 
-    // 4. Update quiz row with audio path + script
+    // 4. Update quiz row with audio path + script + difficulty
     await admin
       .from("quizzes")
-      .update({ audio_url: path, audio_script: script, voice_id })
+      .update({ audio_url: path, audio_script: script, voice_id, difficulty })
       .eq("id", quiz_id);
 
     return jsonResponse({ audio_path: path, questions });

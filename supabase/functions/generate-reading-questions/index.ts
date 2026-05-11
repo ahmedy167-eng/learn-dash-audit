@@ -13,7 +13,14 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const RequestSchema = z.object({
   passage: z.string().trim().min(100, "Passage must be at least 100 characters").max(15000),
   count: z.number().int().min(10).max(25),
+  difficulty: z.enum(["easy", "intermediate", "advanced"]).default("intermediate"),
 });
+
+const DIFFICULTY_GUIDE: Record<string, string> = {
+  easy: "Use simple vocabulary and direct/literal questions (mostly detail and main idea). Distractors should be clearly wrong.",
+  intermediate: "Mix detail, inference, and vocabulary questions with moderately plausible distractors.",
+  advanced: "Emphasize inference, nuanced vocabulary, and author's purpose. Distractors must be highly plausible and require careful reading.",
+};
 
 async function callAI(body: unknown, timeoutMs = 90_000) {
   const ctrl = new AbortController();
@@ -93,18 +100,18 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { passage, count } = parsed.data;
+    const { passage, count, difficulty } = parsed.data;
 
     const result = await callAI({
       model: "google/gemini-2.5-flash",
       messages: [
         {
           role: "system",
-          content: "You generate multiple-choice reading-comprehension questions strictly grounded in a provided passage. Each question must be answerable from the passage alone. Vary question types (main idea, detail, inference, vocabulary in context, author's purpose). Provide exactly 4 distinct plausible options and one correct answer letter (A/B/C/D). Include a 1-2 sentence explanation citing the passage.",
+          content: `You generate multiple-choice reading-comprehension questions strictly grounded in a provided passage. Each question must be answerable from the passage alone. Vary question types (main idea, detail, inference, vocabulary in context, author's purpose). Provide exactly 4 distinct plausible options and one correct answer letter (A/B/C/D). Include a 1-2 sentence explanation citing the passage.\n\nDIFFICULTY (${difficulty}): ${DIFFICULTY_GUIDE[difficulty] ?? DIFFICULTY_GUIDE.intermediate}`,
         },
         {
           role: "user",
-          content: `Generate exactly ${count} reading-comprehension MCQs from this passage.\n\nPASSAGE:\n${passage}`,
+          content: `Generate exactly ${count} reading-comprehension MCQs from this passage at ${difficulty} difficulty.\n\nPASSAGE:\n${passage}`,
         },
       ],
       tools: [{
