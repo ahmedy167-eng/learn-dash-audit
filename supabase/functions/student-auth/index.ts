@@ -249,7 +249,7 @@ interface StudentDataRequest {
 
 interface StudentActionRequest {
   sessionToken: string
-  action: 'submit_quiz' | 'submit_ca' | 'update_ca' | 'send_message' | 'mark_message_read' | 'mark_notice_read' | 'mark_all_messages_read' | 'mark_update_read' | 'mark_all_updates_read'
+  action: 'submit_quiz' | 'retake_quiz' | 'submit_ca' | 'update_ca' | 'send_message' | 'mark_message_read' | 'mark_notice_read' | 'mark_all_messages_read' | 'mark_update_read' | 'mark_all_updates_read'
   data: Record<string, unknown>
 }
 
