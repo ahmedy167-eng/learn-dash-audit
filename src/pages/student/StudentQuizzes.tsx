@@ -364,11 +364,33 @@ const StudentQuizzes = () => {
           </Button>
 
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-foreground">{selectedQuiz.title}</h1>
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              {selectedQuiz.title}
+              {selectedQuiz.quiz_type === 'reading' && (
+                <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-200">
+                  <FileText className="h-3 w-3 mr-1" /> Reading
+                </Badge>
+              )}
+            </h1>
             {selectedQuiz.description && (
               <p className="text-muted-foreground mt-1">{selectedQuiz.description}</p>
             )}
           </div>
+
+          {selectedQuiz.quiz_type === 'reading' && selectedQuiz.reading_passage && (
+            <Card className="mb-6 bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                  <FileText className="h-4 w-4" /> Reading Passage
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm md:text-base whitespace-pre-wrap font-serif leading-relaxed">
+                  {selectedQuiz.reading_passage}
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {loading ? (
             <div className="flex items-center justify-center h-64">
