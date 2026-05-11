@@ -20,7 +20,14 @@ const RequestSchema = z.object({
   count: z.number().int().min(10).max(25),
   voice_id: z.string().min(1).max(100),
   quiz_id: z.string().uuid(),
+  difficulty: z.enum(["easy", "intermediate", "advanced"]).default("intermediate"),
 });
+
+const DIFFICULTY_GUIDE: Record<string, string> = {
+  easy: "Use simple vocabulary and direct/literal questions (mostly detail and main_idea). Distractors should be clearly wrong.",
+  intermediate: "Mix detail, inference, and vocabulary questions with moderately plausible distractors.",
+  advanced: "Emphasize inference, nuanced vocabulary, and author's purpose. Distractors must be highly plausible and require careful listening.",
+};
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
