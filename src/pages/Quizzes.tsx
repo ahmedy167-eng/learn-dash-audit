@@ -791,11 +791,16 @@ const Quizzes = () => {
                         </div>
                       </CardHeader>
                       <CardContent className="pt-0">
-                        <div className="flex items-center gap-2 mb-3">
+                        <div className="flex items-center gap-2 mb-3 flex-wrap">
                           <Badge variant="outline" className="text-xs">
                             <Users className="h-3 w-3 mr-1" />
                             {sectionStudentCounts[quiz.section_id] || 0} students
                           </Badge>
+                          {quiz.quiz_type === 'reading' && (
+                            <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 border-blue-200">
+                              <FileText className="h-3 w-3 mr-1" /> Reading
+                            </Badge>
+                          )}
                         </div>
                         {quiz.description && (
                           <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{quiz.description}</p>
