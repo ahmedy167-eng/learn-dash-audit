@@ -541,11 +541,16 @@ Deno.serve(async (req) => {
           if (student?.section_id) {
              const result = await supabaseAdmin
               .from('quizzes')
-              .select('id, title, description, is_active, created_at, quiz_type, reading_passage, max_plays')
+              .select('id, title, description, is_active, created_at, quiz_type, reading_passage, max_plays, audio_url')
               .eq('section_id', student.section_id)
               .eq('is_active', true)
               .order('created_at', { ascending: false })
-            data = result.data
+            // Hide listening quizzes that are not fully ready (missing audio)
+            const filtered = (result.data || []).filter((q: any) =>
+              q.quiz_type !== 'listening' || !!q.audio_url
+            )
+            // Strip audio_url from response (signed URL fetched separately)
+            data = filtered.map(({ audio_url, ...rest }: any) => rest)
             error = result.error
           } else {
             data = []

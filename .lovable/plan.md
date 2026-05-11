@@ -1,21 +1,30 @@
-## Goal
-On refresh (and after logout), signed-out staff users should land on `/admin-login` instead of being routed to `/admin` or `/dashboard`. Currently, `DashboardLayout` redirects unauthenticated users to `/auth`, and the root path doesn't force the login page.
+## Plan
 
-## Changes
+1. **Repair the specific broken quiz record**
+   - The quiz shown in the student portal is a listening quiz, but it has no stored audio path, no audio script, no voice, and no generated questions.
+   - Update the existing database data for that quiz so it is no longer exposed to students until audio and questions are generated, preventing the “Audio is not available” state.
 
-1. **`src/components/layout/DashboardLayout.tsx`**
-   - Change the unauthenticated redirect from `<Navigate to="/auth" replace />` to `<Navigate to="/admin-login" replace />`. This handles refreshes on any protected staff route (`/admin`, `/dashboard`, `/students`, etc.) when the session is gone.
+2. **Prevent this from happening again**
+   - Update the student quiz list query so listening quizzes only appear to students when they are fully ready: active, assigned to the student’s section, has an audio file, and has at least one question.
+   - This keeps unfinished/failed listening quiz drafts out of the student portal.
 
-2. **`src/hooks/useAuth.tsx` — `signOut`**
-   - After `supabase.auth.signOut()`, perform a hard redirect to `/admin-login` (`window.location.href = '/admin-login'`) so the user is always taken to the login page, regardless of which route they were on.
+3. **Improve the student error handling**
+   - Keep the audio panel from showing a vague “Audio is not available” state for incomplete staff-created listening quizzes.
+   - If a quiz becomes unavailable while a student opens it, show a clear message and return them to the quiz list.
 
-3. **`src/pages/Index.tsx`**
-   - When `loading` is false and there is no `user`, redirect to `/admin-login` instead of showing the marketing landing (optional — only if the user wants `/` to also force login). Keeping current marketing page is also fine; flagged below.
+4. **Verify the fix**
+   - Check the affected quiz no longer appears broken in the student portal.
+   - Confirm valid listening quizzes still load audio through the existing signed-audio endpoint.
 
-## Technical notes
-- `DashboardLayout` is the single guard used by all staff pages, so the one-line redirect change covers refresh on every protected route.
-- `signOut` currently relies on React Router re-render to redirect; a `window.location.href` ensures a clean state (clears in-memory caches, query client, etc.).
-- No DB or edge function changes needed.
+## Technical details
 
-## Open question
-- Should the public landing page (`/`) also auto-redirect signed-out users to `/admin-login`, or keep the current marketing page with Sign In buttons? Default in this plan: **keep the marketing page** and only change protected-route behavior + logout.
+- The failing request is for quiz `aa377ac4-a9c0-497e-b3e7-b2410e3081da`.
+- Database inspection shows:
+  - `quiz_type = listening`
+  - `is_active = true`
+  - `audio_url = null`
+  - `audio_script = null`
+  - `voice_id = null`
+  - `question_count = 0`
+- The student backend correctly returns `404 { "error": "Audio not available" }` because the quiz is active but has no generated audio.
+- This does not point to the student API key/header issue; the request is authenticated and reaching the backend successfully.
