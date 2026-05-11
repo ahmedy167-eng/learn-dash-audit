@@ -911,6 +911,8 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          quiz_type: string
+          reading_passage: string | null
           section_id: string
           title: string
           updated_at: string
@@ -921,6 +923,8 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          quiz_type?: string
+          reading_passage?: string | null
           section_id: string
           title: string
           updated_at?: string
@@ -931,6 +935,8 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          quiz_type?: string
+          reading_passage?: string | null
           section_id?: string
           title?: string
           updated_at?: string
