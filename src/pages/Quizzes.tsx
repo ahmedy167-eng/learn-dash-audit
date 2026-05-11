@@ -884,6 +884,7 @@ const Quizzes = () => {
                         Controls if and when students can read the audio script.
                       </p>
                     </div>
+                    {!editingQuiz && (
                       <div className="space-y-2">
                         <Label>Number of Questions ({formQuestionCount})</Label>
                         <input type="range" min={10} max={25} value={formQuestionCount}
