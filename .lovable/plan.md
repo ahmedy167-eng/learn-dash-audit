@@ -1,54 +1,85 @@
-# Reading Comprehension Quiz
 
-A new quiz type where the teacher writes one reading passage, picks how many questions (10–25), Lovable AI drafts MCQs from the passage, the teacher reviews/edits, then students view the passage with all questions on a single page.
+# Listening Comprehension Quiz
+
+A new quiz type alongside **Standard** and **Reading**. Teachers write a script, generate an audio file via TTS, AI drafts 25 (configurable 10–25) MCQs tagged by skill, set how many times students may replay. Students listen, complete the listen at least once, then answer all questions on one page; results group performance by skill area.
 
 ## Teacher flow (Quizzes page)
 
-1. "New Quiz" gets a type toggle: **Standard** vs **Reading Comprehension**.
-2. Reading mode form:
-   - Title, Section, Description (existing fields).
-   - Large **Reading Passage** textarea (required, ~100–3000 words).
-   - **Number of questions** slider/select (10–25, default 10).
-   - **Generate questions with AI** button → calls a new edge function `generate-reading-questions` that returns N MCQs (question, A/B/C/D, correct answer, short explanation) grounded in the passage.
-3. Draft questions appear in an editable list (reuse current question editor UI). Teacher can edit text/options/correct answer, delete, add manual ones, then **Save Quiz**.
-4. On save, the passage is stored once on the quiz, and questions are inserted without per-question passage duplication.
+1. Quiz type toggle gains a third option: **Listening**.
+2. Listening form fields:
+   - Title, Section, Description (existing).
+   - **Audio script** textarea (200–4000 chars).
+   - **Voice** select (curated ElevenLabs voices: Sarah, Roger, George, etc.).
+   - **Number of questions** slider (10–25, default 25).
+   - **Max plays allowed** select (1, 2, 3, Unlimited; default 2).
+   - **Generate audio + questions** button → calls new edge function `generate-listening-quiz` which:
+     - Calls ElevenLabs TTS with the script → uploads MP3 to `quiz-audio` storage bucket → returns signed URL path.
+     - Calls Lovable AI (`google/gemini-2.5-flash`) to draft N MCQs, each tagged with a `skill` (`main_idea` | `detail` | `inference` | `vocabulary` | `purpose`) plus `question_text`, `option_a–d`, `correct_answer`, `explanation`.
+3. Draft questions appear in editable list (reuse current question editor + a Skill dropdown per question). Teacher edits, deletes, adds manual ones, then **Save Quiz**.
+4. Detail panel shows audio player, script preview, and a **Regenerate audio** / **Regenerate questions** button.
 
 ## Student flow (Student Quizzes page)
 
-- Reading quizzes are labeled with a "Reading" badge in the list.
-- Opening one shows the **passage at the top** (clean typography, scrollable), then all N questions below on the same page with radio-group answers and a single Submit button.
-- Existing scoring + results view is reused; results screen shows the passage above the question review.
+- Listening quizzes get a **"Listening"** badge.
+- Quiz screen layout:
+  - Sticky audio player card at top with **Play** button, progress bar, and **"Plays remaining: X"** badge.
+  - Questions are **hidden** until the audio finishes playing for the **first time**. After that they appear and remain visible regardless of further replays.
+  - Replay button disabled when plays remaining = 0 (Unlimited skips this check).
+  - All N questions on one page, single Submit button.
+- Results screen:
+  - Overall score (existing UI).
+  - **Areas to improve** card: bar list grouped by skill tag with `correct/total` and percentage; skills under 60% highlighted as "Focus area".
+  - Existing per-question review with explanations.
 
 ## Database changes
 
-- `quizzes` table: add `quiz_type text not null default 'standard'` (`'standard' | 'reading'`) and `reading_passage text`.
-- Keep `quiz_questions.reading_passage` for backward compatibility but stop writing to it in reading mode.
-- No RLS changes needed (existing policies cover the new columns).
+- `quizzes` table: extend `quiz_type` to allow `'listening'`; add `audio_url text`, `audio_script text`, `max_plays integer default 2` (nullable = unlimited), `voice_id text`.
+- `quiz_questions` table: add `skill text` (nullable; only used by listening quizzes).
+- New private storage bucket `quiz-audio` with RLS:
+  - Teachers can insert/select/delete files under their own `user_id/...` prefix.
+  - `student-auth` edge function generates signed URLs for students whose section owns the quiz.
+- Existing `notify_students_quiz_change` trigger already covers the new type — no change needed.
 
-## Edge function: `generate-reading-questions`
+## Edge functions
 
-- Auth: standard staff JWT (verify with SUPABASE_JWKS like other staff functions).
-- Input (zod-validated): `{ passage: string (200–15000 chars), count: number (10–25) }`.
-- Calls Lovable AI Gateway (`google/gemini-2.5-flash`) with a structured-output tool schema returning an array of `{ question_text, option_a, option_b, option_c, option_d, correct_answer ('A'|'B'|'C'|'D'), explanation }`.
-- 60s AbortController timeout; returns 429/402 passthrough like `diary-ai`.
+**New: `supabase/functions/generate-listening-quiz/index.ts`**
+- Auth: staff JWT (same pattern as `generate-reading-questions`).
+- Input (zod): `{ script: string (200–4000), count: int (10–25), voice_id: string, quiz_id: uuid }`.
+- Step 1: Call ElevenLabs `text-to-speech/{voice_id}?output_format=mp3_44100_128` with `eleven_multilingual_v2`.
+- Step 2: Upload MP3 to `quiz-audio/{user_id}/{quiz_id}.mp3` using service role client; store path on the quiz row.
+- Step 3: Call Lovable AI with structured tool schema returning `questions[]` including `skill` enum.
+- Returns `{ audio_path, questions }`. 90s timeout per call.
 
-## Student edge function update (`student-auth`)
+**New: `supabase/functions/get-quiz-audio/index.ts`** (or extend `student-auth`)
+- Input: `{ sessionToken, quiz_id }`. Verifies the student belongs to the quiz's section, returns a 1-hour signed URL for the audio file.
 
-- `get-data` for `quizzes` already returns the row — include the new `quiz_type` and `reading_passage` fields so the student UI can render the passage once.
+**Edit: `supabase/functions/student-auth/index.ts`**
+- Include new quiz columns (`audio_url`/`audio_script` excluded — script is teacher-only — but `max_plays`, `quiz_type`) in the `quizzes` projection.
+- Add `get-quiz-audio` action returning a signed URL.
+- Add `skill` column to `quiz_questions` projection.
+
+## Required secret
+
+- **`ELEVENLABS_API_KEY`** — needed before implementation. Will be requested via `add_secret` once the user confirms this plan.
 
 ## Files to add / edit
 
 **New**
-- `supabase/functions/generate-reading-questions/index.ts`
-- `src/components/quizzes/ReadingQuizForm.tsx` (passage + count + AI draft + editable list)
-- migration: add `quiz_type`, `reading_passage` columns to `quizzes`
+- `supabase/functions/generate-listening-quiz/index.ts`
+- `src/components/quizzes/ListeningQuizForm.tsx` (script + voice + count + max plays + AI draft + editable list w/ skill dropdown)
+- `src/components/quizzes/ListeningPlayer.tsx` (sticky player with play counter, gates question visibility)
+- `src/components/quizzes/SkillBreakdown.tsx` (results-screen card)
+- Migration: extend `quizzes` columns, add `quiz_questions.skill`, create `quiz-audio` bucket + RLS.
 
 **Edit**
-- `src/pages/Quizzes.tsx` — add type toggle, mount ReadingQuizForm, save logic for reading quizzes, "Reading" badge in list.
-- `src/pages/student/StudentQuizzes.tsx` — render passage block once when `quiz_type='reading'`; suppress per-question passage display in that case.
-- `supabase/functions/student-auth/index.ts` — include new quiz columns in the `quizzes` projection.
+- `src/pages/Quizzes.tsx` — add Listening type toggle, mount `ListeningQuizForm`, save logic, audio preview + regenerate, "Listening" badge.
+- `src/pages/student/StudentQuizzes.tsx` — branch on `quiz_type='listening'` to render `ListeningPlayer`, gate questions, render `SkillBreakdown` on results.
+- `src/hooks/useStudentApi.tsx` — add `getQuizAudio(quizId)` helper.
+- `supabase/functions/student-auth/index.ts` — projection + new action.
 
 ## Out of scope
 
-- No timer, no question shuffling, no image passages, no PDF upload of passage (text only).
-- No regeneration of a single question (full re-draft only); teacher edits manually for individual fixes.
+- No transcript display to students (defeats the listening test).
+- No per-question audio clips, no segmented audio, no playback speed control.
+- No AI-generated improvement plan (skill % breakdown is the "areas to improve" view).
+- No teacher-uploaded audio files (TTS-only this round).
