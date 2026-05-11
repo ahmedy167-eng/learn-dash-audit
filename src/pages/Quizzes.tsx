@@ -680,7 +680,7 @@ const Quizzes = () => {
                 {!editingQuiz && (
                   <div className="space-y-2">
                     <Label>Quiz Type *</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
                         onClick={() => setFormQuizType('standard')}
@@ -697,9 +697,19 @@ const Quizzes = () => {
                         className={`p-3 rounded-lg border text-left transition-colors ${formQuizType === 'reading' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
                       >
                         <div className="flex items-center gap-2 font-medium text-sm">
-                          <FileText className="h-4 w-4" /> Reading Comprehension
+                          <FileText className="h-4 w-4" /> Reading
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">AI generates questions from a passage</p>
+                        <p className="text-xs text-muted-foreground mt-1">AI questions from a passage</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormQuizType('listening')}
+                        className={`p-3 rounded-lg border text-left transition-colors ${formQuizType === 'listening' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                      >
+                        <div className="flex items-center gap-2 font-medium text-sm">
+                          <Headphones className="h-4 w-4" /> Listening
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">AI audio + questions</p>
                       </button>
                     </div>
                   </div>
@@ -760,6 +770,52 @@ const Quizzes = () => {
                         <div className="flex justify-between text-xs text-muted-foreground">
                           <span>10</span><span>25</span>
                         </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {formQuizType === 'listening' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Audio Script *</Label>
+                      <Textarea
+                        value={formAudioScript}
+                        onChange={(e) => setFormAudioScript(e.target.value)}
+                        placeholder="Write the script that will be read aloud (min 100, max 4000 characters)..."
+                        rows={8}
+                      />
+                      <p className="text-xs text-muted-foreground">{formAudioScript.trim().length} / 4000 characters</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Voice</Label>
+                        <Select value={formVoiceId} onValueChange={setFormVoiceId}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {ELEVEN_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Max Plays</Label>
+                        <Select value={formMaxPlays} onValueChange={setFormMaxPlays}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">1 time</SelectItem>
+                            <SelectItem value="2">2 times</SelectItem>
+                            <SelectItem value="3">3 times</SelectItem>
+                            <SelectItem value="unlimited">Unlimited</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {!editingQuiz && (
+                      <div className="space-y-2">
+                        <Label>Number of Questions ({formQuestionCount})</Label>
+                        <input type="range" min={10} max={25} value={formQuestionCount}
+                          onChange={(e) => setFormQuestionCount(Number(e.target.value))} className="w-full" />
+                        <div className="flex justify-between text-xs text-muted-foreground"><span>10</span><span>25</span></div>
                       </div>
                     )}
                   </>
