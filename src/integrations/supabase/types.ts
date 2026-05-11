@@ -922,6 +922,7 @@ export type Database = {
           reading_passage: string | null
           section_id: string
           title: string
+          transcript_visibility: string
           updated_at: string
           user_id: string
           voice_id: string | null
@@ -939,6 +940,7 @@ export type Database = {
           reading_passage?: string | null
           section_id: string
           title: string
+          transcript_visibility?: string
           updated_at?: string
           user_id: string
           voice_id?: string | null
@@ -956,6 +958,7 @@ export type Database = {
           reading_passage?: string | null
           section_id?: string
           title?: string
+          transcript_visibility?: string
           updated_at?: string
           user_id?: string
           voice_id?: string | null
