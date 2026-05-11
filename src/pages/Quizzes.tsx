@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
  import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
- import { Plus, Trash2, Edit, ClipboardList, Loader2, CheckCircle, HelpCircle, BookOpen, Users, BarChart3, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+ import { Plus, Trash2, Edit, ClipboardList, Loader2, CheckCircle, HelpCircle, BookOpen, Users, BarChart3, XCircle, ChevronDown, ChevronUp, Sparkles, FileText } from 'lucide-react';
  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
  import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
@@ -37,6 +37,8 @@ interface Quiz {
   description: string | null;
   is_active: boolean;
   created_at: string;
+  quiz_type?: string;
+  reading_passage?: string | null;
   sections?: Section;
 }
 
@@ -87,6 +89,10 @@ const Quizzes = () => {
   const [formDescription, setFormDescription] = useState('');
   const [formSectionId, setFormSectionId] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
+  const [formQuizType, setFormQuizType] = useState<'standard' | 'reading'>('standard');
+  const [formReadingPassage, setFormReadingPassage] = useState('');
+  const [formQuestionCount, setFormQuestionCount] = useState(10);
+  const [generatingAI, setGeneratingAI] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
 
   // Question form states
@@ -264,8 +270,12 @@ const Quizzes = () => {
       toast.error('Please fill in all required fields');
       return;
     }
+    if (formQuizType === 'reading' && formReadingPassage.trim().length < 100) {
+      toast.error('Reading passage must be at least 100 characters');
+      return;
+    }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('quizzes')
       .insert({
         user_id: user.id,
@@ -273,16 +283,83 @@ const Quizzes = () => {
         title: formTitle.trim(),
         description: formDescription.trim() || null,
         is_active: formIsActive,
-      });
+        quiz_type: formQuizType,
+        reading_passage: formQuizType === 'reading' ? formReadingPassage.trim() : null,
+      })
+      .select('*, sections(id, name, section_number)')
+      .single();
 
-    if (error) {
+    if (error || !data) {
       toast.error('Failed to create quiz');
-    } else {
-      toast.success('Quiz created successfully');
-      resetForm();
-      setDialogOpen(false);
-      fetchData();
+      return;
     }
+
+    toast.success('Quiz created successfully');
+
+    if (formQuizType === 'reading') {
+      // Generate questions immediately
+      const ok = await generateReadingQuestions(data.id, formReadingPassage.trim(), formQuestionCount);
+      if (ok) {
+        setSelectedQuiz(data as Quiz);
+        await fetchQuestions(data.id);
+      }
+    }
+
+    resetForm();
+    setDialogOpen(false);
+    fetchData();
+  };
+
+  const generateReadingQuestions = async (quizId: string, passage: string, count: number): Promise<boolean> => {
+    setGeneratingAI(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error('Not authenticated'); return false; }
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-reading-questions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ passage, count }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.error || 'AI generation failed');
+        return false;
+      }
+      const rows = (json.questions || []).map((q: any) => ({
+        quiz_id: quizId,
+        question_text: q.question_text,
+        option_a: q.option_a,
+        option_b: q.option_b,
+        option_c: q.option_c,
+        option_d: q.option_d,
+        correct_answer: q.correct_answer,
+        explanation: q.explanation,
+        reading_passage: null,
+      }));
+      const { error: insErr } = await supabase.from('quiz_questions').insert(rows);
+      if (insErr) { toast.error('Failed to save generated questions'); return false; }
+      toast.success(`Generated ${rows.length} questions`);
+      return true;
+    } catch (e) {
+      toast.error('AI generation failed');
+      return false;
+    } finally {
+      setGeneratingAI(false);
+    }
+  };
+
+  const handleRegenerate = async () => {
+    if (!selectedQuiz) return;
+    if (!confirm('This will delete existing questions and generate new ones from the passage. Continue?')) return;
+    await supabase.from('quiz_questions').delete().eq('quiz_id', selectedQuiz.id);
+    const passage = selectedQuiz.reading_passage || '';
+    if (!passage) { toast.error('No passage on this quiz'); return; }
+    const ok = await generateReadingQuestions(selectedQuiz.id, passage, formQuestionCount);
+    if (ok) await fetchQuestions(selectedQuiz.id);
   };
 
   const handleUpdateQuiz = async () => {
@@ -298,6 +375,7 @@ const Quizzes = () => {
         title: formTitle.trim(),
         description: formDescription.trim() || null,
         is_active: formIsActive,
+        reading_passage: formQuizType === 'reading' ? formReadingPassage.trim() : null,
       })
       .eq('id', editingQuiz.id);
 
@@ -412,6 +490,9 @@ const Quizzes = () => {
     setFormDescription('');
     setFormSectionId('');
     setFormIsActive(true);
+    setFormQuizType('standard');
+    setFormReadingPassage('');
+    setFormQuestionCount(10);
     setEditingQuiz(null);
   };
 
@@ -433,6 +514,8 @@ const Quizzes = () => {
     setFormDescription(quiz.description || '');
     setFormSectionId(quiz.section_id);
     setFormIsActive(quiz.is_active);
+    setFormQuizType((quiz.quiz_type as 'standard' | 'reading') || 'standard');
+    setFormReadingPassage(quiz.reading_passage || '');
     setDialogOpen(true);
   };
 
@@ -486,7 +569,7 @@ const Quizzes = () => {
                 Create Quiz
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingQuiz ? 'Edit Quiz' : 'Create New Quiz'}</DialogTitle>
                 <DialogDescription>
@@ -494,6 +577,33 @@ const Quizzes = () => {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 pt-4">
+                {!editingQuiz && (
+                  <div className="space-y-2">
+                    <Label>Quiz Type *</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormQuizType('standard')}
+                        className={`p-3 rounded-lg border text-left transition-colors ${formQuizType === 'standard' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                      >
+                        <div className="flex items-center gap-2 font-medium text-sm">
+                          <ClipboardList className="h-4 w-4" /> Standard
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Add questions one by one</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormQuizType('reading')}
+                        className={`p-3 rounded-lg border text-left transition-colors ${formQuizType === 'reading' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                      >
+                        <div className="flex items-center gap-2 font-medium text-sm">
+                          <FileText className="h-4 w-4" /> Reading Comprehension
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">AI generates questions from a passage</p>
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Section *</Label>
                   <Select value={formSectionId} onValueChange={setFormSectionId}>
@@ -518,8 +628,43 @@ const Quizzes = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Description</Label>
-                  <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="Optional description" rows={3} />
+                  <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="Optional description" rows={2} />
                 </div>
+
+                {formQuizType === 'reading' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Reading Passage *</Label>
+                      <Textarea
+                        value={formReadingPassage}
+                        onChange={(e) => setFormReadingPassage(e.target.value)}
+                        placeholder="Paste or write the reading comprehension passage here (min 100 characters)..."
+                        rows={10}
+                        className="font-serif"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {formReadingPassage.trim().length} characters
+                      </p>
+                    </div>
+                    {!editingQuiz && (
+                      <div className="space-y-2">
+                        <Label>Number of Questions ({formQuestionCount})</Label>
+                        <input
+                          type="range"
+                          min={10}
+                          max={25}
+                          value={formQuestionCount}
+                          onChange={(e) => setFormQuestionCount(Number(e.target.value))}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>10</span><span>25</span>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
                 <div className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg">
                   <div className="space-y-0.5">
                     <Label>Active Status</Label>
@@ -527,8 +672,10 @@ const Quizzes = () => {
                   </div>
                   <Switch checked={formIsActive} onCheckedChange={setFormIsActive} />
                 </div>
-                <Button onClick={editingQuiz ? handleUpdateQuiz : handleCreateQuiz} className="w-full">
-                  {editingQuiz ? 'Update Quiz' : 'Create Quiz'}
+                <Button onClick={editingQuiz ? handleUpdateQuiz : handleCreateQuiz} className="w-full" disabled={generatingAI}>
+                  {generatingAI ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating questions with AI…</>
+                  ) : editingQuiz ? 'Update Quiz' : (formQuizType === 'reading' ? (<><Sparkles className="mr-2 h-4 w-4" /> Create & Generate Questions</>) : 'Create Quiz')}
                 </Button>
               </div>
             </DialogContent>
@@ -644,11 +791,16 @@ const Quizzes = () => {
                         </div>
                       </CardHeader>
                       <CardContent className="pt-0">
-                        <div className="flex items-center gap-2 mb-3">
+                        <div className="flex items-center gap-2 mb-3 flex-wrap">
                           <Badge variant="outline" className="text-xs">
                             <Users className="h-3 w-3 mr-1" />
                             {sectionStudentCounts[quiz.section_id] || 0} students
                           </Badge>
+                          {quiz.quiz_type === 'reading' && (
+                            <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 border-blue-200">
+                              <FileText className="h-3 w-3 mr-1" /> Reading
+                            </Badge>
+                          )}
                         </div>
                         {quiz.description && (
                           <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{quiz.description}</p>
@@ -692,10 +844,21 @@ const Quizzes = () => {
           <Card className="lg:col-span-3 flex flex-col min-h-[600px]">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">
+                <CardTitle className="text-lg flex items-center gap-2">
                   {selectedQuiz ? selectedQuiz.title : 'Select a Quiz'}
+                  {selectedQuiz?.quiz_type === 'reading' && (
+                    <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 border-blue-200">
+                      <FileText className="h-3 w-3 mr-1" /> Reading
+                    </Badge>
+                  )}
                 </CardTitle>
               {selectedQuiz && (
+                <div className="flex items-center gap-2">
+                  {selectedQuiz.quiz_type === 'reading' && (
+                    <Button size="sm" variant="outline" onClick={handleRegenerate} disabled={generatingAI}>
+                      {generatingAI ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Sparkles className="mr-2 h-4 w-4" /> Regenerate</>}
+                    </Button>
+                  )}
                 <Dialog open={questionDialogOpen} onOpenChange={(open) => { setQuestionDialogOpen(open); if (!open) resetQuestionForm(); }}>
                   <DialogTrigger asChild>
                     <Button size="sm">
@@ -766,6 +929,7 @@ const Quizzes = () => {
                     </div>
                   </DialogContent>
                 </Dialog>
+                </div>
               )}
               </div>
             </CardHeader>
@@ -789,6 +953,20 @@ const Quizzes = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {selectedQuiz?.quiz_type === 'reading' && selectedQuiz.reading_passage && (
+                    <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                          <FileText className="h-4 w-4" /> Reading Passage
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm whitespace-pre-wrap font-serif leading-relaxed max-h-48 overflow-y-auto">
+                          {selectedQuiz.reading_passage}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
                   {questions.map((question, index) => (
                     <Card key={question.id} className="overflow-hidden">
                       <CardHeader className="pb-3 bg-muted/30">

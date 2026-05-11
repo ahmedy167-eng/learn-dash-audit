@@ -541,7 +541,7 @@ Deno.serve(async (req) => {
           if (student?.section_id) {
             const result = await supabaseAdmin
               .from('quizzes')
-              .select('id, title, description, is_active, created_at')
+              .select('id, title, description, is_active, created_at, quiz_type, reading_passage')
               .eq('section_id', student.section_id)
               .eq('is_active', true)
               .order('created_at', { ascending: false })
