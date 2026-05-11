@@ -341,6 +341,8 @@ const Quizzes = () => {
         await supabase.from('quizzes').update({ is_active: formIsActive }).eq('id', data.id);
         setSelectedQuiz(data as Quiz);
         await fetchQuestions(data.id);
+      } else {
+        toast.error('Audio generation failed — quiz saved as inactive. Open Edit to retry.');
       }
     }
 
