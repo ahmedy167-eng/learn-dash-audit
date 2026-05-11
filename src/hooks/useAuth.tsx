@@ -294,6 +294,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Best-effort server-side sign out
     }
     await supabase.auth.signOut();
+    window.location.href = '/admin-login';
   };
 
   return (
