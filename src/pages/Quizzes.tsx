@@ -478,6 +478,7 @@ const Quizzes = () => {
     const scriptChanged = formQuizType === 'listening' && formAudioScript.trim() !== (editingQuiz.audio_script || '').trim();
     const voiceChanged = formQuizType === 'listening' && formVoiceId !== (editingQuiz.voice_id || '');
     const needsRegen = scriptChanged || voiceChanged;
+    const clampedCount = Math.max(10, Math.min(25, Number(formQuestionCount) || 10));
 
     const { error } = await supabase
       .from('quizzes')
@@ -486,11 +487,12 @@ const Quizzes = () => {
         title: formTitle.trim(),
         description: formDescription.trim() || null,
         is_active: needsRegen ? false : formIsActive,
+        difficulty: formDifficulty,
         reading_passage: formQuizType === 'reading' ? formReadingPassage.trim() : null,
         audio_script: formQuizType === 'listening' ? formAudioScript.trim() : null,
         voice_id: formQuizType === 'listening' ? formVoiceId : null,
         max_plays: formQuizType === 'listening' ? (formMaxPlays === 'unlimited' ? null : Number(formMaxPlays)) : null,
-      })
+      } as any)
       .eq('id', editingQuiz.id);
 
     if (error) {
@@ -500,7 +502,7 @@ const Quizzes = () => {
 
     if (needsRegen) {
       await supabase.from('quiz_questions').delete().eq('quiz_id', editingQuiz.id);
-      const ok = await generateListeningQuiz(editingQuiz.id, formAudioScript.trim(), formQuestionCount, formVoiceId);
+      const ok = await generateListeningQuiz(editingQuiz.id, formAudioScript.trim(), clampedCount, formVoiceId, formDifficulty);
       if (ok) {
         await supabase.from('quizzes').update({ is_active: formIsActive }).eq('id', editingQuiz.id);
       } else {
