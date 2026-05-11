@@ -358,7 +358,7 @@ const Quizzes = () => {
     fetchData();
   };
 
-  const generateListeningQuiz = async (quizId: string, script: string, count: number, voiceId: string): Promise<boolean> => {
+  const generateListeningQuiz = async (quizId: string, script: string, count: number, voiceId: string, difficulty: Difficulty = 'intermediate'): Promise<boolean> => {
     setGeneratingAI(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
