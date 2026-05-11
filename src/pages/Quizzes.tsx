@@ -270,8 +270,12 @@ const Quizzes = () => {
       toast.error('Please fill in all required fields');
       return;
     }
+    if (formQuizType === 'reading' && formReadingPassage.trim().length < 100) {
+      toast.error('Reading passage must be at least 100 characters');
+      return;
+    }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('quizzes')
       .insert({
         user_id: user.id,
@@ -279,16 +283,83 @@ const Quizzes = () => {
         title: formTitle.trim(),
         description: formDescription.trim() || null,
         is_active: formIsActive,
-      });
+        quiz_type: formQuizType,
+        reading_passage: formQuizType === 'reading' ? formReadingPassage.trim() : null,
+      })
+      .select('*, sections(id, name, section_number)')
+      .single();
 
-    if (error) {
+    if (error || !data) {
       toast.error('Failed to create quiz');
-    } else {
-      toast.success('Quiz created successfully');
-      resetForm();
-      setDialogOpen(false);
-      fetchData();
+      return;
     }
+
+    toast.success('Quiz created successfully');
+
+    if (formQuizType === 'reading') {
+      // Generate questions immediately
+      const ok = await generateReadingQuestions(data.id, formReadingPassage.trim(), formQuestionCount);
+      if (ok) {
+        setSelectedQuiz(data as Quiz);
+        await fetchQuestions(data.id);
+      }
+    }
+
+    resetForm();
+    setDialogOpen(false);
+    fetchData();
+  };
+
+  const generateReadingQuestions = async (quizId: string, passage: string, count: number): Promise<boolean> => {
+    setGeneratingAI(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error('Not authenticated'); return false; }
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-reading-questions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ passage, count }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.error || 'AI generation failed');
+        return false;
+      }
+      const rows = (json.questions || []).map((q: any) => ({
+        quiz_id: quizId,
+        question_text: q.question_text,
+        option_a: q.option_a,
+        option_b: q.option_b,
+        option_c: q.option_c,
+        option_d: q.option_d,
+        correct_answer: q.correct_answer,
+        explanation: q.explanation,
+        reading_passage: null,
+      }));
+      const { error: insErr } = await supabase.from('quiz_questions').insert(rows);
+      if (insErr) { toast.error('Failed to save generated questions'); return false; }
+      toast.success(`Generated ${rows.length} questions`);
+      return true;
+    } catch (e) {
+      toast.error('AI generation failed');
+      return false;
+    } finally {
+      setGeneratingAI(false);
+    }
+  };
+
+  const handleRegenerate = async () => {
+    if (!selectedQuiz) return;
+    if (!confirm('This will delete existing questions and generate new ones from the passage. Continue?')) return;
+    await supabase.from('quiz_questions').delete().eq('quiz_id', selectedQuiz.id);
+    const passage = selectedQuiz.reading_passage || '';
+    if (!passage) { toast.error('No passage on this quiz'); return; }
+    const ok = await generateReadingQuestions(selectedQuiz.id, passage, formQuestionCount);
+    if (ok) await fetchQuestions(selectedQuiz.id);
   };
 
   const handleUpdateQuiz = async () => {
@@ -304,6 +375,7 @@ const Quizzes = () => {
         title: formTitle.trim(),
         description: formDescription.trim() || null,
         is_active: formIsActive,
+        reading_passage: formQuizType === 'reading' ? formReadingPassage.trim() : null,
       })
       .eq('id', editingQuiz.id);
 
