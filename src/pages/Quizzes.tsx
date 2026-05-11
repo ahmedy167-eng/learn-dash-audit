@@ -569,7 +569,7 @@ const Quizzes = () => {
                 Create Quiz
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingQuiz ? 'Edit Quiz' : 'Create New Quiz'}</DialogTitle>
                 <DialogDescription>
@@ -577,6 +577,33 @@ const Quizzes = () => {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 pt-4">
+                {!editingQuiz && (
+                  <div className="space-y-2">
+                    <Label>Quiz Type *</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormQuizType('standard')}
+                        className={`p-3 rounded-lg border text-left transition-colors ${formQuizType === 'standard' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                      >
+                        <div className="flex items-center gap-2 font-medium text-sm">
+                          <ClipboardList className="h-4 w-4" /> Standard
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Add questions one by one</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormQuizType('reading')}
+                        className={`p-3 rounded-lg border text-left transition-colors ${formQuizType === 'reading' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                      >
+                        <div className="flex items-center gap-2 font-medium text-sm">
+                          <FileText className="h-4 w-4" /> Reading Comprehension
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">AI generates questions from a passage</p>
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Section *</Label>
                   <Select value={formSectionId} onValueChange={setFormSectionId}>
@@ -601,8 +628,43 @@ const Quizzes = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Description</Label>
-                  <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="Optional description" rows={3} />
+                  <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="Optional description" rows={2} />
                 </div>
+
+                {formQuizType === 'reading' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Reading Passage *</Label>
+                      <Textarea
+                        value={formReadingPassage}
+                        onChange={(e) => setFormReadingPassage(e.target.value)}
+                        placeholder="Paste or write the reading comprehension passage here (min 100 characters)..."
+                        rows={10}
+                        className="font-serif"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {formReadingPassage.trim().length} characters
+                      </p>
+                    </div>
+                    {!editingQuiz && (
+                      <div className="space-y-2">
+                        <Label>Number of Questions ({formQuestionCount})</Label>
+                        <input
+                          type="range"
+                          min={10}
+                          max={25}
+                          value={formQuestionCount}
+                          onChange={(e) => setFormQuestionCount(Number(e.target.value))}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>10</span><span>25</span>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
                 <div className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg">
                   <div className="space-y-0.5">
                     <Label>Active Status</Label>
@@ -610,8 +672,10 @@ const Quizzes = () => {
                   </div>
                   <Switch checked={formIsActive} onCheckedChange={setFormIsActive} />
                 </div>
-                <Button onClick={editingQuiz ? handleUpdateQuiz : handleCreateQuiz} className="w-full">
-                  {editingQuiz ? 'Update Quiz' : 'Create Quiz'}
+                <Button onClick={editingQuiz ? handleUpdateQuiz : handleCreateQuiz} className="w-full" disabled={generatingAI}>
+                  {generatingAI ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating questions with AI…</>
+                  ) : editingQuiz ? 'Update Quiz' : (formQuizType === 'reading' ? (<><Sparkles className="mr-2 h-4 w-4" /> Create & Generate Questions</>) : 'Create Quiz')}
                 </Button>
               </div>
             </DialogContent>
