@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useStudentAuth } from '@/hooks/useStudentAuth';
 import { useStudentApi } from '@/hooks/useStudentApi';
 import { StudentLayout } from '@/components/student/StudentLayout';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
- import { ClipboardList, CheckCircle, XCircle, ArrowLeft, Loader2, Trophy, Lightbulb, FileText } from 'lucide-react';
+ import { ClipboardList, CheckCircle, XCircle, ArrowLeft, Loader2, Trophy, Lightbulb, FileText, Headphones, Play, Lock, Target } from 'lucide-react';
  import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 
