@@ -110,6 +110,22 @@ const StudentQuizzes = () => {
   const fetchQuizDetails = async (quiz: Quiz) => {
     setSelectedQuiz(quiz);
     setLoading(true);
+    setAudioUrl(null);
+    setPlayCount(0);
+    setHasFinishedFirstPlay(false);
+    setIsPlaying(false);
+
+    // For listening quizzes, fetch signed audio URL
+    if (quiz.quiz_type === 'listening') {
+      setAudioLoading(true);
+      const { data: audioData, error: audioErr } = await getData<{ signedUrl: string }>('quiz_audio', { quizId: quiz.id });
+      if (audioErr || !audioData?.signedUrl) {
+        toast.error('Failed to load audio');
+      } else {
+        setAudioUrl(audioData.signedUrl);
+      }
+      setAudioLoading(false);
+    }
 
     // Fetch questions
     const { data: questionsData, error: questionsError } = await getData<QuizQuestion[]>('quiz_questions', { quizId: quiz.id });
@@ -134,9 +150,23 @@ const StudentQuizzes = () => {
         }
       });
       setSubmissions(submissionsMap);
+      // If student already submitted at least one, treat first play as already done (re-entry)
+      if (Object.keys(submissionsMap).length > 0) {
+        setHasFinishedFirstPlay(true);
+      }
     }
 
     setLoading(false);
+  };
+
+  const handlePlayAudio = () => {
+    if (!audioRef.current || !selectedQuiz) return;
+    const max = selectedQuiz.max_plays;
+    if (max != null && playCount >= max) {
+      toast.error(`You have reached the listening limit (${max} ${max === 1 ? 'play' : 'plays'})`);
+      return;
+    }
+    audioRef.current.play().catch(() => toast.error('Could not play audio'));
   };
 
   const handleAnswerChange = (questionId: string, answer: string) => {
