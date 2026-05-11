@@ -441,12 +441,19 @@ const StudentQuizzes = () => {
                ))}
              </div>
  
-             <div className="mt-6">
-               <Button onClick={goBack} variant="outline" className="w-full">
-                 <ArrowLeft className="mr-2 h-4 w-4" />
-                 Back to Quizzes
-               </Button>
-             </div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <Button onClick={handleRetake} disabled={retaking} className="w-full">
+                {retaking ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Resetting...</>
+                ) : (
+                  <><RotateCcw className="mr-2 h-4 w-4" /> Retake Quiz</>
+                )}
+              </Button>
+              <Button onClick={goBack} variant="outline" className="w-full">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Quizzes
+              </Button>
+            </div>
            </div>
          </StudentLayout>
        );
