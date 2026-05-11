@@ -459,6 +459,14 @@ const Quizzes = () => {
       toast.error('Please fill in all required fields');
       return;
     }
+    if (formQuizType === 'listening' && formAudioScript.trim().length < 100) {
+      toast.error('Audio script must be at least 100 characters');
+      return;
+    }
+
+    const scriptChanged = formQuizType === 'listening' && formAudioScript.trim() !== (editingQuiz.audio_script || '').trim();
+    const voiceChanged = formQuizType === 'listening' && formVoiceId !== (editingQuiz.voice_id || '');
+    const needsRegen = scriptChanged || voiceChanged;
 
     const { error } = await supabase
       .from('quizzes')
@@ -466,20 +474,32 @@ const Quizzes = () => {
         section_id: formSectionId,
         title: formTitle.trim(),
         description: formDescription.trim() || null,
-        is_active: formIsActive,
+        is_active: needsRegen ? false : formIsActive,
         reading_passage: formQuizType === 'reading' ? formReadingPassage.trim() : null,
+        audio_script: formQuizType === 'listening' ? formAudioScript.trim() : null,
+        voice_id: formQuizType === 'listening' ? formVoiceId : null,
         max_plays: formQuizType === 'listening' ? (formMaxPlays === 'unlimited' ? null : Number(formMaxPlays)) : null,
       })
       .eq('id', editingQuiz.id);
 
     if (error) {
       toast.error('Failed to update quiz');
-    } else {
-      toast.success('Quiz updated successfully');
-      resetForm();
-      setDialogOpen(false);
-      fetchData();
+      return;
     }
+
+    if (needsRegen) {
+      const ok = await generateListeningQuiz(editingQuiz.id, formAudioScript.trim(), formQuestionCount, formVoiceId);
+      if (ok) {
+        await supabase.from('quizzes').update({ is_active: formIsActive }).eq('id', editingQuiz.id);
+      } else {
+        toast.error('Audio regeneration failed — quiz marked inactive. Edit again to retry.');
+      }
+    }
+
+    toast.success('Quiz updated successfully');
+    resetForm();
+    setDialogOpen(false);
+    fetchData();
   };
 
   const handleDeleteQuiz = async (quizId: string) => {

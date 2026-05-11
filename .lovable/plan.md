@@ -1,30 +1,44 @@
+## Problem
+
+When you click Edit on a listening quiz, the Audio Script field shows empty even though the quiz was created with a script. Same applies to Voice and other listening fields after edits.
+
+Two bugs work together:
+
+1. **The quiz row in the database actually has no audio_script.** The "Listen detail" quiz currently stores `audio_script = null`, `audio_url = null`, `voice_id = null`. The Edit dialog correctly reads from the database, so it has nothing to display.
+
+2. **The Update Quiz handler does not save listening fields.** `handleUpdateQuiz` only updates section, title, description, active status, reading_passage and max_plays. It never writes back `audio_script`, `voice_id`, `quiz_type`, or `audio_url`. So even when you do type a script in the Edit dialog and press "Update Quiz", it is silently dropped — which explains how the script can disappear from the database after an edit.
+
+The original creation may also have lost the script if the audio generation step crashed before the row was fully saved on the server.
+
 ## Plan
 
-1. **Repair the specific broken quiz record**
-   - The quiz shown in the student portal is a listening quiz, but it has no stored audio path, no audio script, no voice, and no generated questions.
-   - Update the existing database data for that quiz so it is no longer exposed to students until audio and questions are generated, preventing the “Audio is not available” state.
+1. **Make the Update Quiz action actually save listening fields**
+   - Persist `audio_script`, `voice_id`, and `quiz_type` when updating a listening quiz.
+   - Keep `reading_passage` only when the quiz type is reading; clear it for other types.
 
-2. **Prevent this from happening again**
-   - Update the student quiz list query so listening quizzes only appear to students when they are fully ready: active, assigned to the student’s section, has an audio file, and has at least one question.
-   - This keeps unfinished/failed listening quiz drafts out of the student portal.
+2. **Regenerate audio when the script or voice changes during edit**
+   - If a listening quiz is edited and the script text or voice is different from the stored values, re-run the existing audio + question generation flow so `audio_url` is refreshed and stays in sync with the new script.
+   - If only non-audio fields change (title, description, max plays, active), skip regeneration.
 
-3. **Improve the student error handling**
-   - Keep the audio panel from showing a vague “Audio is not available” state for incomplete staff-created listening quizzes.
-   - If a quiz becomes unavailable while a student opens it, show a clear message and return them to the quiz list.
+3. **Repair the existing "Listen detail" quiz**
+   - The current row has no script, no audio, and no questions, so editing it will keep showing empty. Deactivate it so it does not appear to students, and surface a clear "incomplete" badge in the staff Quizzes list so the teacher knows it must be re-created or have a script added.
 
-4. **Verify the fix**
-   - Check the affected quiz no longer appears broken in the student portal.
-   - Confirm valid listening quizzes still load audio through the existing signed-audio endpoint.
+4. **Guard the create flow so a script is never lost**
+   - On create, if audio generation fails after the quiz row is inserted, keep the script that was already saved on the row, mark the quiz inactive, and show a clear "Audio generation failed — edit the quiz to retry" message instead of leaving a half-created quiz the teacher cannot recover.
+
+5. **Verify**
+   - Open Edit on an existing listening quiz → script, voice, and max plays are pre-filled from the database.
+   - Change the script and press Update → new script is saved and new audio is generated; reopening Edit shows the new script.
+   - Change only the title → no audio regeneration runs.
 
 ## Technical details
 
-- The failing request is for quiz `aa377ac4-a9c0-497e-b3e7-b2410e3081da`.
-- Database inspection shows:
-  - `quiz_type = listening`
-  - `is_active = true`
-  - `audio_url = null`
-  - `audio_script = null`
-  - `voice_id = null`
-  - `question_count = 0`
-- The student backend correctly returns `404 { "error": "Audio not available" }` because the quiz is active but has no generated audio.
-- This does not point to the student API key/header issue; the request is authenticated and reaching the backend successfully.
+- File: `src/pages/Quizzes.tsx`
+  - `handleUpdateQuiz` (around line 457): include `audio_script`, `voice_id`, `quiz_type` in the update payload (gated on `formQuizType === 'listening'`), and call `generateListeningQuiz` when script or voice changed vs `editingQuiz`.
+  - `handleCreateQuiz` (around line 294): on `generateListeningQuiz` failure, leave the inserted row with the script intact (already inserted at line 318) and surface a retry message.
+
+- File: `supabase/functions/generate-listening-quiz/index.ts`
+  - On re-run for an existing quiz, the function already updates `audio_url`, `audio_script`, `voice_id` (line 219). For edits, also delete previously generated `quiz_questions` for that `quiz_id` before inserting the new set, so questions match the new script.
+
+- Database: deactivate the broken row.
+  - `UPDATE public.quizzes SET is_active = false WHERE id = 'aa377ac4-a9c0-497e-b3e7-b2410e3081da';`
