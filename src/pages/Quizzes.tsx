@@ -309,6 +309,8 @@ const Quizzes = () => {
       return;
     }
 
+    const clampedCount = Math.max(10, Math.min(25, Number(formQuestionCount) || 10));
+
     const { data, error } = await supabase
       .from('quizzes')
       .insert({
@@ -318,11 +320,12 @@ const Quizzes = () => {
         description: formDescription.trim() || null,
         is_active: formQuizType === 'listening' ? false : formIsActive,
         quiz_type: formQuizType,
+        difficulty: formDifficulty,
         reading_passage: formQuizType === 'reading' ? formReadingPassage.trim() : null,
         audio_script: formQuizType === 'listening' ? formAudioScript.trim() : null,
         voice_id: formQuizType === 'listening' ? formVoiceId : null,
         max_plays: formQuizType === 'listening' ? (formMaxPlays === 'unlimited' ? null : Number(formMaxPlays)) : null,
-      })
+      } as any)
       .select('*, sections(id, name, section_number)')
       .single();
 
@@ -334,13 +337,13 @@ const Quizzes = () => {
     toast.success('Quiz created successfully');
 
     if (formQuizType === 'reading') {
-      const ok = await generateReadingQuestions(data.id, formReadingPassage.trim(), formQuestionCount);
+      const ok = await generateReadingQuestions(data.id, formReadingPassage.trim(), clampedCount, formDifficulty);
       if (ok) {
         setSelectedQuiz(data as Quiz);
         await fetchQuestions(data.id);
       }
     } else if (formQuizType === 'listening') {
-      const ok = await generateListeningQuiz(data.id, formAudioScript.trim(), formQuestionCount, formVoiceId);
+      const ok = await generateListeningQuiz(data.id, formAudioScript.trim(), clampedCount, formVoiceId, formDifficulty);
       if (ok) {
         await supabase.from('quizzes').update({ is_active: formIsActive }).eq('id', data.id);
         setSelectedQuiz(data as Quiz);
