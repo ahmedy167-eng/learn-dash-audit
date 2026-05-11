@@ -520,7 +520,17 @@ const StudentQuizzes = () => {
                       src={audioUrl}
                       controls
                       controlsList="nodownload noplaybackrate"
-                      onPlay={() => setIsPlaying(true)}
+                      onPlay={() => {
+                        const max = selectedQuiz.max_plays;
+                        if (max != null && playCount >= max && audioRef.current) {
+                          audioRef.current.pause();
+                          audioRef.current.currentTime = 0;
+                          toast.error(`You have reached the listening limit (${max} ${max === 1 ? 'play' : 'plays'})`);
+                          setIsPlaying(false);
+                          return;
+                        }
+                        setIsPlaying(true);
+                      }}
                       onPause={() => setIsPlaying(false)}
                       onEnded={() => {
                         setIsPlaying(false);
