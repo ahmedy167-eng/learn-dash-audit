@@ -444,7 +444,7 @@ const StudentQuizzes = () => {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {question.reading_passage && (
+                     {selectedQuiz?.quiz_type !== 'reading' && question.reading_passage && (
                         <div className="bg-muted/50 p-4 rounded-lg">
                           <p className="text-sm font-medium mb-2">Reading Passage:</p>
                           <p className="text-sm whitespace-pre-wrap">{question.reading_passage}</p>
