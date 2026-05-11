@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
  import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
- import { Plus, Trash2, Edit, ClipboardList, Loader2, CheckCircle, HelpCircle, BookOpen, Users, BarChart3, XCircle, ChevronDown, ChevronUp, Sparkles, FileText } from 'lucide-react';
+ import { Plus, Trash2, Edit, ClipboardList, Loader2, CheckCircle, HelpCircle, BookOpen, Users, BarChart3, XCircle, ChevronDown, ChevronUp, Sparkles, FileText, Headphones, Volume2 } from 'lucide-react';
  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
  import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
@@ -39,6 +39,10 @@ interface Quiz {
   created_at: string;
   quiz_type?: string;
   reading_passage?: string | null;
+  audio_url?: string | null;
+  audio_script?: string | null;
+  max_plays?: number | null;
+  voice_id?: string | null;
   sections?: Section;
 }
 
@@ -53,7 +57,25 @@ interface QuizQuestion {
   option_d: string;
   correct_answer: string;
    explanation: string | null;
+   skill?: string | null;
  }
+
+const ELEVEN_VOICES = [
+  { id: 'EXAVITQu4vr4xnSDxMaL', label: 'Sarah (Female, US)' },
+  { id: 'JBFqnCBsd6RMkjVDRZzb', label: 'George (Male, UK)' },
+  { id: 'CwhRBWXzGAHq8TQ4Fs17', label: 'Roger (Male, US)' },
+  { id: 'XrExE9yKIg1WjnnlVkGX', label: 'Matilda (Female, US)' },
+  { id: 'TX3LPaxmHKxFdv7VOQHJ', label: 'Liam (Male, US)' },
+  { id: 'cgSgspJ2msm6clMCkdW9', label: 'Jessica (Female, US)' },
+];
+
+const SKILL_OPTIONS = [
+  { value: 'main_idea', label: 'Main Idea' },
+  { value: 'detail', label: 'Detail' },
+  { value: 'inference', label: 'Inference' },
+  { value: 'vocabulary', label: 'Vocabulary' },
+  { value: 'purpose', label: 'Author\'s Purpose' },
+];
  
  interface StudentQuizSubmission {
    student_id: string;
@@ -89,9 +111,12 @@ const Quizzes = () => {
   const [formDescription, setFormDescription] = useState('');
   const [formSectionId, setFormSectionId] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
-  const [formQuizType, setFormQuizType] = useState<'standard' | 'reading'>('standard');
+  const [formQuizType, setFormQuizType] = useState<'standard' | 'reading' | 'listening'>('standard');
   const [formReadingPassage, setFormReadingPassage] = useState('');
   const [formQuestionCount, setFormQuestionCount] = useState(10);
+  const [formAudioScript, setFormAudioScript] = useState('');
+  const [formVoiceId, setFormVoiceId] = useState(ELEVEN_VOICES[0].id);
+  const [formMaxPlays, setFormMaxPlays] = useState<string>('2');
   const [generatingAI, setGeneratingAI] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
 
@@ -105,6 +130,7 @@ const Quizzes = () => {
   const [correctAnswer, setCorrectAnswer] = useState('');
   const [editingQuestion, setEditingQuestion] = useState<QuizQuestion | null>(null);
    const [explanation, setExplanation] = useState('');
+   const [skill, setSkill] = useState<string>('');
  
    // Results view states
    const [resultsDialogOpen, setResultsDialogOpen] = useState(false);
@@ -274,6 +300,10 @@ const Quizzes = () => {
       toast.error('Reading passage must be at least 100 characters');
       return;
     }
+    if (formQuizType === 'listening' && formAudioScript.trim().length < 100) {
+      toast.error('Audio script must be at least 100 characters');
+      return;
+    }
 
     const { data, error } = await supabase
       .from('quizzes')
@@ -285,6 +315,7 @@ const Quizzes = () => {
         is_active: formIsActive,
         quiz_type: formQuizType,
         reading_passage: formQuizType === 'reading' ? formReadingPassage.trim() : null,
+        max_plays: formQuizType === 'listening' ? (formMaxPlays === 'unlimited' ? null : Number(formMaxPlays)) : null,
       })
       .select('*, sections(id, name, section_number)')
       .single();
@@ -297,8 +328,13 @@ const Quizzes = () => {
     toast.success('Quiz created successfully');
 
     if (formQuizType === 'reading') {
-      // Generate questions immediately
       const ok = await generateReadingQuestions(data.id, formReadingPassage.trim(), formQuestionCount);
+      if (ok) {
+        setSelectedQuiz(data as Quiz);
+        await fetchQuestions(data.id);
+      }
+    } else if (formQuizType === 'listening') {
+      const ok = await generateListeningQuiz(data.id, formAudioScript.trim(), formQuestionCount, formVoiceId);
       if (ok) {
         setSelectedQuiz(data as Quiz);
         await fetchQuestions(data.id);
@@ -308,6 +344,46 @@ const Quizzes = () => {
     resetForm();
     setDialogOpen(false);
     fetchData();
+  };
+
+  const generateListeningQuiz = async (quizId: string, script: string, count: number, voiceId: string): Promise<boolean> => {
+    setGeneratingAI(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error('Not authenticated'); return false; }
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-listening-quiz`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ script, count, voice_id: voiceId, quiz_id: quizId }),
+      });
+      const json = await res.json();
+      if (!res.ok) { toast.error(json.error || 'Audio/AI generation failed'); return false; }
+      const rows = (json.questions || []).map((q: any) => ({
+        quiz_id: quizId,
+        question_text: q.question_text,
+        option_a: q.option_a,
+        option_b: q.option_b,
+        option_c: q.option_c,
+        option_d: q.option_d,
+        correct_answer: q.correct_answer,
+        explanation: q.explanation,
+        skill: q.skill,
+        reading_passage: null,
+      }));
+      const { error: insErr } = await supabase.from('quiz_questions').insert(rows);
+      if (insErr) { toast.error('Failed to save generated questions'); return false; }
+      toast.success(`Audio created and ${rows.length} questions generated`);
+      return true;
+    } catch (e) {
+      toast.error('Generation failed');
+      return false;
+    } finally {
+      setGeneratingAI(false);
+    }
   };
 
   const generateReadingQuestions = async (quizId: string, passage: string, count: number): Promise<boolean> => {
@@ -354,12 +430,25 @@ const Quizzes = () => {
 
   const handleRegenerate = async () => {
     if (!selectedQuiz) return;
-    if (!confirm('This will delete existing questions and generate new ones from the passage. Continue?')) return;
-    await supabase.from('quiz_questions').delete().eq('quiz_id', selectedQuiz.id);
-    const passage = selectedQuiz.reading_passage || '';
-    if (!passage) { toast.error('No passage on this quiz'); return; }
-    const ok = await generateReadingQuestions(selectedQuiz.id, passage, formQuestionCount);
-    if (ok) await fetchQuestions(selectedQuiz.id);
+    if (selectedQuiz.quiz_type === 'reading') {
+      if (!confirm('This will delete existing questions and generate new ones from the passage. Continue?')) return;
+      await supabase.from('quiz_questions').delete().eq('quiz_id', selectedQuiz.id);
+      const passage = selectedQuiz.reading_passage || '';
+      if (!passage) { toast.error('No passage on this quiz'); return; }
+      const ok = await generateReadingQuestions(selectedQuiz.id, passage, formQuestionCount);
+      if (ok) await fetchQuestions(selectedQuiz.id);
+    } else if (selectedQuiz.quiz_type === 'listening') {
+      if (!confirm('This will regenerate the audio AND replace all questions. Continue?')) return;
+      await supabase.from('quiz_questions').delete().eq('quiz_id', selectedQuiz.id);
+      const script = selectedQuiz.audio_script || '';
+      if (!script) { toast.error('No script on this quiz'); return; }
+      const voice = selectedQuiz.voice_id || ELEVEN_VOICES[0].id;
+      const ok = await generateListeningQuiz(selectedQuiz.id, script, formQuestionCount, voice);
+      if (ok) {
+        await fetchQuestions(selectedQuiz.id);
+        await fetchData();
+      }
+    }
   };
 
   const handleUpdateQuiz = async () => {
@@ -376,6 +465,7 @@ const Quizzes = () => {
         description: formDescription.trim() || null,
         is_active: formIsActive,
         reading_passage: formQuizType === 'reading' ? formReadingPassage.trim() : null,
+        max_plays: formQuizType === 'listening' ? (formMaxPlays === 'unlimited' ? null : Number(formMaxPlays)) : null,
       })
       .eq('id', editingQuiz.id);
 
@@ -427,6 +517,7 @@ const Quizzes = () => {
         option_d: optionD.trim(),
         correct_answer: correctAnswer,
          explanation: explanation.trim() || null,
+         skill: selectedQuiz.quiz_type === 'listening' ? (skill || 'detail') : null,
       });
 
     if (error) {
@@ -456,6 +547,7 @@ const Quizzes = () => {
         option_d: optionD.trim(),
         correct_answer: correctAnswer,
          explanation: explanation.trim() || null,
+         skill: selectedQuiz?.quiz_type === 'listening' ? (skill || 'detail') : null,
       })
       .eq('id', editingQuestion.id);
 
@@ -493,6 +585,9 @@ const Quizzes = () => {
     setFormQuizType('standard');
     setFormReadingPassage('');
     setFormQuestionCount(10);
+    setFormAudioScript('');
+    setFormVoiceId(ELEVEN_VOICES[0].id);
+    setFormMaxPlays('2');
     setEditingQuiz(null);
   };
 
@@ -506,6 +601,7 @@ const Quizzes = () => {
     setCorrectAnswer('');
     setEditingQuestion(null);
      setExplanation('');
+     setSkill('');
   };
 
   const openEditQuiz = (quiz: Quiz) => {
@@ -514,8 +610,11 @@ const Quizzes = () => {
     setFormDescription(quiz.description || '');
     setFormSectionId(quiz.section_id);
     setFormIsActive(quiz.is_active);
-    setFormQuizType((quiz.quiz_type as 'standard' | 'reading') || 'standard');
+    setFormQuizType((quiz.quiz_type as 'standard' | 'reading' | 'listening') || 'standard');
     setFormReadingPassage(quiz.reading_passage || '');
+    setFormAudioScript(quiz.audio_script || '');
+    setFormVoiceId(quiz.voice_id || ELEVEN_VOICES[0].id);
+    setFormMaxPlays(quiz.max_plays == null ? 'unlimited' : String(quiz.max_plays));
     setDialogOpen(true);
   };
 
@@ -529,6 +628,7 @@ const Quizzes = () => {
     setOptionD(question.option_d);
     setCorrectAnswer(question.correct_answer);
      setExplanation(question.explanation || '');
+     setSkill(question.skill || '');
     setQuestionDialogOpen(true);
   };
 
@@ -580,7 +680,7 @@ const Quizzes = () => {
                 {!editingQuiz && (
                   <div className="space-y-2">
                     <Label>Quiz Type *</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
                         onClick={() => setFormQuizType('standard')}
@@ -597,9 +697,19 @@ const Quizzes = () => {
                         className={`p-3 rounded-lg border text-left transition-colors ${formQuizType === 'reading' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
                       >
                         <div className="flex items-center gap-2 font-medium text-sm">
-                          <FileText className="h-4 w-4" /> Reading Comprehension
+                          <FileText className="h-4 w-4" /> Reading
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">AI generates questions from a passage</p>
+                        <p className="text-xs text-muted-foreground mt-1">AI questions from a passage</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormQuizType('listening')}
+                        className={`p-3 rounded-lg border text-left transition-colors ${formQuizType === 'listening' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                      >
+                        <div className="flex items-center gap-2 font-medium text-sm">
+                          <Headphones className="h-4 w-4" /> Listening
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">AI audio + questions</p>
                       </button>
                     </div>
                   </div>
@@ -665,6 +775,52 @@ const Quizzes = () => {
                   </>
                 )}
 
+                {formQuizType === 'listening' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Audio Script *</Label>
+                      <Textarea
+                        value={formAudioScript}
+                        onChange={(e) => setFormAudioScript(e.target.value)}
+                        placeholder="Write the script that will be read aloud (min 100, max 4000 characters)..."
+                        rows={8}
+                      />
+                      <p className="text-xs text-muted-foreground">{formAudioScript.trim().length} / 4000 characters</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label>Voice</Label>
+                        <Select value={formVoiceId} onValueChange={setFormVoiceId}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {ELEVEN_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Max Plays</Label>
+                        <Select value={formMaxPlays} onValueChange={setFormMaxPlays}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">1 time</SelectItem>
+                            <SelectItem value="2">2 times</SelectItem>
+                            <SelectItem value="3">3 times</SelectItem>
+                            <SelectItem value="unlimited">Unlimited</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {!editingQuiz && (
+                      <div className="space-y-2">
+                        <Label>Number of Questions ({formQuestionCount})</Label>
+                        <input type="range" min={10} max={25} value={formQuestionCount}
+                          onChange={(e) => setFormQuestionCount(Number(e.target.value))} className="w-full" />
+                        <div className="flex justify-between text-xs text-muted-foreground"><span>10</span><span>25</span></div>
+                      </div>
+                    )}
+                  </>
+                )}
+
                 <div className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg">
                   <div className="space-y-0.5">
                     <Label>Active Status</Label>
@@ -675,7 +831,7 @@ const Quizzes = () => {
                 <Button onClick={editingQuiz ? handleUpdateQuiz : handleCreateQuiz} className="w-full" disabled={generatingAI}>
                   {generatingAI ? (
                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating questions with AI…</>
-                  ) : editingQuiz ? 'Update Quiz' : (formQuizType === 'reading' ? (<><Sparkles className="mr-2 h-4 w-4" /> Create & Generate Questions</>) : 'Create Quiz')}
+                  ) : editingQuiz ? 'Update Quiz' : ((formQuizType === 'reading' || formQuizType === 'listening') ? (<><Sparkles className="mr-2 h-4 w-4" /> Create & Generate</>) : 'Create Quiz')}
                 </Button>
               </div>
             </DialogContent>
@@ -801,6 +957,11 @@ const Quizzes = () => {
                               <FileText className="h-3 w-3 mr-1" /> Reading
                             </Badge>
                           )}
+                          {quiz.quiz_type === 'listening' && (
+                            <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-600 border-purple-200">
+                              <Headphones className="h-3 w-3 mr-1" /> Listening
+                            </Badge>
+                          )}
                         </div>
                         {quiz.description && (
                           <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{quiz.description}</p>
@@ -851,10 +1012,15 @@ const Quizzes = () => {
                       <FileText className="h-3 w-3 mr-1" /> Reading
                     </Badge>
                   )}
+                  {selectedQuiz?.quiz_type === 'listening' && (
+                    <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-600 border-purple-200">
+                      <Headphones className="h-3 w-3 mr-1" /> Listening
+                    </Badge>
+                  )}
                 </CardTitle>
               {selectedQuiz && (
                 <div className="flex items-center gap-2">
-                  {selectedQuiz.quiz_type === 'reading' && (
+                  {(selectedQuiz.quiz_type === 'reading' || selectedQuiz.quiz_type === 'listening') && (
                     <Button size="sm" variant="outline" onClick={handleRegenerate} disabled={generatingAI}>
                       {generatingAI ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Sparkles className="mr-2 h-4 w-4" /> Regenerate</>}
                     </Button>

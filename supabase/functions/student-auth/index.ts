@@ -206,7 +206,7 @@ const validators = {
   // Data type for get-data endpoint
   dataType: (val: unknown): ValidationResult => {
     if (typeof val !== 'string') return { valid: false, error: 'Data type must be a string' }
-       const validTypes = ['profile', 'messages', 'notices', 'quizzes', 'quiz_questions', 'quiz_submissions', 'quiz_results', 'lms_progress', 'ca_projects', 'ca_submissions', 'ca_revisions', 'sections', 'content_updates']
+       const validTypes = ['profile', 'messages', 'notices', 'quizzes', 'quiz_questions', 'quiz_submissions', 'quiz_results', 'quiz_audio', 'lms_progress', 'ca_projects', 'ca_submissions', 'ca_revisions', 'sections', 'content_updates']
     if (!validTypes.includes(val)) {
       return { valid: false, error: 'Invalid data type' }
     }
@@ -243,7 +243,7 @@ interface StudentLoginRequest {
 
 interface StudentDataRequest {
   sessionToken: string
-   dataType: 'profile' | 'messages' | 'notices' | 'quizzes' | 'quiz_questions' | 'quiz_submissions' | 'quiz_results' | 'lms_progress' | 'ca_projects' | 'ca_submissions' | 'ca_revisions' | 'sections' | 'content_updates'
+   dataType: 'profile' | 'messages' | 'notices' | 'quizzes' | 'quiz_questions' | 'quiz_submissions' | 'quiz_results' | 'quiz_audio' | 'lms_progress' | 'ca_projects' | 'ca_submissions' | 'ca_revisions' | 'sections' | 'content_updates'
   filters?: Record<string, unknown>
 }
 
@@ -539,9 +539,9 @@ Deno.serve(async (req) => {
             .single()
 
           if (student?.section_id) {
-            const result = await supabaseAdmin
+             const result = await supabaseAdmin
               .from('quizzes')
-              .select('id, title, description, is_active, created_at, quiz_type, reading_passage')
+              .select('id, title, description, is_active, created_at, quiz_type, reading_passage, max_plays')
               .eq('section_id', student.section_id)
               .eq('is_active', true)
               .order('created_at', { ascending: false })
@@ -561,9 +561,9 @@ Deno.serve(async (req) => {
             if (!quizIdValidation.valid) {
               return validationError('Invalid quiz ID format')
             }
-            const result = await supabaseAdmin
+             const result = await supabaseAdmin
               .from('quiz_questions')
-              .select('id, question_text, reading_passage, option_a, option_b, option_c, option_d, quiz_id')
+              .select('id, question_text, reading_passage, option_a, option_b, option_c, option_d, quiz_id, skill')
               .eq('quiz_id', quizId)
             data = result.data
             error = result.error
@@ -601,7 +601,7 @@ Deno.serve(async (req) => {
            // Get all questions for this quiz
            const { data: allQuestions, error: questionsError } = await supabaseAdmin
              .from('quiz_questions')
-             .select('id, question_text, reading_passage, option_a, option_b, option_c, option_d, correct_answer, explanation')
+             .select('id, question_text, reading_passage, option_a, option_b, option_c, option_d, correct_answer, explanation, skill')
              .eq('quiz_id', quizId)
            
            if (questionsError) {
@@ -665,6 +665,7 @@ Deno.serve(async (req) => {
                correct_answer: q.correct_answer,
                is_correct: submission?.is_correct || false,
                explanation: q.explanation,
+               skill: q.skill || null,
                submitted_at: submission?.submitted_at || null
              }
            })
@@ -815,6 +816,41 @@ Deno.serve(async (req) => {
             .limit(20)
           data = result.data
           error = result.error
+          break
+        }
+
+        case 'quiz_audio': {
+          const quizId = filters?.quizId as string
+          if (!quizId) return validationError('Quiz ID is required')
+          const quizIdValidation = validators.uuid(quizId)
+          if (!quizIdValidation.valid) return validationError('Invalid quiz ID format')
+
+          // Verify the student belongs to the quiz's section
+          const { data: student } = await supabaseAdmin
+            .from('students').select('section_id').eq('id', studentId).single()
+          if (!student?.section_id) return validationError('No section assigned')
+
+          const { data: quiz } = await supabaseAdmin
+            .from('quizzes')
+            .select('id, audio_url, section_id, is_active')
+            .eq('id', quizId)
+            .single()
+          if (!quiz || quiz.section_id !== student.section_id || !quiz.is_active || !quiz.audio_url) {
+            return new Response(JSON.stringify({ error: 'Audio not available' }), {
+              status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
+          }
+
+          const { data: signed, error: signErr } = await supabaseAdmin.storage
+            .from('quiz-audio')
+            .createSignedUrl(quiz.audio_url, 3600)
+
+          if (signErr || !signed?.signedUrl) {
+            return new Response(JSON.stringify({ error: 'Failed to generate audio URL' }), {
+              status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
+          }
+          data = { signedUrl: signed.signedUrl }
           break
         }
 

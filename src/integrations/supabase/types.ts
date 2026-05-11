@@ -823,6 +823,7 @@ export type Database = {
           question_text: string
           quiz_id: string
           reading_passage: string | null
+          skill: string | null
           updated_at: string
         }
         Insert: {
@@ -837,6 +838,7 @@ export type Database = {
           question_text: string
           quiz_id: string
           reading_passage?: string | null
+          skill?: string | null
           updated_at?: string
         }
         Update: {
@@ -851,6 +853,7 @@ export type Database = {
           question_text?: string
           quiz_id?: string
           reading_passage?: string | null
+          skill?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -907,40 +910,52 @@ export type Database = {
       }
       quizzes: {
         Row: {
+          audio_script: string | null
+          audio_url: string | null
           created_at: string
           description: string | null
           id: string
           is_active: boolean
+          max_plays: number | null
           quiz_type: string
           reading_passage: string | null
           section_id: string
           title: string
           updated_at: string
           user_id: string
+          voice_id: string | null
         }
         Insert: {
+          audio_script?: string | null
+          audio_url?: string | null
           created_at?: string
           description?: string | null
           id?: string
           is_active?: boolean
+          max_plays?: number | null
           quiz_type?: string
           reading_passage?: string | null
           section_id: string
           title: string
           updated_at?: string
           user_id: string
+          voice_id?: string | null
         }
         Update: {
+          audio_script?: string | null
+          audio_url?: string | null
           created_at?: string
           description?: string | null
           id?: string
           is_active?: boolean
+          max_plays?: number | null
           quiz_type?: string
           reading_passage?: string | null
           section_id?: string
           title?: string
           updated_at?: string
           user_id?: string
+          voice_id?: string | null
         }
         Relationships: [
           {
