@@ -607,12 +607,8 @@ const StudentQuizzes = () => {
                       <div className="flex items-start justify-between">
                         <CardTitle className="text-lg">Question {index + 1}</CardTitle>
                         {hasSubmitted && (
-                          <Badge variant={submission.is_correct ? 'default' : 'destructive'}>
-                            {submission.is_correct ? (
-                              <><CheckCircle className="w-3 h-3 mr-1" /> Correct</>
-                            ) : (
-                              <><XCircle className="w-3 h-3 mr-1" /> Incorrect</>
-                            )}
+                          <Badge variant="secondary">
+                            <CheckCircle className="w-3 h-3 mr-1" /> Answered
                           </Badge>
                         )}
                       </div>
@@ -650,9 +646,9 @@ const StudentQuizzes = () => {
                       {!hasSubmitted && (
                         <Button 
                           onClick={() => handleSubmitAnswer(question)}
-                          disabled={submitting || !currentAnswers[question.id]}
+                          disabled={submittingId === question.id || !currentAnswers[question.id]}
                         >
-                          {submitting ? (
+                          {submittingId === question.id ? (
                             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
                           ) : (
                             'Submit Answer'
