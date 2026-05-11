@@ -70,7 +70,7 @@ async function generateAudio(script: string, voiceId: string): Promise<ArrayBuff
   }
 }
 
-async function generateQuestions(script: string, count: number) {
+async function generateQuestions(script: string, count: number, difficulty: string = "intermediate") {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 90_000);
   try {
@@ -86,11 +86,11 @@ async function generateQuestions(script: string, count: number) {
           {
             role: "system",
             content:
-              "You generate multiple-choice listening-comprehension questions strictly grounded in a provided audio script. Each question must be answerable from the script alone. Vary skill types and tag each question with one of: main_idea, detail, inference, vocabulary, purpose. Provide exactly 4 distinct plausible options and one correct answer letter (A/B/C/D). Include a 1-2 sentence explanation citing the script.",
+              `You generate multiple-choice listening-comprehension questions strictly grounded in a provided audio script. Each question must be answerable from the script alone. Vary skill types and tag each question with one of: main_idea, detail, inference, vocabulary, purpose. Provide exactly 4 distinct plausible options and one correct answer letter (A/B/C/D). Include a 1-2 sentence explanation citing the script.\n\nDIFFICULTY (${difficulty}): ${DIFFICULTY_GUIDE[difficulty] ?? DIFFICULTY_GUIDE.intermediate}`,
           },
           {
             role: "user",
-            content: `Generate exactly ${count} listening-comprehension MCQs from this script.\n\nSCRIPT:\n${script}`,
+            content: `Generate exactly ${count} listening-comprehension MCQs from this script at ${difficulty} difficulty.\n\nSCRIPT:\n${script}`,
           },
         ],
         tools: [{
