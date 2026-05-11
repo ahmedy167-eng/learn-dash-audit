@@ -410,7 +410,7 @@ const Quizzes = () => {
           Authorization: `Bearer ${session.access_token}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
-        body: JSON.stringify({ passage, count }),
+        body: JSON.stringify({ passage, count, difficulty }),
       });
       const json = await res.json();
       if (!res.ok) {
