@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
- import { ClipboardList, CheckCircle, XCircle, ArrowLeft, Loader2, Trophy, Lightbulb, FileText, Headphones, Play, Lock, Target } from 'lucide-react';
+ import { ClipboardList, CheckCircle, XCircle, ArrowLeft, Loader2, Trophy, Lightbulb, FileText, Headphones, Play, Lock, Target, RotateCcw } from 'lucide-react';
  import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 
