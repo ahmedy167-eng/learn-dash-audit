@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
  import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
- import { Plus, Trash2, Edit, ClipboardList, Loader2, CheckCircle, HelpCircle, BookOpen, Users, BarChart3, XCircle, ChevronDown, ChevronUp, Sparkles, FileText } from 'lucide-react';
+ import { Plus, Trash2, Edit, ClipboardList, Loader2, CheckCircle, HelpCircle, BookOpen, Users, BarChart3, XCircle, ChevronDown, ChevronUp, Sparkles, FileText, Headphones, Volume2 } from 'lucide-react';
  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
  import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
@@ -39,6 +39,10 @@ interface Quiz {
   created_at: string;
   quiz_type?: string;
   reading_passage?: string | null;
+  audio_url?: string | null;
+  audio_script?: string | null;
+  max_plays?: number | null;
+  voice_id?: string | null;
   sections?: Section;
 }
 
@@ -53,7 +57,25 @@ interface QuizQuestion {
   option_d: string;
   correct_answer: string;
    explanation: string | null;
+   skill?: string | null;
  }
+
+const ELEVEN_VOICES = [
+  { id: 'EXAVITQu4vr4xnSDxMaL', label: 'Sarah (Female, US)' },
+  { id: 'JBFqnCBsd6RMkjVDRZzb', label: 'George (Male, UK)' },
+  { id: 'CwhRBWXzGAHq8TQ4Fs17', label: 'Roger (Male, US)' },
+  { id: 'XrExE9yKIg1WjnnlVkGX', label: 'Matilda (Female, US)' },
+  { id: 'TX3LPaxmHKxFdv7VOQHJ', label: 'Liam (Male, US)' },
+  { id: 'cgSgspJ2msm6clMCkdW9', label: 'Jessica (Female, US)' },
+];
+
+const SKILL_OPTIONS = [
+  { value: 'main_idea', label: 'Main Idea' },
+  { value: 'detail', label: 'Detail' },
+  { value: 'inference', label: 'Inference' },
+  { value: 'vocabulary', label: 'Vocabulary' },
+  { value: 'purpose', label: 'Author\'s Purpose' },
+];
  
  interface StudentQuizSubmission {
    student_id: string;
@@ -89,9 +111,12 @@ const Quizzes = () => {
   const [formDescription, setFormDescription] = useState('');
   const [formSectionId, setFormSectionId] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
-  const [formQuizType, setFormQuizType] = useState<'standard' | 'reading'>('standard');
+  const [formQuizType, setFormQuizType] = useState<'standard' | 'reading' | 'listening'>('standard');
   const [formReadingPassage, setFormReadingPassage] = useState('');
   const [formQuestionCount, setFormQuestionCount] = useState(10);
+  const [formAudioScript, setFormAudioScript] = useState('');
+  const [formVoiceId, setFormVoiceId] = useState(ELEVEN_VOICES[0].id);
+  const [formMaxPlays, setFormMaxPlays] = useState<string>('2');
   const [generatingAI, setGeneratingAI] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
 
@@ -105,6 +130,7 @@ const Quizzes = () => {
   const [correctAnswer, setCorrectAnswer] = useState('');
   const [editingQuestion, setEditingQuestion] = useState<QuizQuestion | null>(null);
    const [explanation, setExplanation] = useState('');
+   const [skill, setSkill] = useState<string>('');
  
    // Results view states
    const [resultsDialogOpen, setResultsDialogOpen] = useState(false);
