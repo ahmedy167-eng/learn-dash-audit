@@ -80,6 +80,12 @@ const StudentQuizzes = () => {
    const [showResults, setShowResults] = useState(false);
    const [quizResults, setQuizResults] = useState<QuizResultsData | null>(null);
    const [loadingResults, setLoadingResults] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [playCount, setPlayCount] = useState(0);
+  const [hasFinishedFirstPlay, setHasFinishedFirstPlay] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     fetchQuizzes();
