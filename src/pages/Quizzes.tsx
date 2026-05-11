@@ -953,6 +953,20 @@ const Quizzes = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {selectedQuiz?.quiz_type === 'reading' && selectedQuiz.reading_passage && (
+                    <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                          <FileText className="h-4 w-4" /> Reading Passage
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm whitespace-pre-wrap font-serif leading-relaxed max-h-48 overflow-y-auto">
+                          {selectedQuiz.reading_passage}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
                   {questions.map((question, index) => (
                     <Card key={question.id} className="overflow-hidden">
                       <CardHeader className="pb-3 bg-muted/30">
