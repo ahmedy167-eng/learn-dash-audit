@@ -216,7 +216,7 @@ const validators = {
   // Action type for action endpoint
   actionType: (val: unknown): ValidationResult => {
     if (typeof val !== 'string') return { valid: false, error: 'Action must be a string' }
-    const validActions = ['submit_quiz', 'submit_ca', 'update_ca', 'send_message', 'mark_message_read', 'mark_notice_read', 'mark_all_messages_read', 'mark_update_read', 'mark_all_updates_read']
+    const validActions = ['submit_quiz', 'retake_quiz', 'submit_ca', 'update_ca', 'send_message', 'mark_message_read', 'mark_notice_read', 'mark_all_messages_read', 'mark_update_read', 'mark_all_updates_read']
     if (!validActions.includes(val)) {
       return { valid: false, error: 'Invalid action' }
     }
