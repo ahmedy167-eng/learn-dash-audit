@@ -76,7 +76,7 @@ const StudentQuizzes = () => {
   const [submissions, setSubmissions] = useState<Record<string, QuizSubmission>>({});
   const [currentAnswers, setCurrentAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
    const [showResults, setShowResults] = useState(false);
    const [quizResults, setQuizResults] = useState<QuizResultsData | null>(null);
    const [loadingResults, setLoadingResults] = useState(false);
