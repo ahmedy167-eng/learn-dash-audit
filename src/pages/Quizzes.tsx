@@ -490,6 +490,7 @@ const Quizzes = () => {
     }
 
     if (needsRegen) {
+      await supabase.from('quiz_questions').delete().eq('quiz_id', editingQuiz.id);
       const ok = await generateListeningQuiz(editingQuiz.id, formAudioScript.trim(), formQuestionCount, formVoiceId);
       if (ok) {
         await supabase.from('quizzes').update({ is_active: formIsActive }).eq('id', editingQuiz.id);
