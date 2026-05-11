@@ -312,6 +312,58 @@ const StudentQuizzes = () => {
                </CardContent>
              </Card>
  
+             {/* Skill / Improvement Areas Breakdown (listening) */}
+             {selectedQuiz.quiz_type === 'listening' && quizResults.results && quizResults.results.some(r => r.skill) && (() => {
+               const skillLabels: Record<string, string> = {
+                 main_idea: 'Main Idea',
+                 detail: 'Detail',
+                 inference: 'Inference',
+                 vocabulary: 'Vocabulary',
+                 purpose: 'Purpose / Tone',
+               };
+               const buckets = new Map<string, { correct: number; total: number }>();
+               quizResults.results.forEach(r => {
+                 const key = r.skill || 'other';
+                 const b = buckets.get(key) || { correct: 0, total: 0 };
+                 b.total += 1;
+                 if (r.is_correct) b.correct += 1;
+                 buckets.set(key, b);
+               });
+               const rows = Array.from(buckets.entries()).map(([k, v]) => ({
+                 key: k,
+                 label: skillLabels[k] || k,
+                 correct: v.correct,
+                 total: v.total,
+                 pct: Math.round((v.correct / v.total) * 100),
+               })).sort((a, b) => a.pct - b.pct);
+               return (
+                 <Card className="mb-6 border-purple-200 dark:border-purple-800">
+                   <CardHeader className="pb-3">
+                     <CardTitle className="text-base flex items-center gap-2">
+                       <Target className="h-4 w-4 text-purple-600" /> Areas to improve
+                     </CardTitle>
+                     <CardDescription>Performance grouped by skill. Skills below 60% are flagged as focus areas.</CardDescription>
+                   </CardHeader>
+                   <CardContent className="space-y-3">
+                     {rows.map(row => (
+                       <div key={row.key} className="space-y-1">
+                         <div className="flex items-center justify-between text-sm">
+                           <span className="font-medium">{row.label}</span>
+                           <span className="flex items-center gap-2">
+                             <span className="text-muted-foreground">{row.correct}/{row.total}</span>
+                             <Badge variant={row.pct < 60 ? 'destructive' : row.pct < 80 ? 'secondary' : 'default'}>
+                               {row.pct}%{row.pct < 60 ? ' · Focus' : ''}
+                             </Badge>
+                           </span>
+                         </div>
+                         <Progress value={row.pct} className="h-2" />
+                       </div>
+                     ))}
+                   </CardContent>
+                 </Card>
+               );
+             })()}
+
              {/* Question Results */}
              <div className="space-y-4">
                <h2 className="text-lg font-semibold">Question Review</h2>
