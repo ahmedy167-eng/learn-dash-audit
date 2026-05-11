@@ -601,7 +601,7 @@ Deno.serve(async (req) => {
            // Get all questions for this quiz
            const { data: allQuestions, error: questionsError } = await supabaseAdmin
              .from('quiz_questions')
-             .select('id, question_text, reading_passage, option_a, option_b, option_c, option_d, correct_answer, explanation')
+             .select('id, question_text, reading_passage, option_a, option_b, option_c, option_d, correct_answer, explanation, skill')
              .eq('quiz_id', quizId)
            
            if (questionsError) {
@@ -665,6 +665,7 @@ Deno.serve(async (req) => {
                correct_answer: q.correct_answer,
                is_correct: submission?.is_correct || false,
                explanation: q.explanation,
+               skill: q.skill || null,
                submitted_at: submission?.submitted_at || null
              }
            })
