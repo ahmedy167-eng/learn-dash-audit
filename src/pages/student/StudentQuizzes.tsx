@@ -76,7 +76,7 @@ const StudentQuizzes = () => {
   const [submissions, setSubmissions] = useState<Record<string, QuizSubmission>>({});
   const [currentAnswers, setCurrentAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
    const [showResults, setShowResults] = useState(false);
    const [quizResults, setQuizResults] = useState<QuizResultsData | null>(null);
    const [loadingResults, setLoadingResults] = useState(false);
@@ -181,7 +181,7 @@ const StudentQuizzes = () => {
       return;
     }
 
-    setSubmitting(true);
+    setSubmittingId(question.id);
 
     // Note: correct_answer is not exposed to client anymore for security
     // The server will validate and return whether it's correct
@@ -195,14 +195,10 @@ const StudentQuizzes = () => {
       toast.error('Failed to submit answer');
     } else if (data) {
       setSubmissions(prev => ({ ...prev, [question.id]: data }));
-      if (data.is_correct) {
-        toast.success('Correct answer! 🎉');
-      } else {
-        toast.error('Incorrect answer');
-      }
+      toast.success('Answer saved');
     }
 
-    setSubmitting(false);
+    setSubmittingId(null);
   };
 
   const goBack = () => {
@@ -611,12 +607,8 @@ const StudentQuizzes = () => {
                       <div className="flex items-start justify-between">
                         <CardTitle className="text-lg">Question {index + 1}</CardTitle>
                         {hasSubmitted && (
-                          <Badge variant={submission.is_correct ? 'default' : 'destructive'}>
-                            {submission.is_correct ? (
-                              <><CheckCircle className="w-3 h-3 mr-1" /> Correct</>
-                            ) : (
-                              <><XCircle className="w-3 h-3 mr-1" /> Incorrect</>
-                            )}
+                          <Badge variant="secondary">
+                            <CheckCircle className="w-3 h-3 mr-1" /> Answered
                           </Badge>
                         )}
                       </div>
@@ -654,9 +646,9 @@ const StudentQuizzes = () => {
                       {!hasSubmitted && (
                         <Button 
                           onClick={() => handleSubmitAnswer(question)}
-                          disabled={submitting || !currentAnswers[question.id]}
+                          disabled={submittingId === question.id || !currentAnswers[question.id]}
                         >
-                          {submitting ? (
+                          {submittingId === question.id ? (
                             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
                           ) : (
                             'Submit Answer'
