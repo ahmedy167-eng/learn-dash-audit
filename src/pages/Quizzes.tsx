@@ -490,6 +490,9 @@ const Quizzes = () => {
     setFormDescription('');
     setFormSectionId('');
     setFormIsActive(true);
+    setFormQuizType('standard');
+    setFormReadingPassage('');
+    setFormQuestionCount(10);
     setEditingQuiz(null);
   };
 
@@ -511,6 +514,8 @@ const Quizzes = () => {
     setFormDescription(quiz.description || '');
     setFormSectionId(quiz.section_id);
     setFormIsActive(quiz.is_active);
+    setFormQuizType((quiz.quiz_type as 'standard' | 'reading') || 'standard');
+    setFormReadingPassage(quiz.reading_passage || '');
     setDialogOpen(true);
   };
 
