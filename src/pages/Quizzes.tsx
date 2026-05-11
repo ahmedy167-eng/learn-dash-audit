@@ -89,6 +89,10 @@ const Quizzes = () => {
   const [formDescription, setFormDescription] = useState('');
   const [formSectionId, setFormSectionId] = useState('');
   const [formIsActive, setFormIsActive] = useState(true);
+  const [formQuizType, setFormQuizType] = useState<'standard' | 'reading'>('standard');
+  const [formReadingPassage, setFormReadingPassage] = useState('');
+  const [formQuestionCount, setFormQuestionCount] = useState(10);
+  const [generatingAI, setGeneratingAI] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
 
   // Question form states
