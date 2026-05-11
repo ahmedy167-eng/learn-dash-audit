@@ -100,18 +100,18 @@ Deno.serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const { passage, count } = parsed.data;
+    const { passage, count, difficulty } = parsed.data;
 
     const result = await callAI({
       model: "google/gemini-2.5-flash",
       messages: [
         {
           role: "system",
-          content: "You generate multiple-choice reading-comprehension questions strictly grounded in a provided passage. Each question must be answerable from the passage alone. Vary question types (main idea, detail, inference, vocabulary in context, author's purpose). Provide exactly 4 distinct plausible options and one correct answer letter (A/B/C/D). Include a 1-2 sentence explanation citing the passage.",
+          content: `You generate multiple-choice reading-comprehension questions strictly grounded in a provided passage. Each question must be answerable from the passage alone. Vary question types (main idea, detail, inference, vocabulary in context, author's purpose). Provide exactly 4 distinct plausible options and one correct answer letter (A/B/C/D). Include a 1-2 sentence explanation citing the passage.\n\nDIFFICULTY (${difficulty}): ${DIFFICULTY_GUIDE[difficulty] ?? DIFFICULTY_GUIDE.intermediate}`,
         },
         {
           role: "user",
-          content: `Generate exactly ${count} reading-comprehension MCQs from this passage.\n\nPASSAGE:\n${passage}`,
+          content: `Generate exactly ${count} reading-comprehension MCQs from this passage at ${difficulty} difficulty.\n\nPASSAGE:\n${passage}`,
         },
       ],
       tools: [{
