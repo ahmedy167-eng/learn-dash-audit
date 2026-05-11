@@ -1105,6 +1105,12 @@ const Quizzes = () => {
                       <Headphones className="h-3 w-3 mr-1" /> Listening
                     </Badge>
                   )}
+                  {selectedQuiz?.quiz_type === 'listening' && selectedQuiz?.transcript_visibility && selectedQuiz.transcript_visibility !== 'never' && (
+                    <Badge variant="outline" className="text-xs">
+                      <FileText className="h-3 w-3 mr-1" />
+                      Transcript: {selectedQuiz.transcript_visibility === 'always' ? 'Always' : 'After audio'}
+                    </Badge>
+                  )}
                 </CardTitle>
               {selectedQuiz && (
                 <div className="flex items-center gap-2">
