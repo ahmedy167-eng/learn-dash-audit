@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
     if (!parsed.success) {
       return jsonResponse({ error: "Invalid request", details: parsed.error.flatten() }, 400);
     }
-    const { script, count, voice_id, quiz_id } = parsed.data;
+    const { script, count, voice_id, quiz_id, difficulty } = parsed.data;
 
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -215,15 +215,15 @@ Deno.serve(async (req) => {
     }
 
     // 3. Generate questions
-    const questions = await generateQuestions(script, count);
+    const questions = await generateQuestions(script, count, difficulty);
     if (questions.length === 0) {
       return jsonResponse({ error: "AI returned no usable questions. Try again." }, 502);
     }
 
-    // 4. Update quiz row with audio path + script
+    // 4. Update quiz row with audio path + script + difficulty
     await admin
       .from("quizzes")
-      .update({ audio_url: path, audio_script: script, voice_id })
+      .update({ audio_url: path, audio_script: script, voice_id, difficulty })
       .eq("id", quiz_id);
 
     return jsonResponse({ audio_path: path, questions });
