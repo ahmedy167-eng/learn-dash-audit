@@ -831,7 +831,7 @@ const Quizzes = () => {
                 <Button onClick={editingQuiz ? handleUpdateQuiz : handleCreateQuiz} className="w-full" disabled={generatingAI}>
                   {generatingAI ? (
                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating questions with AI…</>
-                  ) : editingQuiz ? 'Update Quiz' : (formQuizType === 'reading' ? (<><Sparkles className="mr-2 h-4 w-4" /> Create & Generate Questions</>) : 'Create Quiz')}
+                  ) : editingQuiz ? 'Update Quiz' : ((formQuizType === 'reading' || formQuizType === 'listening') ? (<><Sparkles className="mr-2 h-4 w-4" /> Create & Generate</>) : 'Create Quiz')}
                 </Button>
               </div>
             </DialogContent>
@@ -957,6 +957,11 @@ const Quizzes = () => {
                               <FileText className="h-3 w-3 mr-1" /> Reading
                             </Badge>
                           )}
+                          {quiz.quiz_type === 'listening' && (
+                            <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-600 border-purple-200">
+                              <Headphones className="h-3 w-3 mr-1" /> Listening
+                            </Badge>
+                          )}
                         </div>
                         {quiz.description && (
                           <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{quiz.description}</p>
@@ -1007,10 +1012,15 @@ const Quizzes = () => {
                       <FileText className="h-3 w-3 mr-1" /> Reading
                     </Badge>
                   )}
+                  {selectedQuiz?.quiz_type === 'listening' && (
+                    <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-600 border-purple-200">
+                      <Headphones className="h-3 w-3 mr-1" /> Listening
+                    </Badge>
+                  )}
                 </CardTitle>
               {selectedQuiz && (
                 <div className="flex items-center gap-2">
-                  {selectedQuiz.quiz_type === 'reading' && (
+                  {(selectedQuiz.quiz_type === 'reading' || selectedQuiz.quiz_type === 'listening') && (
                     <Button size="sm" variant="outline" onClick={handleRegenerate} disabled={generatingAI}>
                       {generatingAI ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Sparkles className="mr-2 h-4 w-4" /> Regenerate</>}
                     </Button>
