@@ -929,6 +929,7 @@ const Quizzes = () => {
                     </div>
                   </DialogContent>
                 </Dialog>
+                </div>
               )}
               </div>
             </CardHeader>
