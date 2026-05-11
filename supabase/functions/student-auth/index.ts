@@ -206,7 +206,7 @@ const validators = {
   // Data type for get-data endpoint
   dataType: (val: unknown): ValidationResult => {
     if (typeof val !== 'string') return { valid: false, error: 'Data type must be a string' }
-       const validTypes = ['profile', 'messages', 'notices', 'quizzes', 'quiz_questions', 'quiz_submissions', 'quiz_results', 'lms_progress', 'ca_projects', 'ca_submissions', 'ca_revisions', 'sections', 'content_updates']
+       const validTypes = ['profile', 'messages', 'notices', 'quizzes', 'quiz_questions', 'quiz_submissions', 'quiz_results', 'quiz_audio', 'lms_progress', 'ca_projects', 'ca_submissions', 'ca_revisions', 'sections', 'content_updates']
     if (!validTypes.includes(val)) {
       return { valid: false, error: 'Invalid data type' }
     }
@@ -243,7 +243,7 @@ interface StudentLoginRequest {
 
 interface StudentDataRequest {
   sessionToken: string
-   dataType: 'profile' | 'messages' | 'notices' | 'quizzes' | 'quiz_questions' | 'quiz_submissions' | 'quiz_results' | 'lms_progress' | 'ca_projects' | 'ca_submissions' | 'ca_revisions' | 'sections' | 'content_updates'
+   dataType: 'profile' | 'messages' | 'notices' | 'quizzes' | 'quiz_questions' | 'quiz_submissions' | 'quiz_results' | 'quiz_audio' | 'lms_progress' | 'ca_projects' | 'ca_submissions' | 'ca_revisions' | 'sections' | 'content_updates'
   filters?: Record<string, unknown>
 }
 
@@ -539,9 +539,9 @@ Deno.serve(async (req) => {
             .single()
 
           if (student?.section_id) {
-            const result = await supabaseAdmin
+             const result = await supabaseAdmin
               .from('quizzes')
-              .select('id, title, description, is_active, created_at, quiz_type, reading_passage')
+              .select('id, title, description, is_active, created_at, quiz_type, reading_passage, max_plays')
               .eq('section_id', student.section_id)
               .eq('is_active', true)
               .order('created_at', { ascending: false })
@@ -561,9 +561,9 @@ Deno.serve(async (req) => {
             if (!quizIdValidation.valid) {
               return validationError('Invalid quiz ID format')
             }
-            const result = await supabaseAdmin
+             const result = await supabaseAdmin
               .from('quiz_questions')
-              .select('id, question_text, reading_passage, option_a, option_b, option_c, option_d, quiz_id')
+              .select('id, question_text, reading_passage, option_a, option_b, option_c, option_d, quiz_id, skill')
               .eq('quiz_id', quizId)
             data = result.data
             error = result.error
