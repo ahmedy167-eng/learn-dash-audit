@@ -43,8 +43,11 @@ interface Quiz {
   audio_script?: string | null;
   max_plays?: number | null;
   voice_id?: string | null;
+  difficulty?: string;
   sections?: Section;
 }
+
+type Difficulty = 'easy' | 'intermediate' | 'advanced';
 
 interface QuizQuestion {
   id: string;
