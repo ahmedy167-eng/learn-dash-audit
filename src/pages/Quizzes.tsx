@@ -44,7 +44,7 @@ interface Quiz {
   max_plays?: number | null;
   voice_id?: string | null;
   difficulty?: string;
-  transcript_visibility?: 'never' | 'after_audio' | 'always' | null;
+  transcript_visibility?: string | null;
   sections?: Section;
 }
 
