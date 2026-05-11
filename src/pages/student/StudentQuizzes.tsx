@@ -684,7 +684,19 @@ const StudentQuizzes = () => {
             {quizzes.map((quiz) => (
               <Card key={quiz.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => fetchQuizDetails(quiz)}>
                 <CardHeader>
-                  <CardTitle className="text-lg">{quiz.title}</CardTitle>
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-lg">{quiz.title}</CardTitle>
+                    {quiz.quiz_type === 'listening' && (
+                      <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-200 shrink-0">
+                        <Headphones className="h-3 w-3 mr-1" /> Listening
+                      </Badge>
+                    )}
+                    {quiz.quiz_type === 'reading' && (
+                      <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-200 shrink-0">
+                        <FileText className="h-3 w-3 mr-1" /> Reading
+                      </Badge>
+                    )}
+                  </div>
                   {quiz.description && (
                     <CardDescription>{quiz.description}</CardDescription>
                   )}
