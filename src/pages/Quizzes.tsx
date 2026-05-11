@@ -44,6 +44,7 @@ interface Quiz {
   max_plays?: number | null;
   voice_id?: string | null;
   difficulty?: string;
+  transcript_visibility?: string | null;
   sections?: Section;
 }
 
@@ -120,6 +121,7 @@ const Quizzes = () => {
   const [formAudioScript, setFormAudioScript] = useState('');
   const [formVoiceId, setFormVoiceId] = useState(ELEVEN_VOICES[0].id);
   const [formMaxPlays, setFormMaxPlays] = useState<string>('2');
+  const [formTranscriptVisibility, setFormTranscriptVisibility] = useState<'never' | 'after_audio' | 'always'>('never');
   const [formDifficulty, setFormDifficulty] = useState<Difficulty>('intermediate');
   const [generatingAI, setGeneratingAI] = useState(false);
   const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
@@ -325,6 +327,7 @@ const Quizzes = () => {
         audio_script: formQuizType === 'listening' ? formAudioScript.trim() : null,
         voice_id: formQuizType === 'listening' ? formVoiceId : null,
         max_plays: formQuizType === 'listening' ? (formMaxPlays === 'unlimited' ? null : Number(formMaxPlays)) : null,
+        transcript_visibility: formQuizType === 'listening' ? formTranscriptVisibility : 'never',
       } as any)
       .select('*, sections(id, name, section_number)')
       .single();
@@ -492,6 +495,7 @@ const Quizzes = () => {
         audio_script: formQuizType === 'listening' ? formAudioScript.trim() : null,
         voice_id: formQuizType === 'listening' ? formVoiceId : null,
         max_plays: formQuizType === 'listening' ? (formMaxPlays === 'unlimited' ? null : Number(formMaxPlays)) : null,
+        transcript_visibility: formQuizType === 'listening' ? formTranscriptVisibility : 'never',
       } as any)
       .eq('id', editingQuiz.id);
 
@@ -625,6 +629,7 @@ const Quizzes = () => {
     setFormAudioScript('');
     setFormVoiceId(ELEVEN_VOICES[0].id);
     setFormMaxPlays('2');
+    setFormTranscriptVisibility('never');
     setFormDifficulty('intermediate');
     setEditingQuiz(null);
   };
@@ -653,6 +658,7 @@ const Quizzes = () => {
     setFormAudioScript(quiz.audio_script || '');
     setFormVoiceId(quiz.voice_id || ELEVEN_VOICES[0].id);
     setFormMaxPlays(quiz.max_plays == null ? 'unlimited' : String(quiz.max_plays));
+    setFormTranscriptVisibility(((quiz.transcript_visibility as any) || 'never'));
     setFormDifficulty(((quiz.difficulty as Difficulty) || 'intermediate'));
     setDialogOpen(true);
   };
@@ -863,6 +869,20 @@ const Quizzes = () => {
                           </SelectContent>
                         </Select>
                       </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Show Transcript to Students</Label>
+                      <Select value={formTranscriptVisibility} onValueChange={(v) => setFormTranscriptVisibility(v as 'never' | 'after_audio' | 'always')}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="never">Never — audio only</SelectItem>
+                          <SelectItem value="after_audio">After audio finishes</SelectItem>
+                          <SelectItem value="always">Always visible</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Controls if and when students can read the audio script.
+                      </p>
                     </div>
                     {!editingQuiz && (
                       <div className="space-y-2">
@@ -1083,6 +1103,12 @@ const Quizzes = () => {
                   {selectedQuiz?.quiz_type === 'listening' && (
                     <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-600 border-purple-200">
                       <Headphones className="h-3 w-3 mr-1" /> Listening
+                    </Badge>
+                  )}
+                  {selectedQuiz?.quiz_type === 'listening' && selectedQuiz?.transcript_visibility && selectedQuiz.transcript_visibility !== 'never' && (
+                    <Badge variant="outline" className="text-xs">
+                      <FileText className="h-3 w-3 mr-1" />
+                      Transcript: {selectedQuiz.transcript_visibility === 'always' ? 'Always' : 'After audio'}
                     </Badge>
                   )}
                 </CardTitle>

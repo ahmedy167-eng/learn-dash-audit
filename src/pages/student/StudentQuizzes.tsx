@@ -19,6 +19,8 @@ interface Quiz {
   quiz_type?: string;
   reading_passage?: string | null;
   max_plays?: number | null;
+  audio_script?: string | null;
+  transcript_visibility?: 'never' | 'after_audio' | 'always' | string;
 }
 
 interface QuizQuestion {
@@ -554,6 +556,29 @@ const StudentQuizzes = () => {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {selectedQuiz.quiz_type === 'listening' && selectedQuiz.audio_script && (
+            (selectedQuiz.transcript_visibility === 'always' ||
+              (selectedQuiz.transcript_visibility === 'after_audio' && hasFinishedFirstPlay)) && (
+              <Card className="mb-6 border-purple-200 dark:border-purple-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <FileText className="h-4 w-4" /> Transcript
+                  </CardTitle>
+                  <CardDescription>
+                    {selectedQuiz.transcript_visibility === 'always'
+                      ? 'You can read along with the audio.'
+                      : 'The script is now available to review.'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap max-h-72 overflow-y-auto bg-muted/40 rounded-md p-3">
+                    {selectedQuiz.audio_script}
+                  </p>
+                </CardContent>
+              </Card>
+            )
           )}
 
           {loading ? (
