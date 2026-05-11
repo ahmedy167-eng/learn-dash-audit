@@ -13,7 +13,14 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const RequestSchema = z.object({
   passage: z.string().trim().min(100, "Passage must be at least 100 characters").max(15000),
   count: z.number().int().min(10).max(25),
+  difficulty: z.enum(["easy", "intermediate", "advanced"]).default("intermediate"),
 });
+
+const DIFFICULTY_GUIDE: Record<string, string> = {
+  easy: "Use simple vocabulary and direct/literal questions (mostly detail and main idea). Distractors should be clearly wrong.",
+  intermediate: "Mix detail, inference, and vocabulary questions with moderately plausible distractors.",
+  advanced: "Emphasize inference, nuanced vocabulary, and author's purpose. Distractors must be highly plausible and require careful reading.",
+};
 
 async function callAI(body: unknown, timeoutMs = 90_000) {
   const ctrl = new AbortController();
