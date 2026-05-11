@@ -18,6 +18,7 @@ interface Quiz {
   is_active: boolean;
   quiz_type?: string;
   reading_passage?: string | null;
+  max_plays?: number | null;
 }
 
 interface QuizQuestion {
@@ -30,6 +31,7 @@ interface QuizQuestion {
   option_c: string;
   option_d: string;
   correct_answer?: string;
+  skill?: string | null;
 }
 
 interface QuizSubmission {
@@ -51,6 +53,7 @@ interface QuizSubmission {
    correct_answer: string;
    is_correct: boolean;
    explanation: string | null;
+   skill?: string | null;
  }
  
  interface QuizResultsData {
