@@ -780,6 +780,21 @@ const Quizzes = () => {
                   <Textarea value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="Optional description" rows={2} />
                 </div>
 
+                <div className="space-y-2">
+                  <Label>Difficulty</Label>
+                  <Select value={formDifficulty} onValueChange={(v) => setFormDifficulty(v as Difficulty)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="easy">Easy</SelectItem>
+                      <SelectItem value="intermediate">Intermediate</SelectItem>
+                      <SelectItem value="advanced">Advanced</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Controls how challenging AI-generated questions will be.
+                  </p>
+                </div>
+
                 {formQuizType === 'reading' && (
                   <>
                     <div className="space-y-2">
