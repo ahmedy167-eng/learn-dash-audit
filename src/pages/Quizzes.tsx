@@ -625,6 +625,7 @@ const Quizzes = () => {
     setFormAudioScript('');
     setFormVoiceId(ELEVEN_VOICES[0].id);
     setFormMaxPlays('2');
+    setFormDifficulty('intermediate');
     setEditingQuiz(null);
   };
 
