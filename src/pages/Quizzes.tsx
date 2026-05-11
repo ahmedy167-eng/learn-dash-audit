@@ -844,10 +844,21 @@ const Quizzes = () => {
           <Card className="lg:col-span-3 flex flex-col min-h-[600px]">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">
+                <CardTitle className="text-lg flex items-center gap-2">
                   {selectedQuiz ? selectedQuiz.title : 'Select a Quiz'}
+                  {selectedQuiz?.quiz_type === 'reading' && (
+                    <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 border-blue-200">
+                      <FileText className="h-3 w-3 mr-1" /> Reading
+                    </Badge>
+                  )}
                 </CardTitle>
               {selectedQuiz && (
+                <div className="flex items-center gap-2">
+                  {selectedQuiz.quiz_type === 'reading' && (
+                    <Button size="sm" variant="outline" onClick={handleRegenerate} disabled={generatingAI}>
+                      {generatingAI ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Sparkles className="mr-2 h-4 w-4" /> Regenerate</>}
+                    </Button>
+                  )}
                 <Dialog open={questionDialogOpen} onOpenChange={(open) => { setQuestionDialogOpen(open); if (!open) resetQuestionForm(); }}>
                   <DialogTrigger asChild>
                     <Button size="sm">
