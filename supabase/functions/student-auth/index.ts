@@ -819,6 +819,41 @@ Deno.serve(async (req) => {
           break
         }
 
+        case 'quiz_audio': {
+          const quizId = filters?.quizId as string
+          if (!quizId) return validationError('Quiz ID is required')
+          const quizIdValidation = validators.uuid(quizId)
+          if (!quizIdValidation.valid) return validationError('Invalid quiz ID format')
+
+          // Verify the student belongs to the quiz's section
+          const { data: student } = await supabaseAdmin
+            .from('students').select('section_id').eq('id', studentId).single()
+          if (!student?.section_id) return validationError('No section assigned')
+
+          const { data: quiz } = await supabaseAdmin
+            .from('quizzes')
+            .select('id, audio_url, section_id, is_active')
+            .eq('id', quizId)
+            .single()
+          if (!quiz || quiz.section_id !== student.section_id || !quiz.is_active || !quiz.audio_url) {
+            return new Response(JSON.stringify({ error: 'Audio not available' }), {
+              status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
+          }
+
+          const { data: signed, error: signErr } = await supabaseAdmin.storage
+            .from('quiz-audio')
+            .createSignedUrl(quiz.audio_url, 3600)
+
+          if (signErr || !signed?.signedUrl) {
+            return new Response(JSON.stringify({ error: 'Failed to generate audio URL' }), {
+              status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
+          }
+          data = { signedUrl: signed.signedUrl }
+          break
+        }
+
         default:
           return new Response(
             JSON.stringify({ error: 'Invalid data type' }),
