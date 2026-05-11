@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
- import { ClipboardList, CheckCircle, XCircle, ArrowLeft, Loader2, Trophy, Lightbulb, FileText, Headphones, Play, Lock, Target } from 'lucide-react';
+ import { ClipboardList, CheckCircle, XCircle, ArrowLeft, Loader2, Trophy, Lightbulb, FileText, Headphones, Play, Lock, Target, RotateCcw } from 'lucide-react';
  import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 
@@ -81,7 +81,8 @@ const StudentQuizzes = () => {
   const [submittingId, setSubmittingId] = useState<string | null>(null);
    const [showResults, setShowResults] = useState(false);
    const [quizResults, setQuizResults] = useState<QuizResultsData | null>(null);
-   const [loadingResults, setLoadingResults] = useState(false);
+  const [loadingResults, setLoadingResults] = useState(false);
+  const [retaking, setRetaking] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
   const [playCount, setPlayCount] = useState(0);
@@ -242,7 +243,32 @@ const StudentQuizzes = () => {
      }
      setLoadingResults(false);
    };
- 
+
+   const handleRetake = async () => {
+     if (!selectedQuiz) return;
+     setRetaking(true);
+     const { error } = await performAction('retake_quiz', { quizId: selectedQuiz.id });
+     if (error) {
+       toast.error('Failed to reset quiz. Please try again.');
+       setRetaking(false);
+       return;
+     }
+     // Reset local state to start fresh
+     setSubmissions({});
+     setCurrentAnswers({});
+     setQuizResults(null);
+     setShowResults(false);
+     setPlayCount(0);
+     setHasFinishedFirstPlay(false);
+     setIsPlaying(false);
+     if (audioRef.current) {
+       audioRef.current.pause();
+       audioRef.current.currentTime = 0;
+     }
+     toast.success('Quiz reset. Good luck!');
+     setRetaking(false);
+   };
+
    const getOptionLabel = (answer: string, question: QuizResult) => {
      switch (answer) {
        case 'A': return question.option_a;
@@ -441,12 +467,19 @@ const StudentQuizzes = () => {
                ))}
              </div>
  
-             <div className="mt-6">
-               <Button onClick={goBack} variant="outline" className="w-full">
-                 <ArrowLeft className="mr-2 h-4 w-4" />
-                 Back to Quizzes
-               </Button>
-             </div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <Button onClick={handleRetake} disabled={retaking} className="w-full">
+                {retaking ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Resetting...</>
+                ) : (
+                  <><RotateCcw className="mr-2 h-4 w-4" /> Retake Quiz</>
+                )}
+              </Button>
+              <Button onClick={goBack} variant="outline" className="w-full">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Quizzes
+              </Button>
+            </div>
            </div>
          </StudentLayout>
        );

@@ -216,7 +216,7 @@ const validators = {
   // Action type for action endpoint
   actionType: (val: unknown): ValidationResult => {
     if (typeof val !== 'string') return { valid: false, error: 'Action must be a string' }
-    const validActions = ['submit_quiz', 'submit_ca', 'update_ca', 'send_message', 'mark_message_read', 'mark_notice_read', 'mark_all_messages_read', 'mark_update_read', 'mark_all_updates_read']
+    const validActions = ['submit_quiz', 'retake_quiz', 'submit_ca', 'update_ca', 'send_message', 'mark_message_read', 'mark_notice_read', 'mark_all_messages_read', 'mark_update_read', 'mark_all_updates_read']
     if (!validActions.includes(val)) {
       return { valid: false, error: 'Invalid action' }
     }
@@ -249,7 +249,7 @@ interface StudentDataRequest {
 
 interface StudentActionRequest {
   sessionToken: string
-  action: 'submit_quiz' | 'submit_ca' | 'update_ca' | 'send_message' | 'mark_message_read' | 'mark_notice_read' | 'mark_all_messages_read' | 'mark_update_read' | 'mark_all_updates_read'
+  action: 'submit_quiz' | 'retake_quiz' | 'submit_ca' | 'update_ca' | 'send_message' | 'mark_message_read' | 'mark_notice_read' | 'mark_all_messages_read' | 'mark_update_read' | 'mark_all_updates_read'
   data: Record<string, unknown>
 }
 
@@ -959,6 +959,43 @@ Deno.serve(async (req) => {
             .single()
           result = insertResult.data
           actionError = insertResult.error
+          break
+        }
+
+        case 'retake_quiz': {
+          const { quizId } = actionData as { quizId: string }
+          const quizIdValidation = validators.uuid(quizId)
+          if (!quizIdValidation.valid) {
+            return validationError('Invalid quiz ID format')
+          }
+
+          const { data: qs, error: qErr } = await supabaseAdmin
+            .from('quiz_questions')
+            .select('id')
+            .eq('quiz_id', quizId)
+
+          if (qErr) {
+            actionError = qErr
+            break
+          }
+
+          const questionIds = (qs || []).map(q => q.id)
+          if (questionIds.length === 0) {
+            result = { success: true, deleted: 0 }
+            break
+          }
+
+          const delResult = await supabaseAdmin
+            .from('quiz_submissions')
+            .delete()
+            .eq('student_id', studentId)
+            .in('question_id', questionIds)
+
+          if (delResult.error) {
+            actionError = delResult.error
+          } else {
+            result = { success: true }
+          }
           break
         }
 
