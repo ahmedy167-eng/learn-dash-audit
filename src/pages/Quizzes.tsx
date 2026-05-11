@@ -442,12 +442,14 @@ const Quizzes = () => {
 
   const handleRegenerate = async () => {
     if (!selectedQuiz) return;
+    const clampedCount = Math.max(10, Math.min(25, Number(formQuestionCount) || 10));
+    const diff = (selectedQuiz.difficulty as Difficulty) || formDifficulty;
     if (selectedQuiz.quiz_type === 'reading') {
       if (!confirm('This will delete existing questions and generate new ones from the passage. Continue?')) return;
       await supabase.from('quiz_questions').delete().eq('quiz_id', selectedQuiz.id);
       const passage = selectedQuiz.reading_passage || '';
       if (!passage) { toast.error('No passage on this quiz'); return; }
-      const ok = await generateReadingQuestions(selectedQuiz.id, passage, formQuestionCount);
+      const ok = await generateReadingQuestions(selectedQuiz.id, passage, clampedCount, diff);
       if (ok) await fetchQuestions(selectedQuiz.id);
     } else if (selectedQuiz.quiz_type === 'listening') {
       if (!confirm('This will regenerate the audio AND replace all questions. Continue?')) return;
@@ -455,7 +457,7 @@ const Quizzes = () => {
       const script = selectedQuiz.audio_script || '';
       if (!script) { toast.error('No script on this quiz'); return; }
       const voice = selectedQuiz.voice_id || ELEVEN_VOICES[0].id;
-      const ok = await generateListeningQuiz(selectedQuiz.id, script, formQuestionCount, voice);
+      const ok = await generateListeningQuiz(selectedQuiz.id, script, clampedCount, voice, diff);
       if (ok) {
         await fetchQuestions(selectedQuiz.id);
         await fetchData();
