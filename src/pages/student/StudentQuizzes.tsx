@@ -181,7 +181,7 @@ const StudentQuizzes = () => {
       return;
     }
 
-    setSubmitting(true);
+    setSubmittingId(question.id);
 
     // Note: correct_answer is not exposed to client anymore for security
     // The server will validate and return whether it's correct
@@ -195,14 +195,10 @@ const StudentQuizzes = () => {
       toast.error('Failed to submit answer');
     } else if (data) {
       setSubmissions(prev => ({ ...prev, [question.id]: data }));
-      if (data.is_correct) {
-        toast.success('Correct answer! 🎉');
-      } else {
-        toast.error('Incorrect answer');
-      }
+      toast.success('Answer saved');
     }
 
-    setSubmitting(false);
+    setSubmittingId(null);
   };
 
   const goBack = () => {
