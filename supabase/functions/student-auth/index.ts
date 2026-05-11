@@ -962,6 +962,43 @@ Deno.serve(async (req) => {
           break
         }
 
+        case 'retake_quiz': {
+          const { quizId } = actionData as { quizId: string }
+          const quizIdValidation = validators.uuid(quizId)
+          if (!quizIdValidation.valid) {
+            return validationError('Invalid quiz ID format')
+          }
+
+          const { data: qs, error: qErr } = await supabaseAdmin
+            .from('quiz_questions')
+            .select('id')
+            .eq('quiz_id', quizId)
+
+          if (qErr) {
+            actionError = qErr
+            break
+          }
+
+          const questionIds = (qs || []).map(q => q.id)
+          if (questionIds.length === 0) {
+            result = { success: true, deleted: 0 }
+            break
+          }
+
+          const delResult = await supabaseAdmin
+            .from('quiz_submissions')
+            .delete()
+            .eq('student_id', studentId)
+            .in('question_id', questionIds)
+
+          if (delResult.error) {
+            actionError = delResult.error
+          } else {
+            result = { success: true }
+          }
+          break
+        }
+
         case 'submit_ca': {
           const { projectId, stage, content } = actionData as {
             projectId: string
