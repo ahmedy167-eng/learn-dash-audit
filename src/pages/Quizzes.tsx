@@ -300,6 +300,10 @@ const Quizzes = () => {
       toast.error('Reading passage must be at least 100 characters');
       return;
     }
+    if (formQuizType === 'listening' && formAudioScript.trim().length < 100) {
+      toast.error('Audio script must be at least 100 characters');
+      return;
+    }
 
     const { data, error } = await supabase
       .from('quizzes')
@@ -311,6 +315,7 @@ const Quizzes = () => {
         is_active: formIsActive,
         quiz_type: formQuizType,
         reading_passage: formQuizType === 'reading' ? formReadingPassage.trim() : null,
+        max_plays: formQuizType === 'listening' ? (formMaxPlays === 'unlimited' ? null : Number(formMaxPlays)) : null,
       })
       .select('*, sections(id, name, section_number)')
       .single();
@@ -323,8 +328,13 @@ const Quizzes = () => {
     toast.success('Quiz created successfully');
 
     if (formQuizType === 'reading') {
-      // Generate questions immediately
       const ok = await generateReadingQuestions(data.id, formReadingPassage.trim(), formQuestionCount);
+      if (ok) {
+        setSelectedQuiz(data as Quiz);
+        await fetchQuestions(data.id);
+      }
+    } else if (formQuizType === 'listening') {
+      const ok = await generateListeningQuiz(data.id, formAudioScript.trim(), formQuestionCount, formVoiceId);
       if (ok) {
         setSelectedQuiz(data as Quiz);
         await fetchQuestions(data.id);
@@ -334,6 +344,46 @@ const Quizzes = () => {
     resetForm();
     setDialogOpen(false);
     fetchData();
+  };
+
+  const generateListeningQuiz = async (quizId: string, script: string, count: number, voiceId: string): Promise<boolean> => {
+    setGeneratingAI(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error('Not authenticated'); return false; }
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-listening-quiz`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ script, count, voice_id: voiceId, quiz_id: quizId }),
+      });
+      const json = await res.json();
+      if (!res.ok) { toast.error(json.error || 'Audio/AI generation failed'); return false; }
+      const rows = (json.questions || []).map((q: any) => ({
+        quiz_id: quizId,
+        question_text: q.question_text,
+        option_a: q.option_a,
+        option_b: q.option_b,
+        option_c: q.option_c,
+        option_d: q.option_d,
+        correct_answer: q.correct_answer,
+        explanation: q.explanation,
+        skill: q.skill,
+        reading_passage: null,
+      }));
+      const { error: insErr } = await supabase.from('quiz_questions').insert(rows);
+      if (insErr) { toast.error('Failed to save generated questions'); return false; }
+      toast.success(`Audio created and ${rows.length} questions generated`);
+      return true;
+    } catch (e) {
+      toast.error('Generation failed');
+      return false;
+    } finally {
+      setGeneratingAI(false);
+    }
   };
 
   const generateReadingQuestions = async (quizId: string, passage: string, count: number): Promise<boolean> => {
