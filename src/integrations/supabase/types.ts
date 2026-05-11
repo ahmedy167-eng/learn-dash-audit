@@ -914,6 +914,7 @@ export type Database = {
           audio_url: string | null
           created_at: string
           description: string | null
+          difficulty: string
           id: string
           is_active: boolean
           max_plays: number | null
@@ -930,6 +931,7 @@ export type Database = {
           audio_url?: string | null
           created_at?: string
           description?: string | null
+          difficulty?: string
           id?: string
           is_active?: boolean
           max_plays?: number | null
@@ -946,6 +948,7 @@ export type Database = {
           audio_url?: string | null
           created_at?: string
           description?: string | null
+          difficulty?: string
           id?: string
           is_active?: boolean
           max_plays?: number | null
