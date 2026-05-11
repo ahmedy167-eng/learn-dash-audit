@@ -16,6 +16,8 @@ interface Quiz {
   title: string;
   description: string | null;
   is_active: boolean;
+  quiz_type?: string;
+  reading_passage?: string | null;
 }
 
 interface QuizQuestion {
