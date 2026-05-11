@@ -243,7 +243,32 @@ const StudentQuizzes = () => {
      }
      setLoadingResults(false);
    };
- 
+
+   const handleRetake = async () => {
+     if (!selectedQuiz) return;
+     setRetaking(true);
+     const { error } = await performAction('retake_quiz', { quizId: selectedQuiz.id });
+     if (error) {
+       toast.error('Failed to reset quiz. Please try again.');
+       setRetaking(false);
+       return;
+     }
+     // Reset local state to start fresh
+     setSubmissions({});
+     setCurrentAnswers({});
+     setQuizResults(null);
+     setShowResults(false);
+     setPlayCount(0);
+     setHasFinishedFirstPlay(false);
+     setIsPlaying(false);
+     if (audioRef.current) {
+       audioRef.current.pause();
+       audioRef.current.currentTime = 0;
+     }
+     toast.success('Quiz reset. Good luck!');
+     setRetaking(false);
+   };
+
    const getOptionLabel = (answer: string, question: QuizResult) => {
      switch (answer) {
        case 'A': return question.option_a;
