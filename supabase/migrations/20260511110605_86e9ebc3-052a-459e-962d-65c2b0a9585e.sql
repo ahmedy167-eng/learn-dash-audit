@@ -1,0 +1,2 @@
+ALTER TABLE public.quizzes DROP CONSTRAINT IF EXISTS quizzes_quiz_type_check;
+ALTER TABLE public.quizzes ADD CONSTRAINT quizzes_quiz_type_check CHECK (quiz_type IN ('standard', 'reading', 'listening'));
