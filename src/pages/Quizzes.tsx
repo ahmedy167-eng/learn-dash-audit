@@ -370,7 +370,7 @@ const Quizzes = () => {
           Authorization: `Bearer ${session.access_token}`,
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
-        body: JSON.stringify({ script, count, voice_id: voiceId, quiz_id: quizId }),
+        body: JSON.stringify({ script, count, voice_id: voiceId, quiz_id: quizId, difficulty }),
       });
       const json = await res.json();
       if (!res.ok) { toast.error(json.error || 'Audio/AI generation failed'); return false; }
