@@ -102,6 +102,7 @@ const SKILL_OPTIONS = [
 
 const Quizzes = () => {
   const { user } = useAuth();
+  const { hasPermission, loading: permLoading } = usePermissions();
   const [sections, setSections] = useState<Section[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [sectionStudentCounts, setSectionStudentCounts] = useState<Record<string, number>>({});
