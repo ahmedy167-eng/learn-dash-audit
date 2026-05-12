@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { PermissionsProvider } from "@/hooks/usePermissions";
 import { StudentAuthProvider } from "@/hooks/useStudentAuth";
+import { GuestAuthProvider } from "@/hooks/useGuestAuth";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
 // Lazy load all route components for code splitting
