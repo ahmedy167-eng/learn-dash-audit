@@ -42,7 +42,7 @@ const navItems: NavItem[] = [
   { title: 'Schedule', url: '/schedule', icon: Calendar, permission: 'schedule' },
   { title: 'Lesson Plan', url: '/lesson-plan', icon: BookOpen, permission: 'lesson_plan' },
   { title: 'Tasks', url: '/tasks', icon: CheckSquare, permission: 'tasks' },
-  { title: 'Quizzes', url: '/quizzes', icon: ClipboardList },
+  { title: 'Quizzes', url: '/quizzes', icon: ClipboardList, permission: 'quizzes' },
   { title: 'LMS Management', url: '/lms-management', icon: BookOpen },
   { title: 'CA Projects', url: '/ca-projects', icon: FolderOpen },
   { title: 'Diary', url: '/diary', icon: NotebookPen },
