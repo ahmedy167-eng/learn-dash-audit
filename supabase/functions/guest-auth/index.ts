@@ -268,8 +268,7 @@ Deno.serve(async (req) => {
       const quizId = String(body.quizId || '')
       if (!UUID_REGEX.test(quizId)) return jsonResponse({ error: 'Invalid quizId' }, 400)
 
-      const { data: guestSection } = await supabaseAdmin
-        .from('sections').select('id').eq('is_guest_section', true).maybeSingle()
+      const guestSection = await getGuestSectionForGuest(supabaseAdmin, session.guest_id)
       if (!guestSection) return jsonResponse({ error: 'No guest section configured' }, 403)
 
       const { data: quiz } = await supabaseAdmin
