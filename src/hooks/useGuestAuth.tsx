@@ -12,7 +12,7 @@ interface GuestAuthContextType {
   loading: boolean;
   sessionToken: string | null;
   signIn: (username: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (username: string, password: string, displayName: string) => Promise<{ error: Error | null }>;
+  signUp: (username: string, password: string, displayName: string) => Promise<{ error: Error | null; pendingApproval?: boolean; message?: string }>;
   signOut: () => Promise<void>;
   apiCall: (action: string, payload?: Record<string, unknown>) => Promise<any>;
 }
