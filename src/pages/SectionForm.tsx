@@ -43,6 +43,7 @@ export default function SectionForm() {
   const [offDays, setOffDays] = useState<Date[]>([]);
   const [offDayInput, setOffDayInput] = useState<Date>();
   const [notes, setNotes] = useState('');
+  const [isGuestSection, setIsGuestSection] = useState(false);
 
   useEffect(() => {
     if (isEditing && id) {
