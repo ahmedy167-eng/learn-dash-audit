@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { PermissionsProvider } from "@/hooks/usePermissions";
 import { StudentAuthProvider } from "@/hooks/useStudentAuth";
+import { GuestAuthProvider } from "@/hooks/useGuestAuth";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
 // Lazy load all route components for code splitting
@@ -34,6 +35,9 @@ const StudentCAProjects = lazy(() => import("./pages/student/StudentCAProjects")
 const StaffChat = lazy(() => import("./pages/StaffChat"));
 const Diary = lazy(() => import("./pages/Diary"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const GuestLogin = lazy(() => import("./pages/GuestLogin"));
+const GuestSignup = lazy(() => import("./pages/GuestSignup"));
+const GuestPortal = lazy(() => import("./pages/GuestPortal"));
 
 const queryClient = new QueryClient();
 
@@ -49,6 +53,7 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <StudentAuthProvider>
+            <GuestAuthProvider>
             <TooltipProvider>
               <Sonner />
               <BrowserRouter>
@@ -78,6 +83,9 @@ function App() {
                       <Route path="/student-portal/quizzes" element={<StudentQuizzes />} />
                       <Route path="/student-portal/lms" element={<StudentLMS />} />
                       <Route path="/student-portal/ca-projects" element={<StudentCAProjects />} />
+                      <Route path="/guest-login" element={<GuestLogin />} />
+                      <Route path="/guest-signup" element={<GuestSignup />} />
+                      <Route path="/guest/quizzes" element={<GuestPortal />} />
                       <Route path="/staff-chat" element={<StaffChat />} />
                       <Route path="/diary" element={<Diary />} />
                       <Route path="*" element={<NotFound />} />
@@ -86,6 +94,7 @@ function App() {
                 </PermissionsProvider>
               </BrowserRouter>
             </TooltipProvider>
+            </GuestAuthProvider>
           </StudentAuthProvider>
         </AuthProvider>
       </QueryClientProvider>

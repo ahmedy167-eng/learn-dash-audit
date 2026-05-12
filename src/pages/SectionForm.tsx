@@ -43,6 +43,7 @@ export default function SectionForm() {
   const [offDays, setOffDays] = useState<Date[]>([]);
   const [offDayInput, setOffDayInput] = useState<Date>();
   const [notes, setNotes] = useState('');
+  const [isGuestSection, setIsGuestSection] = useState(false);
 
   useEffect(() => {
     if (isEditing && id) {
@@ -74,6 +75,7 @@ export default function SectionForm() {
           setOffDays(data.off_days.map((d: string) => new Date(d)));
         }
         setNotes(data.notes || '');
+        setIsGuestSection((data as any).is_guest_section === true);
       }
     } catch (error) {
       console.error('Error fetching section:', error);
@@ -107,8 +109,14 @@ export default function SectionForm() {
         teaching_days: teachingDays,
         off_days: offDays.map(d => format(d, 'yyyy-MM-dd')),
         notes: notes.trim() || null,
+        is_guest_section: isGuestSection,
         user_id: user?.id,
-      };
+      } as any;
+
+      // If marking this as the guest section, clear flag from any other section first
+      if (isGuestSection) {
+        await supabase.from('sections').update({ is_guest_section: false } as any).neq('id', id || '00000000-0000-0000-0000-000000000000');
+      }
 
       if (isEditing && id) {
         const { error } = await supabase
@@ -369,6 +377,23 @@ export default function SectionForm() {
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
                 />
+              </div>
+
+              {/* Guest section toggle */}
+              <div className="flex items-start gap-3 rounded-lg border p-4">
+                <input
+                  id="isGuestSection"
+                  type="checkbox"
+                  checked={isGuestSection}
+                  onChange={(e) => setIsGuestSection(e.target.checked)}
+                  className="mt-1"
+                />
+                <div>
+                  <Label htmlFor="isGuestSection" className="cursor-pointer">Use as Guest Section</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Quizzes assigned to this section become available to all guest accounts (sign-up at <code>/guest-signup</code>). Only one section can be the guest section.
+                  </p>
+                </div>
               </div>
 
               {/* Actions */}
