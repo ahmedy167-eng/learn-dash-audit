@@ -11,7 +11,8 @@ export type FeatureKey =
   | 'lesson_plan' 
   | 'tasks' 
   | 'off_days'
-  | 'staff_chat';
+  | 'staff_chat'
+  | 'quizzes';
 
 interface Permission {
   feature: string;
