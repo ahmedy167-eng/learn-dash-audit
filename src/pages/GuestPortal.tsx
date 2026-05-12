@@ -14,7 +14,7 @@ interface Quiz {
   description: string | null;
   quiz_type: string;
   difficulty: string;
-  audio_url: string | null;
+  has_audio: boolean | null;
   audio_script: string | null;
   transcript_visibility: 'never' | 'after_audio' | 'always' | null;
   max_plays: number | null;
