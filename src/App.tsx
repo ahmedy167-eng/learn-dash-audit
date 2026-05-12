@@ -35,6 +35,9 @@ const StudentCAProjects = lazy(() => import("./pages/student/StudentCAProjects")
 const StaffChat = lazy(() => import("./pages/StaffChat"));
 const Diary = lazy(() => import("./pages/Diary"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const GuestLogin = lazy(() => import("./pages/GuestLogin"));
+const GuestSignup = lazy(() => import("./pages/GuestSignup"));
+const GuestPortal = lazy(() => import("./pages/GuestPortal"));
 
 const queryClient = new QueryClient();
 
