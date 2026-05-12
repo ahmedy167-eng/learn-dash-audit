@@ -12,6 +12,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 // Lazy load all route components for code splitting
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
+const TeacherSignup = lazy(() => import("./pages/TeacherSignup"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -62,6 +63,8 @@ function App() {
                     <Routes>
                       <Route path="/" element={<Index />} />
                       <Route path="/auth" element={<Auth />} />
+                      <Route path="/teacher-signup" element={<TeacherSignup />} />
+                      <Route path="/join" element={<TeacherSignup />} />
                       <Route path="/admin-login" element={<AdminLogin />} />
                       <Route path="/admin" element={<Admin />} />
                       <Route path="/dashboard" element={<Dashboard />} />
