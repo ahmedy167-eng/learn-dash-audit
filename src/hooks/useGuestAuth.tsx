@@ -12,7 +12,7 @@ interface GuestAuthContextType {
   loading: boolean;
   sessionToken: string | null;
   signIn: (username: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (username: string, password: string, displayName: string) => Promise<{ error: Error | null }>;
+  signUp: (username: string, password: string, displayName: string) => Promise<{ error: Error | null; pendingApproval?: boolean; message?: string }>;
   signOut: () => Promise<void>;
   apiCall: (action: string, payload?: Record<string, unknown>) => Promise<any>;
 }
@@ -91,6 +91,9 @@ export function GuestAuthProvider({ children }: { children: ReactNode }) {
   const signUp = useCallback(async (username: string, password: string, displayName: string) => {
     try {
       const data = await callEdge('signup', { username, password, displayName });
+      if (data?.pendingApproval) {
+        return { error: null, pendingApproval: true, message: data.message };
+      }
       sessionStorage.setItem(STORAGE_GUEST, JSON.stringify(data.guest));
       sessionStorage.setItem(STORAGE_TOKEN, data.sessionToken);
       sessionStorage.setItem(STORAGE_EXPIRES, data.expiresAt);

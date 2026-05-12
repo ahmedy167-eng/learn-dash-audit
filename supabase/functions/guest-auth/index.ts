@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
       const password_hash = await hashPassword(password)
       const { data: created, error: insertErr } = await supabaseAdmin
         .from('guest_students')
-        .insert([{ username, password_hash, display_name: displayName, last_login_at: new Date().toISOString() }])
+        .insert([{ username, password_hash, display_name: displayName, is_active: false }])
         .select('id, username, display_name')
         .single()
       if (insertErr || !created) {
@@ -168,13 +168,10 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: 'Failed to create account' }, 500)
       }
 
-      const sessionToken = crypto.randomUUID() + '-' + crypto.randomUUID()
-      const expiresAt = new Date(Date.now() + SESSION_LIFETIME_MS).toISOString()
-      await supabaseAdmin.from('guest_sessions').insert({ guest_id: created.id, session_token: sessionToken, expires_at: expiresAt })
-
+      // Account created but not active — admin approval required before login
       return jsonResponse({
-        guest: { id: created.id, username: created.username, display_name: created.display_name },
-        sessionToken, expiresAt,
+        pendingApproval: true,
+        message: 'Your account was created and is pending admin approval. You will be able to sign in once an administrator activates your account.',
       })
     }
 

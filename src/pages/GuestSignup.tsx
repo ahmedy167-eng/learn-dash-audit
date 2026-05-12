@@ -21,10 +21,16 @@ export default function GuestSignup() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await signUp(username.toLowerCase().trim(), password, displayName.trim());
+    const { error, pendingApproval, message } = await signUp(username.toLowerCase().trim(), password, displayName.trim());
     setLoading(false);
-    if (error) toast.error(error.message);
-    else { toast.success('Account created!'); navigate('/guest/quizzes'); }
+    if (error) { toast.error(error.message); return; }
+    if (pendingApproval) {
+      toast.success(message || 'Account created. Pending admin approval.', { duration: 8000 });
+      navigate('/guest-login');
+    } else {
+      toast.success('Account created!');
+      navigate('/guest/quizzes');
+    }
   };
 
   return (
@@ -35,7 +41,7 @@ export default function GuestSignup() {
             <GraduationCap className="w-7 h-7 text-primary" />
           </div>
           <CardTitle>Create Guest Account</CardTitle>
-          <CardDescription>Sign up to take quizzes</CardDescription>
+          <CardDescription>Sign up to take quizzes. New accounts require admin approval before you can sign in.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">

@@ -1,0 +1,1 @@
+ALTER TABLE public.guest_students ALTER COLUMN is_active SET DEFAULT false;
