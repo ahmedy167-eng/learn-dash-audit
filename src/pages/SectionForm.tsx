@@ -75,6 +75,7 @@ export default function SectionForm() {
           setOffDays(data.off_days.map((d: string) => new Date(d)));
         }
         setNotes(data.notes || '');
+        setIsGuestSection((data as any).is_guest_section === true);
       }
     } catch (error) {
       console.error('Error fetching section:', error);
