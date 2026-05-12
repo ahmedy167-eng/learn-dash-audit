@@ -81,10 +81,22 @@ export default function GuestPortal() {
     setPlayCount(0);
     setHasFinishedFirstPlay(false);
     setIsPlaying(false);
+    setAudioUrl(null);
     setLoadingQ(true);
     try {
       const d = await apiCall('get-questions', { quizId: q.id });
       setQuestions(d.questions || []);
+      if (q.quiz_type === 'listening' && q.has_audio) {
+        setLoadingAudio(true);
+        try {
+          const a = await apiCall('get-audio-url', { quizId: q.id });
+          setAudioUrl(a.signedUrl || null);
+        } catch (e: any) {
+          toast.error(e.message || 'Failed to load audio');
+        } finally {
+          setLoadingAudio(false);
+        }
+      }
     } catch (e: any) {
       toast.error(e.message);
       setSelected(null);
