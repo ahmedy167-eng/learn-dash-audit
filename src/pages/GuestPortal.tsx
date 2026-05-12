@@ -59,6 +59,8 @@ export default function GuestPortal() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playCount, setPlayCount] = useState(0);
   const [hasFinishedFirstPlay, setHasFinishedFirstPlay] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [loadingAudio, setLoadingAudio] = useState(false);
 
   useEffect(() => {
     if (!guest) return;
