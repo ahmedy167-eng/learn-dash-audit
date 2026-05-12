@@ -91,6 +91,9 @@ export function GuestAuthProvider({ children }: { children: ReactNode }) {
   const signUp = useCallback(async (username: string, password: string, displayName: string) => {
     try {
       const data = await callEdge('signup', { username, password, displayName });
+      if (data?.pendingApproval) {
+        return { error: null, pendingApproval: true, message: data.message };
+      }
       sessionStorage.setItem(STORAGE_GUEST, JSON.stringify(data.guest));
       sessionStorage.setItem(STORAGE_TOKEN, data.sessionToken);
       sessionStorage.setItem(STORAGE_EXPIRES, data.expiresAt);
