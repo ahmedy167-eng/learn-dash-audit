@@ -53,6 +53,7 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <StudentAuthProvider>
+            <GuestAuthProvider>
             <TooltipProvider>
               <Sonner />
               <BrowserRouter>
