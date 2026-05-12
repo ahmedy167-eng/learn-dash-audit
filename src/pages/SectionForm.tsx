@@ -109,8 +109,14 @@ export default function SectionForm() {
         teaching_days: teachingDays,
         off_days: offDays.map(d => format(d, 'yyyy-MM-dd')),
         notes: notes.trim() || null,
+        is_guest_section: isGuestSection,
         user_id: user?.id,
-      };
+      } as any;
+
+      // If marking this as the guest section, clear flag from any other section first
+      if (isGuestSection) {
+        await supabase.from('sections').update({ is_guest_section: false } as any).neq('id', id || '00000000-0000-0000-0000-000000000000');
+      }
 
       if (isEditing && id) {
         const { error } = await supabase
