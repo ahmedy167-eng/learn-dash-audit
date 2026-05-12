@@ -107,6 +107,9 @@ const StudentLogin = () => {
             <p className="mt-4 text-center text-sm text-muted-foreground">
               Contact your teacher if you're having trouble logging in
             </p>
+            <p className="mt-2 text-center text-sm text-muted-foreground">
+              Visiting? <a href="/guest-signup" className="text-primary underline">Create a guest account</a> or <a href="/guest-login" className="text-primary underline">sign in as guest</a>
+            </p>
           </CardContent>
         </Card>
       </main>
