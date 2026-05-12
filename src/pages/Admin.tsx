@@ -207,6 +207,9 @@ export default function Admin() {
         {/* Student Management */}
         <StudentManagement />
 
+        {/* Guest Student Management */}
+        <GuestStudentManagement />
+
         {/* Users Table */}
         <Card>
           <CardHeader>
