@@ -100,6 +100,18 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
   }
 }
 
+async function getGuestSectionForGuest(supabaseAdmin: SupabaseClient, guestId: string): Promise<{ id: string } | null> {
+  const { data: guest } = await supabaseAdmin
+    .from('guest_students').select('assigned_teacher_id').eq('id', guestId).maybeSingle()
+  if (!guest?.assigned_teacher_id) return null
+  const { data: section } = await supabaseAdmin
+    .from('sections').select('id')
+    .eq('is_guest_section', true)
+    .eq('user_id', guest.assigned_teacher_id)
+    .maybeSingle()
+  return section || null
+}
+
 async function validateSession(supabaseAdmin: SupabaseClient, sessionToken: string) {
   if (typeof sessionToken !== 'string' || !SESSION_TOKEN_REGEX.test(sessionToken)) return null
   const { data: session } = await supabaseAdmin
