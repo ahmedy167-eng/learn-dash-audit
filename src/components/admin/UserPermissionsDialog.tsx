@@ -37,6 +37,7 @@ const FEATURES = [
   { key: 'tasks', label: 'Tasks', description: 'Personal task management' },
   { key: 'off_days', label: 'Off Days', description: 'Request time off' },
   { key: 'staff_chat', label: 'Staff Chat', description: 'Send and receive messages with other staff' },
+  { key: 'quizzes', label: 'Quizzes', description: 'Create and manage quizzes (standard, reading, listening)' },
 ];
 
 export function UserPermissionsDialog({ user, open, onOpenChange, onUpdate }: UserPermissionsDialogProps) {

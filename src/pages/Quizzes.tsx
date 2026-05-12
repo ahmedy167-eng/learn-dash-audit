@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -101,6 +102,7 @@ const SKILL_OPTIONS = [
 
 const Quizzes = () => {
   const { user } = useAuth();
+  const { hasPermission, loading: permLoading } = usePermissions();
   const [sections, setSections] = useState<Section[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [sectionStudentCounts, setSectionStudentCounts] = useState<Record<string, number>>({});
@@ -687,6 +689,26 @@ const Quizzes = () => {
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!permLoading && !hasPermission('quizzes')) {
+    return (
+      <DashboardLayout>
+        <div className="p-6 md:p-8">
+          <Card className="max-w-xl mx-auto">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-primary" />
+                Quizzes access required
+              </CardTitle>
+              <CardDescription>
+                Your account doesn't have access to the Quizzes feature yet. Please ask an administrator to enable "Quizzes" in your user permissions.
+              </CardDescription>
+            </CardHeader>
+          </Card>
         </div>
       </DashboardLayout>
     );
