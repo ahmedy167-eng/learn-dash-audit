@@ -542,6 +542,71 @@ export type Database = {
         }
         Relationships: []
       }
+      guest_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          guest_id: string
+          id: string
+          session_token: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          guest_id: string
+          id?: string
+          session_token: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          guest_id?: string
+          id?: string
+          session_token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guest_sessions_guest_id_fkey"
+            columns: ["guest_id"]
+            isOneToOne: false
+            referencedRelation: "guest_students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guest_students: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+          is_active: boolean
+          last_login_at: string | null
+          password_hash: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          id?: string
+          is_active?: boolean
+          last_login_at?: string | null
+          password_hash: string
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          last_login_at?: string | null
+          password_hash?: string
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
       lesson_plans: {
         Row: {
           aim_main: string | null
@@ -868,30 +933,40 @@ export type Database = {
       }
       quiz_submissions: {
         Row: {
+          guest_id: string | null
           id: string
           is_correct: boolean
           question_id: string
           selected_answer: string
-          student_id: string
+          student_id: string | null
           submitted_at: string
         }
         Insert: {
+          guest_id?: string | null
           id?: string
           is_correct: boolean
           question_id: string
           selected_answer: string
-          student_id: string
+          student_id?: string | null
           submitted_at?: string
         }
         Update: {
+          guest_id?: string | null
           id?: string
           is_correct?: boolean
           question_id?: string
           selected_answer?: string
-          student_id?: string
+          student_id?: string | null
           submitted_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "quiz_submissions_guest_id_fkey"
+            columns: ["guest_id"]
+            isOneToOne: false
+            referencedRelation: "guest_students"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "quiz_submissions_question_id_fkey"
             columns: ["question_id"]
@@ -1023,6 +1098,7 @@ export type Database = {
           created_at: string
           finish_class_time: string | null
           id: string
+          is_guest_section: boolean
           name: string
           notes: string | null
           off_days: string[] | null
@@ -1040,6 +1116,7 @@ export type Database = {
           created_at?: string
           finish_class_time?: string | null
           id?: string
+          is_guest_section?: boolean
           name: string
           notes?: string | null
           off_days?: string[] | null
@@ -1057,6 +1134,7 @@ export type Database = {
           created_at?: string
           finish_class_time?: string | null
           id?: string
+          is_guest_section?: boolean
           name?: string
           notes?: string | null
           off_days?: string[] | null
