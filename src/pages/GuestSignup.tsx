@@ -41,7 +41,7 @@ export default function GuestSignup() {
             <GraduationCap className="w-7 h-7 text-primary" />
           </div>
           <CardTitle>Create Guest Account</CardTitle>
-          <CardDescription>Sign up to take quizzes</CardDescription>
+          <CardDescription>Sign up to take quizzes. New accounts require admin approval before you can sign in.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
