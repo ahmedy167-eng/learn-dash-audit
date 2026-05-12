@@ -576,6 +576,7 @@ export type Database = {
       }
       guest_students: {
         Row: {
+          assigned_teacher_id: string | null
           created_at: string
           display_name: string
           id: string
@@ -586,6 +587,7 @@ export type Database = {
           username: string
         }
         Insert: {
+          assigned_teacher_id?: string | null
           created_at?: string
           display_name: string
           id?: string
@@ -596,6 +598,7 @@ export type Database = {
           username: string
         }
         Update: {
+          assigned_teacher_id?: string | null
           created_at?: string
           display_name?: string
           id?: string

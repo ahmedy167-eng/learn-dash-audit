@@ -205,7 +205,7 @@ export default function GuestPortal() {
             {loadingQuizzes ? (
               <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
             ) : quizzes.length === 0 ? (
-              <Card><CardContent className="py-12 text-center text-muted-foreground">No quizzes available right now. Check back later.</CardContent></Card>
+              <Card><CardContent className="py-12 text-center text-muted-foreground">No quizzes available yet. If this is your first time, an admin still needs to assign you to a teacher.</CardContent></Card>
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
                 {quizzes.map((q) => (

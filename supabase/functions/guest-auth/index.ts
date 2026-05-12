@@ -100,6 +100,18 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
   }
 }
 
+async function getGuestSectionForGuest(supabaseAdmin: SupabaseClient, guestId: string): Promise<{ id: string } | null> {
+  const { data: guest } = await supabaseAdmin
+    .from('guest_students').select('assigned_teacher_id').eq('id', guestId).maybeSingle()
+  if (!guest?.assigned_teacher_id) return null
+  const { data: section } = await supabaseAdmin
+    .from('sections').select('id')
+    .eq('is_guest_section', true)
+    .eq('user_id', guest.assigned_teacher_id)
+    .maybeSingle()
+  return section || null
+}
+
 async function validateSession(supabaseAdmin: SupabaseClient, sessionToken: string) {
   if (typeof sessionToken !== 'string' || !SESSION_TOKEN_REGEX.test(sessionToken)) return null
   const { data: session } = await supabaseAdmin
@@ -230,8 +242,7 @@ Deno.serve(async (req) => {
 
     // ── LIST QUIZZES (guest section only) ──────
     if (action === 'list-quizzes' && req.method === 'POST') {
-      const { data: guestSection } = await supabaseAdmin
-        .from('sections').select('id').eq('is_guest_section', true).maybeSingle()
+      const guestSection = await getGuestSectionForGuest(supabaseAdmin, session.guest_id)
       if (!guestSection) return jsonResponse({ quizzes: [] })
 
       const { data: quizzes } = await supabaseAdmin
@@ -257,8 +268,7 @@ Deno.serve(async (req) => {
       const quizId = String(body.quizId || '')
       if (!UUID_REGEX.test(quizId)) return jsonResponse({ error: 'Invalid quizId' }, 400)
 
-      const { data: guestSection } = await supabaseAdmin
-        .from('sections').select('id').eq('is_guest_section', true).maybeSingle()
+      const guestSection = await getGuestSectionForGuest(supabaseAdmin, session.guest_id)
       if (!guestSection) return jsonResponse({ error: 'No guest section configured' }, 403)
 
       const { data: quiz } = await supabaseAdmin
@@ -283,8 +293,7 @@ Deno.serve(async (req) => {
       if (!UUID_REGEX.test(quizId)) return jsonResponse({ error: 'Invalid quizId' }, 400)
 
       // Confirm quiz belongs to guest section
-      const { data: guestSection } = await supabaseAdmin
-        .from('sections').select('id').eq('is_guest_section', true).maybeSingle()
+      const guestSection = await getGuestSectionForGuest(supabaseAdmin, session.guest_id)
       if (!guestSection) return jsonResponse({ error: 'No guest section configured' }, 403)
 
       const { data: quiz } = await supabaseAdmin
@@ -310,8 +319,7 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: 'Invalid payload' }, 400)
       }
 
-      const { data: guestSection } = await supabaseAdmin
-        .from('sections').select('id').eq('is_guest_section', true).maybeSingle()
+      const guestSection = await getGuestSectionForGuest(supabaseAdmin, session.guest_id)
       if (!guestSection) return jsonResponse({ error: 'No guest section configured' }, 403)
 
       const { data: quiz } = await supabaseAdmin
