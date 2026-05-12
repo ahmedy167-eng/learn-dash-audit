@@ -21,10 +21,16 @@ export default function GuestSignup() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await signUp(username.toLowerCase().trim(), password, displayName.trim());
+    const { error, pendingApproval, message } = await signUp(username.toLowerCase().trim(), password, displayName.trim());
     setLoading(false);
-    if (error) toast.error(error.message);
-    else { toast.success('Account created!'); navigate('/guest/quizzes'); }
+    if (error) { toast.error(error.message); return; }
+    if (pendingApproval) {
+      toast.success(message || 'Account created. Pending admin approval.', { duration: 8000 });
+      navigate('/guest-login');
+    } else {
+      toast.success('Account created!');
+      navigate('/guest/quizzes');
+    }
   };
 
   return (
