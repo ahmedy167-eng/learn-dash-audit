@@ -14,6 +14,7 @@ import { ActivityFeed } from '@/components/admin/ActivityFeed';
 import { MessageInbox } from '@/components/admin/MessageInbox';
 import { SessionAnalytics } from '@/components/admin/SessionAnalytics';
 import { StudentManagement } from '@/components/admin/StudentManagement';
+import { GuestStudentManagement } from '@/components/admin/GuestStudentManagement';
 import { Clock } from '@/components/admin/Clock';
 import { RefreshCw, Shield, Users, Settings, Eye, GraduationCap, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
