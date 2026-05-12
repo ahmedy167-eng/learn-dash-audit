@@ -242,8 +242,7 @@ Deno.serve(async (req) => {
 
     // ── LIST QUIZZES (guest section only) ──────
     if (action === 'list-quizzes' && req.method === 'POST') {
-      const { data: guestSection } = await supabaseAdmin
-        .from('sections').select('id').eq('is_guest_section', true).maybeSingle()
+      const guestSection = await getGuestSectionForGuest(supabaseAdmin, session.guest_id)
       if (!guestSection) return jsonResponse({ quizzes: [] })
 
       const { data: quizzes } = await supabaseAdmin
