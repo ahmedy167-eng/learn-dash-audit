@@ -319,8 +319,7 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: 'Invalid payload' }, 400)
       }
 
-      const { data: guestSection } = await supabaseAdmin
-        .from('sections').select('id').eq('is_guest_section', true).maybeSingle()
+      const guestSection = await getGuestSectionForGuest(supabaseAdmin, session.guest_id)
       if (!guestSection) return jsonResponse({ error: 'No guest section configured' }, 403)
 
       const { data: quiz } = await supabaseAdmin
