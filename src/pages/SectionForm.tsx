@@ -379,6 +379,23 @@ export default function SectionForm() {
                 />
               </div>
 
+              {/* Guest section toggle */}
+              <div className="flex items-start gap-3 rounded-lg border p-4">
+                <input
+                  id="isGuestSection"
+                  type="checkbox"
+                  checked={isGuestSection}
+                  onChange={(e) => setIsGuestSection(e.target.checked)}
+                  className="mt-1"
+                />
+                <div>
+                  <Label htmlFor="isGuestSection" className="cursor-pointer">Use as Guest Section</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Quizzes assigned to this section become available to all guest accounts (sign-up at <code>/guest-signup</code>). Only one section can be the guest section.
+                  </p>
+                </div>
+              </div>
+
               {/* Actions */}
               <div className="flex gap-4 justify-end">
                 <Button type="button" variant="outline" onClick={() => navigate('/sections')}>
