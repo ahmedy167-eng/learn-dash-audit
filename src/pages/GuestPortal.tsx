@@ -14,7 +14,7 @@ interface Quiz {
   description: string | null;
   quiz_type: string;
   difficulty: string;
-  audio_url: string | null;
+  has_audio: boolean | null;
   audio_script: string | null;
   transcript_visibility: 'never' | 'after_audio' | 'always' | null;
   max_plays: number | null;
@@ -59,6 +59,8 @@ export default function GuestPortal() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playCount, setPlayCount] = useState(0);
   const [hasFinishedFirstPlay, setHasFinishedFirstPlay] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [loadingAudio, setLoadingAudio] = useState(false);
 
   useEffect(() => {
     if (!guest) return;
@@ -79,10 +81,22 @@ export default function GuestPortal() {
     setPlayCount(0);
     setHasFinishedFirstPlay(false);
     setIsPlaying(false);
+    setAudioUrl(null);
     setLoadingQ(true);
     try {
       const d = await apiCall('get-questions', { quizId: q.id });
       setQuestions(d.questions || []);
+      if (q.quiz_type === 'listening' && q.has_audio) {
+        setLoadingAudio(true);
+        try {
+          const a = await apiCall('get-audio-url', { quizId: q.id });
+          setAudioUrl(a.signedUrl || null);
+        } catch (e: any) {
+          toast.error(e.message || 'Failed to load audio');
+        } finally {
+          setLoadingAudio(false);
+        }
+      }
     } catch (e: any) {
       toast.error(e.message);
       setSelected(null);
@@ -231,19 +245,19 @@ export default function GuestPortal() {
               </Card>
             )}
 
-            {selected.audio_url && (
+            {selected.has_audio && (
               <Card className="mb-4">
                 <CardHeader><CardTitle className="text-base">Audio</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
                   <audio
                     ref={audioRef}
-                    src={selected.audio_url}
+                    src={audioUrl || undefined}
                     onEnded={() => { setIsPlaying(false); setPlayCount((c) => c + 1); setHasFinishedFirstPlay(true); }}
                     onPause={() => setIsPlaying(false)}
                   />
                   <div className="flex items-center gap-3">
-                    <Button onClick={togglePlay} variant="outline" size="sm">
-                      {isPlaying ? <><Pause className="h-4 w-4 mr-1" />Pause</> : <><Play className="h-4 w-4 mr-1" />Play</>}
+                    <Button onClick={togglePlay} variant="outline" size="sm" disabled={!audioUrl || loadingAudio}>
+                      {loadingAudio ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Loading</> : isPlaying ? <><Pause className="h-4 w-4 mr-1" />Pause</> : <><Play className="h-4 w-4 mr-1" />Play</>}
                     </Button>
                     {selected.max_plays && (
                       <span className="text-sm text-muted-foreground">Plays: {playCount} / {selected.max_plays}</span>
