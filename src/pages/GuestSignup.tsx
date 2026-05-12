@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, Navigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { useGuestAuth } from '@/hooks/useGuestAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,8 @@ export default function GuestSignup() {
   const [loading, setLoading] = useState(false);
   const { signUp, guest } = useGuestAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isEduportal = location.pathname === '/eduportal';
 
   if (guest) return <Navigate to="/guest/quizzes" replace />;
 
@@ -40,8 +42,12 @@ export default function GuestSignup() {
           <div className="mx-auto w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mb-2">
             <GraduationCap className="w-7 h-7 text-primary" />
           </div>
-          <CardTitle>Create Guest Account</CardTitle>
-          <CardDescription>Sign up to take quizzes. New accounts require admin approval before you can sign in.</CardDescription>
+          <CardTitle>{isEduportal ? 'EduPortal Guest Registration' : 'Create Guest Account'}</CardTitle>
+          <CardDescription>
+            {isEduportal 
+              ? 'Welcome to EduPortal! Create a guest account to start taking quizzes. New accounts require admin approval before you can sign in.' 
+              : 'Sign up to take quizzes. New accounts require admin approval before you can sign in.'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">

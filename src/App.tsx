@@ -85,6 +85,7 @@ function App() {
                       <Route path="/student-portal/ca-projects" element={<StudentCAProjects />} />
                       <Route path="/guest-login" element={<GuestLogin />} />
                       <Route path="/guest-signup" element={<GuestSignup />} />
+                      <Route path="/eduportal" element={<GuestSignup />} />
                       <Route path="/guest/quizzes" element={<GuestPortal />} />
                       <Route path="/staff-chat" element={<StaffChat />} />
                       <Route path="/diary" element={<Diary />} />
