@@ -15,6 +15,8 @@ export default function GuestSignup() {
   const [loading, setLoading] = useState(false);
   const { signUp, guest } = useGuestAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isEduportal = location.pathname === '/eduportal';
 
   if (guest) return <Navigate to="/guest/quizzes" replace />;
 
