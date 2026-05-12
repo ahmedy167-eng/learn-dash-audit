@@ -244,11 +244,40 @@ Deno.serve(async (req) => {
         .eq('is_active', true)
         .order('created_at', { ascending: false })
 
-      const sanitized = (quizzes || []).map((q: any) => ({
-        ...q,
-        audio_script: q.transcript_visibility === 'never' ? null : q.audio_script,
-      }))
+      const sanitized = (quizzes || []).map((q: any) => {
+        const { audio_url, ...rest } = q
+        return {
+          ...rest,
+          has_audio: !!audio_url,
+          audio_script: q.transcript_visibility === 'never' ? null : q.audio_script,
+        }
+      })
       return jsonResponse({ quizzes: sanitized })
+    }
+
+    // ── GET SIGNED AUDIO URL ───────────────────
+    if (action === 'get-audio-url' && req.method === 'POST') {
+      const quizId = String(body.quizId || '')
+      if (!UUID_REGEX.test(quizId)) return jsonResponse({ error: 'Invalid quizId' }, 400)
+
+      const { data: guestSection } = await supabaseAdmin
+        .from('sections').select('id').eq('is_guest_section', true).maybeSingle()
+      if (!guestSection) return jsonResponse({ error: 'No guest section configured' }, 403)
+
+      const { data: quiz } = await supabaseAdmin
+        .from('quizzes').select('id, section_id, is_active, audio_url').eq('id', quizId).maybeSingle()
+      if (!quiz || quiz.section_id !== guestSection.id || !quiz.is_active || !quiz.audio_url) {
+        return jsonResponse({ error: 'Audio not available' }, 403)
+      }
+
+      const { data: signed, error: signErr } = await supabaseAdmin.storage
+        .from('quiz-audio')
+        .createSignedUrl(quiz.audio_url, 3600)
+      if (signErr || !signed?.signedUrl) {
+        console.error('[guest-auth] signed url error', signErr)
+        return jsonResponse({ error: 'Failed to generate audio URL' }, 500)
+      }
+      return jsonResponse({ signedUrl: signed.signedUrl })
     }
 
     // ── GET QUIZ QUESTIONS ─────────────────────
