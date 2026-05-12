@@ -75,6 +75,16 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     fetchPermissions();
   }, [fetchPermissions]);
 
+  // Refetch permissions when auth state changes (sign-in, sign-up, sign-out)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event) => {
+      if (_event === 'SIGNED_IN' || _event === 'TOKEN_REFRESHED' || _event === 'USER_UPDATED') {
+        fetchPermissions();
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [fetchPermissions]);
+
   const hasPermission = (feature: FeatureKey): boolean => {
     if (isAdmin) return true;
     const permission = permissions.find(p => p.feature === feature);
