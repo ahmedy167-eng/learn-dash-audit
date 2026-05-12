@@ -245,19 +245,19 @@ export default function GuestPortal() {
               </Card>
             )}
 
-            {selected.audio_url && (
+            {selected.has_audio && (
               <Card className="mb-4">
                 <CardHeader><CardTitle className="text-base">Audio</CardTitle></CardHeader>
                 <CardContent className="space-y-3">
                   <audio
                     ref={audioRef}
-                    src={selected.audio_url}
+                    src={audioUrl || undefined}
                     onEnded={() => { setIsPlaying(false); setPlayCount((c) => c + 1); setHasFinishedFirstPlay(true); }}
                     onPause={() => setIsPlaying(false)}
                   />
                   <div className="flex items-center gap-3">
-                    <Button onClick={togglePlay} variant="outline" size="sm">
-                      {isPlaying ? <><Pause className="h-4 w-4 mr-1" />Pause</> : <><Play className="h-4 w-4 mr-1" />Play</>}
+                    <Button onClick={togglePlay} variant="outline" size="sm" disabled={!audioUrl || loadingAudio}>
+                      {loadingAudio ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Loading</> : isPlaying ? <><Pause className="h-4 w-4 mr-1" />Pause</> : <><Play className="h-4 w-4 mr-1" />Play</>}
                     </Button>
                     {selected.max_plays && (
                       <span className="text-sm text-muted-foreground">Plays: {playCount} / {selected.max_plays}</span>
