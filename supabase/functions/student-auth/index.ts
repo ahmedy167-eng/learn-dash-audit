@@ -329,19 +329,87 @@ Deno.serve(async (req) => {
         return candidate === normalizedName.toLowerCase()
       })
 
-      // Pick the best duplicate:
-      // 1) active records first
-      // 2) records with a section assigned first
-      // 3) newest first
-      nameMatches.sort((a: any, b: any) => {
-        const activeDiff = Number(b.is_active !== false) - Number(a.is_active !== false)
-        if (activeDiff !== 0) return activeDiff
+      // Pick the best duplicate. When the same student exists in multiple sections,
+      // we want to log them into the section that actually has recent published content
+      // (quizzes, CA projects, LMS progress) so they don't land in a stale/empty section.
+      const activeMatches = nameMatches.filter((s: any) => s.is_active !== false)
+      const candidates = activeMatches.length > 0 ? activeMatches : nameMatches
+
+      // Compute a "last content activity" timestamp for each candidate row.
+      const sectionIds = Array.from(
+        new Set(candidates.map((s: any) => s.section_id).filter(Boolean))
+      ) as string[]
+      const studentRowIds = candidates.map((s: any) => s.id)
+
+      const lastBySection: Record<string, number> = {}
+      const lastByStudent: Record<string, number> = {}
+
+      if (sectionIds.length > 0) {
+        const [{ data: qz }, { data: ca }] = await Promise.all([
+          supabaseAdmin
+            .from('quizzes')
+            .select('section_id, created_at, updated_at, is_active')
+            .in('section_id', sectionIds)
+            .eq('is_active', true),
+          supabaseAdmin
+            .from('ca_projects')
+            .select('section_id, updated_at, created_at')
+            .in('section_id', sectionIds),
+        ])
+        for (const q of (qz || []) as any[]) {
+          const t = Math.max(
+            new Date(q.updated_at || 0).getTime(),
+            new Date(q.created_at || 0).getTime()
+          )
+          if (!lastBySection[q.section_id] || t > lastBySection[q.section_id]) {
+            lastBySection[q.section_id] = t
+          }
+        }
+        for (const p of (ca || []) as any[]) {
+          const t = Math.max(
+            new Date(p.updated_at || 0).getTime(),
+            new Date(p.created_at || 0).getTime()
+          )
+          if (!lastBySection[p.section_id] || t > lastBySection[p.section_id]) {
+            lastBySection[p.section_id] = t
+          }
+        }
+      }
+
+      if (studentRowIds.length > 0) {
+        const { data: lms } = await supabaseAdmin
+          .from('lms_progress')
+          .select('student_id, updated_at, created_at')
+          .in('student_id', studentRowIds)
+        for (const l of (lms || []) as any[]) {
+          const t = Math.max(
+            new Date(l.updated_at || 0).getTime(),
+            new Date(l.created_at || 0).getTime()
+          )
+          if (!lastByStudent[l.student_id] || t > lastByStudent[l.student_id]) {
+            lastByStudent[l.student_id] = t
+          }
+        }
+      }
+
+      const scoreOf = (s: any) =>
+        Math.max(
+          s.section_id ? (lastBySection[s.section_id] || 0) : 0,
+          lastByStudent[s.id] || 0
+        )
+
+      candidates.sort((a: any, b: any) => {
+        // Prefer rows that have a section
         const sectionDiff = Number(!!b.section_id) - Number(!!a.section_id)
         if (sectionDiff !== 0) return sectionDiff
+        // Prefer rows whose section/student has the most recent content
+        const scoreDiff = scoreOf(b) - scoreOf(a)
+        if (scoreDiff !== 0) return scoreDiff
+        // Final tiebreaker: newest record
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
       })
 
-      const student = nameMatches[0]
+      const student = candidates[0] || nameMatches[0]
 
       if (!student) {
         console.log(`[student-auth] No student found for: ${name}, ${studentId}`)
