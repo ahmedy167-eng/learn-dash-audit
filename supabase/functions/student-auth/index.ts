@@ -307,13 +307,13 @@ Deno.serve(async (req) => {
 
       console.log(`[student-auth] Login attempt for student ID: ${studentId}`)
 
-      // Query student using service role (bypasses RLS)
+      // Query student using service role (bypasses RLS).
+      // Use whitespace-tolerant name match so duplicate records with extra spaces still match.
+      const normalizedName = name.trim().replace(/\s+/g, ' ')
       const { data: students, error: queryError } = await supabaseAdmin
         .from('students')
-        .select('id, full_name, student_id, section_id, section_number, course, is_active')
-        .ilike('full_name', name.trim())
+        .select('id, full_name, student_id, section_id, section_number, course, is_active, created_at')
         .eq('student_id', studentId.trim())
-        .limit(1)
 
       if (queryError) {
         console.error('[student-auth] Query error:', queryError)
@@ -323,7 +323,25 @@ Deno.serve(async (req) => {
         )
       }
 
-      const student = students?.[0]
+      // Filter by normalized name (case-insensitive, collapse whitespace)
+      const nameMatches = (students || []).filter((s: any) => {
+        const candidate = String(s.full_name || '').trim().replace(/\s+/g, ' ').toLowerCase()
+        return candidate === normalizedName.toLowerCase()
+      })
+
+      // Pick the best duplicate:
+      // 1) active records first
+      // 2) records with a section assigned first
+      // 3) newest first
+      nameMatches.sort((a: any, b: any) => {
+        const activeDiff = Number(b.is_active !== false) - Number(a.is_active !== false)
+        if (activeDiff !== 0) return activeDiff
+        const sectionDiff = Number(!!b.section_id) - Number(!!a.section_id)
+        if (sectionDiff !== 0) return sectionDiff
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      })
+
+      const student = nameMatches[0]
 
       if (!student) {
         console.log(`[student-auth] No student found for: ${name}, ${studentId}`)
