@@ -1,37 +1,65 @@
-## Problem
+New Academic Year 2026/2027 Prospective Students Tracking
 
-Some students (e.g. NAIF SAEED, ID 447101567) exist as multiple active rows in `students`, each tied to a different section. Login currently picks the wrong duplicate, so the student lands in a stale section and sees test/empty quizzes instead of the real listening quiz that was published in the active section.
+Goal
+Add a dedicated admin-only registry where the Super Admin can record students expected for the 2026/2027 academic year. Each record stores the student's full name, student ID, a free-text track number, and a per-week status for weeks 1-15. The feature is separate from the active Students table so the current year is not polluted until students are formally enrolled.
 
-The previous tiebreaker (active → has section → newest) still picks the wrong row when the older duplicate is the one with real content.
+What we will build
 
-## Fix
+Database
+- New table `public.prospective_students`:
+  - `id` uuid primary key default gen_random_uuid()
+  - `full_name` text not null
+  - `student_id` text not null
+  - `track_number` text
+  - `academic_year` text not null default '2026/2027'
+  - `weeks` jsonb not null default '{}'::jsonb
+  - `status` text not null default 'Pending' -- e.g., Pending, Confirmed, Withdrawn, Enrolled
+  - `notes` text
+  - `created_by` uuid references auth.users(id) not null
+  - `created_at` timestamptz not null default now()
+  - `updated_at` timestamptz not null default now()
+  - unique (`student_id`, `academic_year`)
+- GRANT SELECT, INSERT, UPDATE, DELETE to authenticated; GRANT ALL to service_role.
+- Enable RLS and add an admin-only policy using `public.has_role(auth.uid(), 'admin')`.
+- Add a trigger to update `updated_at` on row update.
+- Update `supabase/integrations/supabase/types.ts` generated types to include the new table.
 
-Update `supabase/functions/student-auth/index.ts` login lookup to score each duplicate by the freshness of content actually published to its section, and log in the student into the highest‑scoring record.
+Admin UI
+- New component `src/components/admin/ProspectiveStudentsManagement.tsx`.
+- Insert it into `src/pages/Admin.tsx` below the Guest Students card (only rendered for `isAdmin`).
+- The component includes:
+  - Header with count, academic year filter, and an export/refresh toolbar.
+  - Search by name, student ID, or track number.
+  - Table columns: Full Name, Student ID, Track Number, Status, Weeks 1-15 (compact badges), Notes, Actions.
+  - Add/Edit dialog with fields: Full Name, Student ID, Track Number, Status, Notes, and a 15-week grid of small status dropdowns.
+  - Inline status chips on the table for quick viewing.
+  - Delete with confirmation.
+- Use existing shadcn/ui components (Card, Table, Dialog, Select, Input, Button, Badge) to match the current admin design.
 
-For each candidate row (whitespace‑normalized name match + studentId, `is_active = true`):
+Bulk import
+- Add an "Import from Excel" button in the prospective-students component that opens a file upload dialog.
+- Use the already-installed `exceljs` library to parse the uploaded file.
+- Required columns: `Full Name`, `Student ID`. Optional: `Track Number`, `Status`, `Notes`, and `Week 1` through `Week 15`.
+- Validate rows before inserting; show a summary toast: created count, skipped count, and any duplicate student IDs.
+- After import, refresh the list.
+- Provide a "Download template" link so the admin can fill the correct format before uploading.
 
-1. Look up the most recent activity timestamp across:
-   - `quizzes.created_at` / `updated_at` where `section_id` matches and `is_active = true`
-   - `ca_projects.updated_at` where `section_id` matches
-   - `lms_progress.updated_at` where `student_id` matches that specific row
-2. Take the max of those as a `last_content_at` for the row.
-3. Sort candidates by:
-   1. `section_id IS NOT NULL` first (skip rows with no section if any other has one)
-   2. `last_content_at DESC` (rows whose section actually has content win)
-   3. `students.created_at DESC` as a final tiebreaker
-4. Use the winning row to create the session.
+Security & access
+- Visible only to Super Admin (`isAdmin` from `usePermissions`).
+- No teacher access; no student access.
+- Row-level security enforced server-side via `has_role`.
+- `created_by` stores the admin user for audit purposes.
 
-If no row has any content at all, fall back to the current behavior (newest active row with a section).
+Out of scope
+- Converting a prospective student into an active student automatically (can be added later).
+- Exposing this list to teachers or students.
+- Email / notification workflows.
+- Multiple academic years beyond selecting a filter.
 
-No schema changes. No client changes. Only the edge function login handler is touched.
-
-## Verification
-
-- Re-run the existing `[student-auth] Login attempt` flow for `447101567` and confirm the resolved `student.id` is `726a38b2…` (section `d1ad…`, the listening‑quiz section), not `f2c5c01d…`.
-- Spot‑check 1–2 other duplicate students via `supabase--read_query` to make sure they route to a section that has real published content.
-- Confirm Quizzes page now shows the listening quiz with the audio card after re‑login.
-
-## Out of scope
-
-- Admin tooling to merge/deactivate duplicate student rows (can be a follow‑up).
-- Letting students choose a section at login.
+Acceptance criteria
+- Admin sees a "2026/2027 Prospective Students" card on the Admin dashboard.
+- Admin can add a prospective student manually with name, ID, track number, status, notes, and week-by-week status.
+- Admin can upload an Excel file with the required columns and import many students at once.
+- Admin can edit or delete prospective records.
+- Duplicate `student_id` values for the same academic year are rejected.
+- Non-admin users do not see the feature or the data.
