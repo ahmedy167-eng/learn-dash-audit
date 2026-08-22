@@ -15,6 +15,7 @@ import { MessageInbox } from '@/components/admin/MessageInbox';
 import { SessionAnalytics } from '@/components/admin/SessionAnalytics';
 import { StudentManagement } from '@/components/admin/StudentManagement';
 import { GuestStudentManagement } from '@/components/admin/GuestStudentManagement';
+import { ProspectiveStudentsManagement } from '@/components/admin/ProspectiveStudentsManagement';
 import { Clock } from '@/components/admin/Clock';
 import { RefreshCw, Shield, Users, Settings, Eye, GraduationCap, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
@@ -209,6 +210,9 @@ export default function Admin() {
 
         {/* Guest Student Management */}
         <GuestStudentManagement />
+
+        {/* Prospective Students 2026/2027 */}
+        <ProspectiveStudentsManagement />
 
         {/* Users Table */}
         <Card>

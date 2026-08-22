@@ -878,6 +878,48 @@ export type Database = {
         }
         Relationships: []
       }
+      prospective_students: {
+        Row: {
+          academic_year: string
+          created_at: string
+          created_by: string
+          full_name: string
+          id: string
+          notes: string | null
+          status: string
+          student_id: string
+          track_number: string | null
+          updated_at: string
+          weeks: Json
+        }
+        Insert: {
+          academic_year?: string
+          created_at?: string
+          created_by: string
+          full_name: string
+          id?: string
+          notes?: string | null
+          status?: string
+          student_id: string
+          track_number?: string | null
+          updated_at?: string
+          weeks?: Json
+        }
+        Update: {
+          academic_year?: string
+          created_at?: string
+          created_by?: string
+          full_name?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          student_id?: string
+          track_number?: string | null
+          updated_at?: string
+          weeks?: Json
+        }
+        Relationships: []
+      }
       quiz_questions: {
         Row: {
           correct_answer: string
