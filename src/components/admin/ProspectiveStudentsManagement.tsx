@@ -65,6 +65,7 @@ interface ProspectiveStudent {
   id: string;
   full_name: string;
   student_id: string;
+  email: string | null;
   track_number: string | null;
   academic_year: string;
   weeks: Record<string, string | null>;
@@ -74,6 +75,7 @@ interface ProspectiveStudent {
   created_at: string;
   updated_at: string;
 }
+
 
 const ACADEMIC_YEAR = '2026/2027';
 const WEEK_NUMBERS = Array.from({ length: 15 }, (_, i) => String(i + 1));
