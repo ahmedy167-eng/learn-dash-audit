@@ -518,6 +518,7 @@ export function ProspectiveStudentsManagement() {
                 <TableRow>
                   <TableHead>Full Name</TableHead>
                   <TableHead>Student ID</TableHead>
+                  <TableHead>Email</TableHead>
                   <TableHead>Track Number</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Weeks 1-15</TableHead>
