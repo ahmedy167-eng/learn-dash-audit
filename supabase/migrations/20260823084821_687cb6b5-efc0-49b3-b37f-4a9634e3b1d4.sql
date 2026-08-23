@@ -1,0 +1,1 @@
+ALTER TABLE public.prospective_students ADD COLUMN IF NOT EXISTS email text GENERATED ALWAYS AS (student_id || '@student.ksu.edu.sa') STORED;

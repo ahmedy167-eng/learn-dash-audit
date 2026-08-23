@@ -65,6 +65,7 @@ interface ProspectiveStudent {
   id: string;
   full_name: string;
   student_id: string;
+  email: string | null;
   track_number: string | null;
   academic_year: string;
   weeks: Record<string, string | null>;
@@ -74,6 +75,7 @@ interface ProspectiveStudent {
   created_at: string;
   updated_at: string;
 }
+
 
 const ACADEMIC_YEAR = '2026/2027';
 const WEEK_NUMBERS = Array.from({ length: 15 }, (_, i) => String(i + 1));
@@ -274,12 +276,12 @@ export function ProspectiveStudentsManagement() {
   const downloadTemplate = () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Prospective Students');
-    const headers = ['Full Name', 'Student ID', 'Track Number', 'Status', 'Notes', ...WEEK_NUMBERS.map((w) => `Week ${w}`)];
+    const headers = ['Full Name', 'Student ID', 'Email', 'Track Number', 'Status', 'Notes', ...WEEK_NUMBERS.map((w) => `Week ${w}`)];
     worksheet.addRow(headers);
-    worksheet.addRow(['Example Student', 'STU001', 'Track A', 'Pending', 'Note here', ...WEEK_NUMBERS.map(() => '')]);
+    worksheet.addRow(['Example Student', 'STU001', 'STU001@student.ksu.edu.sa', 'Track A', 'Pending', 'Note here', ...WEEK_NUMBERS.map(() => '')]);
 
     headers.forEach((_, index) => {
-      worksheet.getColumn(index + 1).width = index < 5 ? 22 : 10;
+      worksheet.getColumn(index + 1).width = index < 6 ? 22 : 10;
     });
     worksheet.getRow(1).font = { bold: true };
 
@@ -430,6 +432,7 @@ export function ProspectiveStudentsManagement() {
       (r) =>
         r.full_name.toLowerCase().includes(query) ||
         r.student_id.toLowerCase().includes(query) ||
+        (r.email || '').toLowerCase().includes(query) ||
         (r.track_number || '').toLowerCase().includes(query)
     );
   }, [records, searchQuery]);
@@ -515,6 +518,7 @@ export function ProspectiveStudentsManagement() {
                 <TableRow>
                   <TableHead>Full Name</TableHead>
                   <TableHead>Student ID</TableHead>
+                  <TableHead>Email</TableHead>
                   <TableHead>Track Number</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Weeks 1-15</TableHead>
@@ -527,6 +531,7 @@ export function ProspectiveStudentsManagement() {
                   <TableRow key={record.id}>
                     <TableCell className="font-medium min-w-[150px]">{record.full_name}</TableCell>
                     <TableCell>{record.student_id}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{record.email || '-'}</TableCell>
                     <TableCell>{record.track_number || '-'}</TableCell>
                     <TableCell>
                       <Badge variant={STATUS_BADGE_VARIANTS[record.status] || 'secondary'}>
@@ -613,6 +618,17 @@ export function ProspectiveStudentsManagement() {
                   required
                   disabled={!!editingRecord}
                 />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  value={formStudentId ? `${formStudentId}@student.ksu.edu.sa` : ''}
+                  disabled
+                  readOnly
+                  placeholder="Auto-generated from student ID"
+                />
+                <p className="text-xs text-muted-foreground">Email is generated automatically from the student ID.</p>
               </div>
             </div>
 
