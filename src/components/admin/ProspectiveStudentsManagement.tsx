@@ -618,14 +618,14 @@ export function ProspectiveStudentsManagement() {
                 {WEEK_NUMBERS.map((week) => (
                   <div key={week} className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Week {week}</Label>
-                    <Select value={formWeeks[week] || ''} onValueChange={(v) => setWeekStatus(week, v)}>
+                    <Select value={formWeeks[week] || WEEK_NONE} onValueChange={(v) => setWeekStatus(week, v)}>
                       <SelectTrigger className="h-8 text-xs">
                         <SelectValue placeholder="-" />
                       </SelectTrigger>
                       <SelectContent>
                         {WEEK_STATUS_OPTIONS.map((opt) => (
                           <SelectItem key={opt} value={opt}>
-                            {opt || '-'}
+                            {opt === WEEK_NONE ? '-' : opt}
                           </SelectItem>
                         ))}
                       </SelectContent>
