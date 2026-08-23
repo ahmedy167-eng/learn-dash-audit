@@ -276,12 +276,12 @@ export function ProspectiveStudentsManagement() {
   const downloadTemplate = () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Prospective Students');
-    const headers = ['Full Name', 'Student ID', 'Track Number', 'Status', 'Notes', ...WEEK_NUMBERS.map((w) => `Week ${w}`)];
+    const headers = ['Full Name', 'Student ID', 'Email', 'Track Number', 'Status', 'Notes', ...WEEK_NUMBERS.map((w) => `Week ${w}`)];
     worksheet.addRow(headers);
-    worksheet.addRow(['Example Student', 'STU001', 'Track A', 'Pending', 'Note here', ...WEEK_NUMBERS.map(() => '')]);
+    worksheet.addRow(['Example Student', 'STU001', 'STU001@student.ksu.edu.sa', 'Track A', 'Pending', 'Note here', ...WEEK_NUMBERS.map(() => '')]);
 
     headers.forEach((_, index) => {
-      worksheet.getColumn(index + 1).width = index < 5 ? 22 : 10;
+      worksheet.getColumn(index + 1).width = index < 6 ? 22 : 10;
     });
     worksheet.getRow(1).font = { bold: true };
 
