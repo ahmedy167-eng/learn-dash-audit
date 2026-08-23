@@ -432,6 +432,7 @@ export function ProspectiveStudentsManagement() {
       (r) =>
         r.full_name.toLowerCase().includes(query) ||
         r.student_id.toLowerCase().includes(query) ||
+        (r.email || '').toLowerCase().includes(query) ||
         (r.track_number || '').toLowerCase().includes(query)
     );
   }, [records, searchQuery]);
