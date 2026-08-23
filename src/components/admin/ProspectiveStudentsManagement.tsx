@@ -347,6 +347,10 @@ export function ProspectiveStudentsManagement() {
       }[] = [];
       const skippedRows: number[] = [];
 
+      const existingIds = new Set(records.map((r) => r.student_id.trim().toLowerCase()));
+      const seenIds = new Set<string>();
+      const duplicateIds: string[] = [];
+
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return;
         const fullName = String(row.getCell(fullNameCol).value || '').trim();
@@ -355,6 +359,13 @@ export function ProspectiveStudentsManagement() {
           skippedRows.push(rowNumber);
           return;
         }
+
+        const normalizedId = studentId.toLowerCase();
+        if (existingIds.has(normalizedId) || seenIds.has(normalizedId)) {
+          duplicateIds.push(studentId);
+          return;
+        }
+        seenIds.add(normalizedId);
 
         const weeks: Record<string, string> = {};
         Object.entries(weekCols).forEach(([week, col]) => {
@@ -375,7 +386,12 @@ export function ProspectiveStudentsManagement() {
       });
 
       if (rowsToInsert.length === 0) {
-        toast.error('No valid student data found in the file');
+        toast.error(
+          duplicateIds.length > 0
+            ? `Nothing to import — all ${duplicateIds.length} Student ID(s) already exist: ${duplicateIds.slice(0, 5).join(', ')}${duplicateIds.length > 5 ? '...' : ''}`
+            : 'No valid student data found in the file',
+          { duration: 6000 }
+        );
         return;
       }
 
@@ -389,7 +405,14 @@ export function ProspectiveStudentsManagement() {
         return;
       }
 
-      toast.success(`Imported ${rowsToInsert.length} prospective students${skippedRows.length > 0 ? `, skipped ${skippedRows.length} empty rows` : ''}`);
+      const parts = [`Imported ${rowsToInsert.length} prospective students`];
+      if (duplicateIds.length > 0) {
+        parts.push(`skipped ${duplicateIds.length} duplicate(s): ${duplicateIds.slice(0, 5).join(', ')}${duplicateIds.length > 5 ? '...' : ''}`);
+      }
+      if (skippedRows.length > 0) {
+        parts.push(`skipped ${skippedRows.length} empty row(s)`);
+      }
+      toast.success(parts.join(', '), { duration: 6000 });
       fetchRecords();
     } catch (error: any) {
       console.error('Import error:', error);
