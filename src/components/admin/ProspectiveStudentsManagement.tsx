@@ -78,7 +78,8 @@ interface ProspectiveStudent {
 const ACADEMIC_YEAR = '2026/2027';
 const WEEK_NUMBERS = Array.from({ length: 15 }, (_, i) => String(i + 1));
 const STATUS_OPTIONS = ['Pending', 'Confirmed', 'Withdrawn', 'Enrolled'];
-const WEEK_STATUS_OPTIONS = ['', 'Pending', 'Present', 'Absent', 'Late', 'Excused', 'N/A'];
+const WEEK_NONE = '__none__';
+const WEEK_STATUS_OPTIONS = [WEEK_NONE, 'Pending', 'Present', 'Absent', 'Late', 'Excused', 'N/A'];
 
 const WEEK_STATUS_COLORS: Record<string, string> = {
   Present: 'bg-green-100 text-green-800 hover:bg-green-200',
@@ -392,7 +393,7 @@ export function ProspectiveStudentsManagement() {
   }, [records, searchQuery]);
 
   const setWeekStatus = (week: string, value: string) => {
-    setFormWeeks((prev) => ({ ...prev, [week]: value }));
+    setFormWeeks((prev) => ({ ...prev, [week]: value === WEEK_NONE ? '' : value }));
   };
 
   return (
@@ -617,14 +618,14 @@ export function ProspectiveStudentsManagement() {
                 {WEEK_NUMBERS.map((week) => (
                   <div key={week} className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Week {week}</Label>
-                    <Select value={formWeeks[week] || ''} onValueChange={(v) => setWeekStatus(week, v)}>
+                    <Select value={formWeeks[week] || WEEK_NONE} onValueChange={(v) => setWeekStatus(week, v)}>
                       <SelectTrigger className="h-8 text-xs">
                         <SelectValue placeholder="-" />
                       </SelectTrigger>
                       <SelectContent>
                         {WEEK_STATUS_OPTIONS.map((opt) => (
                           <SelectItem key={opt} value={opt}>
-                            {opt || '-'}
+                            {opt === WEEK_NONE ? '-' : opt}
                           </SelectItem>
                         ))}
                       </SelectContent>
