@@ -531,6 +531,7 @@ export function ProspectiveStudentsManagement() {
                   <TableRow key={record.id}>
                     <TableCell className="font-medium min-w-[150px]">{record.full_name}</TableCell>
                     <TableCell>{record.student_id}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{record.email || '-'}</TableCell>
                     <TableCell>{record.track_number || '-'}</TableCell>
                     <TableCell>
                       <Badge variant={STATUS_BADGE_VARIANTS[record.status] || 'secondary'}>
