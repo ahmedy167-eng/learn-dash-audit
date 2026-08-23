@@ -618,6 +618,19 @@ export function ProspectiveStudentsManagement() {
                   required
                   disabled={!!editingRecord}
                 />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  value={formStudentId ? `${formStudentId}@student.ksu.edu.sa` : ''}
+                  disabled
+                  readOnly
+                  placeholder="Auto-generated from student ID"
+                />
+                <p className="text-xs text-muted-foreground">Email is generated automatically from the student ID.</p>
               </div>
             </div>
 
