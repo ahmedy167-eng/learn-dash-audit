@@ -208,6 +208,21 @@ export function ProspectiveStudentsManagement() {
       weeks: weeksPayload,
     };
 
+    // Pre-check for duplicate student ID for this academic year
+    const duplicate = records.find(
+      (r) =>
+        r.student_id.trim().toLowerCase() === payload.student_id.toLowerCase() &&
+        r.id !== editingRecord?.id
+    );
+    if (duplicate) {
+      setIsSubmitting(false);
+      toast.error(
+        `Student ID "${payload.student_id}" already exists (${duplicate.full_name}). Edit the existing record instead.`,
+        { duration: 5000 }
+      );
+      return;
+    }
+
     try {
       if (editingRecord) {
         const { error } = await supabase
@@ -229,7 +244,11 @@ export function ProspectiveStudentsManagement() {
       fetchRecords();
     } catch (error: any) {
       console.error('Error saving prospective student:', error);
-      toast.error(error.message || 'Failed to save record');
+      if (error.code === '23505' || error.message?.includes('unique constraint')) {
+        toast.error(`Student ID "${payload.student_id}" already exists for 2026/2027. Edit the existing record instead.`, { duration: 5000 });
+      } else {
+        toast.error(error.message || 'Failed to save record');
+      }
     } finally {
       setIsSubmitting(false);
     }
