@@ -883,6 +883,7 @@ export type Database = {
           academic_year: string
           created_at: string
           created_by: string
+          email: string | null
           full_name: string
           id: string
           notes: string | null
@@ -896,6 +897,7 @@ export type Database = {
           academic_year?: string
           created_at?: string
           created_by: string
+          email?: string | null
           full_name: string
           id?: string
           notes?: string | null
@@ -909,6 +911,7 @@ export type Database = {
           academic_year?: string
           created_at?: string
           created_by?: string
+          email?: string | null
           full_name?: string
           id?: string
           notes?: string | null
