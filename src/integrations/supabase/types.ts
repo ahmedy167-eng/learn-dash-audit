@@ -878,6 +878,33 @@ export type Database = {
         }
         Relationships: []
       }
+      prospective_sections: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          label: string | null
+          section_number: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          label?: string | null
+          section_number: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          label?: string | null
+          section_number?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       prospective_students: {
         Row: {
           academic_year: string
@@ -887,6 +914,7 @@ export type Database = {
           full_name: string
           id: string
           notes: string | null
+          section_id: string | null
           status: string
           student_id: string
           track_number: string | null
@@ -901,6 +929,7 @@ export type Database = {
           full_name: string
           id?: string
           notes?: string | null
+          section_id?: string | null
           status?: string
           student_id: string
           track_number?: string | null
@@ -915,13 +944,22 @@ export type Database = {
           full_name?: string
           id?: string
           notes?: string | null
+          section_id?: string | null
           status?: string
           student_id?: string
           track_number?: string | null
           updated_at?: string
           weeks?: Json
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "prospective_students_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "prospective_sections"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quiz_questions: {
         Row: {
