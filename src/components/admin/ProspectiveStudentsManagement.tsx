@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -58,6 +59,8 @@ import {
   Calendar,
   GraduationCap,
   Loader2,
+  Layers,
+  X,
 } from 'lucide-react';
 import ExcelJS from 'exceljs';
 
@@ -71,9 +74,17 @@ interface ProspectiveStudent {
   weeks: Record<string, string | null>;
   status: string;
   notes: string | null;
+  section_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
+}
+
+interface ProspectiveSection {
+  id: string;
+  section_number: string;
+  label: string | null;
+  created_at: string;
 }
 
 
@@ -81,6 +92,8 @@ const ACADEMIC_YEAR = '2026/2027';
 const WEEK_NUMBERS = Array.from({ length: 15 }, (_, i) => String(i + 1));
 const STATUS_OPTIONS = ['Pending', 'Confirmed', 'Withdrawn', 'Enrolled'];
 const WEEK_NONE = '__none__';
+const SECTION_ALL = '__all__';
+const SECTION_UNASSIGNED = '__unassigned__';
 const WEEK_STATUS_OPTIONS = [WEEK_NONE, 'Pending', 'Present', 'Absent', 'Late', 'Excused', 'N/A'];
 
 const WEEK_STATUS_COLORS: Record<string, string> = {
@@ -113,6 +126,17 @@ export function ProspectiveStudentsManagement() {
   const [recordToDelete, setRecordToDelete] = useState<ProspectiveStudent | null>(null);
   const [isImporting, setIsImporting] = useState(false);
 
+  // Section state
+  const [sections, setSections] = useState<ProspectiveSection[]>([]);
+  const [sectionFilter, setSectionFilter] = useState<string>(SECTION_ALL);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkSectionId, setBulkSectionId] = useState<string>(SECTION_UNASSIGNED);
+  const [isAssigning, setIsAssigning] = useState(false);
+  const [isSectionsDialogOpen, setIsSectionsDialogOpen] = useState(false);
+  const [newSectionNumber, setNewSectionNumber] = useState('');
+  const [newSectionLabel, setNewSectionLabel] = useState('');
+  const [sectionToDelete, setSectionToDelete] = useState<ProspectiveSection | null>(null);
+
   // Form state
   const [formName, setFormName] = useState('');
   const [formStudentId, setFormStudentId] = useState('');
@@ -120,6 +144,7 @@ export function ProspectiveStudentsManagement() {
   const [formStatus, setFormStatus] = useState('Pending');
   const [formNotes, setFormNotes] = useState('');
   const [formWeeks, setFormWeeks] = useState<Record<string, string>>({});
+  const [formSectionId, setFormSectionId] = useState<string>(SECTION_UNASSIGNED);
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -146,8 +171,21 @@ export function ProspectiveStudentsManagement() {
     }
   };
 
+  const fetchSections = async () => {
+    const { data, error } = await supabase
+      .from('prospective_sections')
+      .select('*')
+      .order('section_number', { ascending: true });
+    if (error) {
+      console.error('Error fetching prospective sections:', error);
+      return;
+    }
+    setSections((data || []) as ProspectiveSection[]);
+  };
+
   useEffect(() => {
     fetchRecords();
+    fetchSections();
   }, []);
 
   const resetForm = () => {
@@ -157,6 +195,7 @@ export function ProspectiveStudentsManagement() {
     setFormStatus('Pending');
     setFormNotes('');
     setFormWeeks({});
+    setFormSectionId(SECTION_UNASSIGNED);
     setEditingRecord(null);
   };
 
@@ -172,6 +211,7 @@ export function ProspectiveStudentsManagement() {
     setFormTrackNumber(record.track_number || '');
     setFormStatus(record.status);
     setFormNotes(record.notes || '');
+    setFormSectionId(record.section_id || SECTION_UNASSIGNED);
     setFormWeeks(
       WEEK_NUMBERS.reduce((acc, week) => {
         acc[week] = record.weeks?.[week] || '';
@@ -208,6 +248,7 @@ export function ProspectiveStudentsManagement() {
       status: formStatus,
       notes: formNotes.trim() || null,
       weeks: weeksPayload,
+      section_id: formSectionId === SECTION_UNASSIGNED ? null : formSectionId,
     };
 
     // Pre-check for duplicate student ID for this academic year
@@ -276,12 +317,12 @@ export function ProspectiveStudentsManagement() {
   const downloadTemplate = () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Prospective Students');
-    const headers = ['Full Name', 'Student ID', 'Email', 'Track Number', 'Status', 'Notes', ...WEEK_NUMBERS.map((w) => `Week ${w}`)];
+    const headers = ['Full Name', 'Student ID', 'Email', 'Track Number', 'Section', 'Status', 'Notes', ...WEEK_NUMBERS.map((w) => `Week ${w}`)];
     worksheet.addRow(headers);
-    worksheet.addRow(['Example Student', 'STU001', 'STU001@student.ksu.edu.sa', 'Track A', 'Pending', 'Note here', ...WEEK_NUMBERS.map(() => '')]);
+    worksheet.addRow(['Example Student', 'STU001', 'STU001@student.ksu.edu.sa', 'Track A', '6490', 'Pending', 'Note here', ...WEEK_NUMBERS.map(() => '')]);
 
     headers.forEach((_, index) => {
-      worksheet.getColumn(index + 1).width = index < 6 ? 22 : 10;
+      worksheet.getColumn(index + 1).width = index < 7 ? 22 : 10;
     });
     worksheet.getRow(1).font = { bold: true };
 
@@ -331,6 +372,10 @@ export function ProspectiveStudentsManagement() {
       const trackNumberCol = headers['track number'];
       const statusCol = headers['status'];
       const notesCol = headers['notes'];
+      const sectionCol = headers['section'];
+      const sectionByNumber = new Map(
+        sections.map((s) => [s.section_number.trim().toLowerCase(), s.id])
+      );
       const weekCols: Record<string, number> = {};
       WEEK_NUMBERS.forEach((week) => {
         const key = `week ${week}`;
@@ -346,12 +391,14 @@ export function ProspectiveStudentsManagement() {
         weeks: Record<string, string>;
         created_by: string;
         academic_year: string;
+        section_id: string | null;
       }[] = [];
       const skippedRows: number[] = [];
 
       const existingIds = new Set(records.map((r) => r.student_id.trim().toLowerCase()));
       const seenIds = new Set<string>();
       const duplicateIds: string[] = [];
+      const unknownSections: string[] = [];
 
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return;
@@ -375,6 +422,16 @@ export function ProspectiveStudentsManagement() {
           if (value) weeks[week] = value;
         });
 
+        let sectionId: string | null = null;
+        if (sectionCol) {
+          const rawSection = String(row.getCell(sectionCol).value || '').trim();
+          if (rawSection) {
+            const found = sectionByNumber.get(rawSection.toLowerCase());
+            if (found) sectionId = found;
+            else unknownSections.push(rawSection);
+          }
+        }
+
         rowsToInsert.push({
           full_name: fullName,
           student_id: studentId,
@@ -384,6 +441,7 @@ export function ProspectiveStudentsManagement() {
           weeks,
           created_by: user?.id as string,
           academic_year: ACADEMIC_YEAR,
+          section_id: sectionId,
         });
       });
 
@@ -413,6 +471,9 @@ export function ProspectiveStudentsManagement() {
       }
       if (skippedRows.length > 0) {
         parts.push(`skipped ${skippedRows.length} empty row(s)`);
+      }
+      if (unknownSections.length > 0) {
+        parts.push(`unknown section(s) left unassigned: ${[...new Set(unknownSections)].slice(0, 5).join(', ')}`);
       }
       toast.success(parts.join(', '), { duration: 6000 });
       fetchRecords();
