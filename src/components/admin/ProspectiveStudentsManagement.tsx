@@ -794,6 +794,87 @@ export function ProspectiveStudentsManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Manage Sections Dialog */}
+      <Dialog open={isSectionsDialogOpen} onOpenChange={setIsSectionsDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Manage Sections</DialogTitle>
+            <DialogDescription>
+              Create the sections students can be assigned to. Deleting a section leaves its students unassigned.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                placeholder="Section number (e.g., 6490)"
+                value={newSectionNumber}
+                onChange={(e) => setNewSectionNumber(e.target.value)}
+              />
+              <Input
+                placeholder="Label (optional)"
+                value={newSectionLabel}
+                onChange={(e) => setNewSectionLabel(e.target.value)}
+              />
+              <Button onClick={handleAddSection} disabled={!newSectionNumber.trim()}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add
+              </Button>
+            </div>
+
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {sections.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No sections yet</p>
+              ) : (
+                sections.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between rounded-md border p-2">
+                    <div>
+                      <span className="font-medium">{s.section_number}</span>
+                      {s.label && <span className="text-muted-foreground text-sm ml-2">{s.label}</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">
+                        {records.filter((r) => r.section_id === s.id).length} students
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => setSectionToDelete(s)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Section Confirmation */}
+      <AlertDialog open={!!sectionToDelete} onOpenChange={(open) => !open && setSectionToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Section</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete section <strong>{sectionToDelete?.section_number}</strong>? Students in it will become unassigned; no student records are deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSectionToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSection}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </Card>
   );
 }
