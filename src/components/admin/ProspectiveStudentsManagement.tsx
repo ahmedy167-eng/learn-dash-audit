@@ -486,17 +486,103 @@ export function ProspectiveStudentsManagement() {
     }
   };
 
+  const sectionNumberById = useMemo(
+    () => new Map(sections.map((s) => [s.id, s.section_number])),
+    [sections]
+  );
+
   const filteredRecords = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return records;
-    return records.filter(
-      (r) =>
+    return records.filter((r) => {
+      if (sectionFilter === SECTION_UNASSIGNED && r.section_id) return false;
+      if (sectionFilter !== SECTION_ALL && sectionFilter !== SECTION_UNASSIGNED && r.section_id !== sectionFilter)
+        return false;
+      if (!query) return true;
+      return (
         r.full_name.toLowerCase().includes(query) ||
         r.student_id.toLowerCase().includes(query) ||
         (r.email || '').toLowerCase().includes(query) ||
         (r.track_number || '').toLowerCase().includes(query)
-    );
-  }, [records, searchQuery]);
+      );
+    });
+  }, [records, searchQuery, sectionFilter]);
+
+  const allVisibleSelected =
+    filteredRecords.length > 0 && filteredRecords.every((r) => selectedIds.has(r.id));
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (checked: boolean) => {
+    setSelectedIds(checked ? new Set(filteredRecords.map((r) => r.id)) : new Set());
+  };
+
+  const handleBulkAssign = async () => {
+    if (selectedIds.size === 0) return;
+    setIsAssigning(true);
+    try {
+      const sectionId = bulkSectionId === SECTION_UNASSIGNED ? null : bulkSectionId;
+      const { error } = await supabase
+        .from('prospective_students')
+        .update({ section_id: sectionId })
+        .in('id', Array.from(selectedIds));
+      if (error) throw error;
+      toast.success(
+        sectionId
+          ? `${selectedIds.size} student(s) assigned to ${sectionNumberById.get(sectionId)}`
+          : `${selectedIds.size} student(s) unassigned`
+      );
+      setSelectedIds(new Set());
+      fetchRecords();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to assign section');
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  const handleAddSection = async () => {
+    if (!user?.id || !newSectionNumber.trim()) return;
+    try {
+      const { error } = await supabase.from('prospective_sections').insert({
+        section_number: newSectionNumber.trim(),
+        label: newSectionLabel.trim() || null,
+        created_by: user.id,
+      });
+      if (error) throw error;
+      toast.success('Section added');
+      setNewSectionNumber('');
+      setNewSectionLabel('');
+      fetchSections();
+    } catch (error: any) {
+      if (error.code === '23505') {
+        toast.error('That section number already exists');
+      } else {
+        toast.error(error.message || 'Failed to add section');
+      }
+    }
+  };
+
+  const handleDeleteSection = async () => {
+    if (!sectionToDelete) return;
+    try {
+      const { error } = await supabase.from('prospective_sections').delete().eq('id', sectionToDelete.id);
+      if (error) throw error;
+      toast.success('Section deleted');
+      setSectionToDelete(null);
+      if (sectionFilter === sectionToDelete.id) setSectionFilter(SECTION_ALL);
+      fetchSections();
+      fetchRecords();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete section');
+    }
+  };
+
 
   const setWeekStatus = (week: string, value: string) => {
     setFormWeeks((prev) => ({ ...prev, [week]: value === WEEK_NONE ? '' : value }));
