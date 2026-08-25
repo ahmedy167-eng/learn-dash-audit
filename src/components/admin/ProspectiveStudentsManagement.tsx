@@ -486,17 +486,103 @@ export function ProspectiveStudentsManagement() {
     }
   };
 
+  const sectionNumberById = useMemo(
+    () => new Map(sections.map((s) => [s.id, s.section_number])),
+    [sections]
+  );
+
   const filteredRecords = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return records;
-    return records.filter(
-      (r) =>
+    return records.filter((r) => {
+      if (sectionFilter === SECTION_UNASSIGNED && r.section_id) return false;
+      if (sectionFilter !== SECTION_ALL && sectionFilter !== SECTION_UNASSIGNED && r.section_id !== sectionFilter)
+        return false;
+      if (!query) return true;
+      return (
         r.full_name.toLowerCase().includes(query) ||
         r.student_id.toLowerCase().includes(query) ||
         (r.email || '').toLowerCase().includes(query) ||
         (r.track_number || '').toLowerCase().includes(query)
-    );
-  }, [records, searchQuery]);
+      );
+    });
+  }, [records, searchQuery, sectionFilter]);
+
+  const allVisibleSelected =
+    filteredRecords.length > 0 && filteredRecords.every((r) => selectedIds.has(r.id));
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (checked: boolean) => {
+    setSelectedIds(checked ? new Set(filteredRecords.map((r) => r.id)) : new Set());
+  };
+
+  const handleBulkAssign = async () => {
+    if (selectedIds.size === 0) return;
+    setIsAssigning(true);
+    try {
+      const sectionId = bulkSectionId === SECTION_UNASSIGNED ? null : bulkSectionId;
+      const { error } = await supabase
+        .from('prospective_students')
+        .update({ section_id: sectionId })
+        .in('id', Array.from(selectedIds));
+      if (error) throw error;
+      toast.success(
+        sectionId
+          ? `${selectedIds.size} student(s) assigned to ${sectionNumberById.get(sectionId)}`
+          : `${selectedIds.size} student(s) unassigned`
+      );
+      setSelectedIds(new Set());
+      fetchRecords();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to assign section');
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
+  const handleAddSection = async () => {
+    if (!user?.id || !newSectionNumber.trim()) return;
+    try {
+      const { error } = await supabase.from('prospective_sections').insert({
+        section_number: newSectionNumber.trim(),
+        label: newSectionLabel.trim() || null,
+        created_by: user.id,
+      });
+      if (error) throw error;
+      toast.success('Section added');
+      setNewSectionNumber('');
+      setNewSectionLabel('');
+      fetchSections();
+    } catch (error: any) {
+      if (error.code === '23505') {
+        toast.error('That section number already exists');
+      } else {
+        toast.error(error.message || 'Failed to add section');
+      }
+    }
+  };
+
+  const handleDeleteSection = async () => {
+    if (!sectionToDelete) return;
+    try {
+      const { error } = await supabase.from('prospective_sections').delete().eq('id', sectionToDelete.id);
+      if (error) throw error;
+      toast.success('Section deleted');
+      setSectionToDelete(null);
+      if (sectionFilter === sectionToDelete.id) setSectionFilter(SECTION_ALL);
+      fetchSections();
+      fetchRecords();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete section');
+    }
+  };
+
 
   const setWeekStatus = (week: string, value: string) => {
     setFormWeeks((prev) => ({ ...prev, [week]: value === WEEK_NONE ? '' : value }));
@@ -541,6 +627,10 @@ export function ProspectiveStudentsManagement() {
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
+            <Button variant="outline" size="sm" onClick={() => setIsSectionsDialogOpen(true)}>
+              <Layers className="h-4 w-4 mr-1" />
+              Sections
+            </Button>
             <Button size="sm" onClick={openAddDialog} disabled={!user}>
               <Plus className="h-4 w-4 mr-1" />
               Add Student
@@ -548,15 +638,60 @@ export function ProspectiveStudentsManagement() {
           </div>
         </div>
 
-        <div className="relative max-w-sm mt-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, ID, or track number..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center mt-4">
+          <div className="relative max-w-sm w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, ID, or track number..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Select value={sectionFilter} onValueChange={setSectionFilter}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={SECTION_ALL}>All sections</SelectItem>
+              <SelectItem value={SECTION_UNASSIGNED}>Unassigned</SelectItem>
+              {sections.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.section_number}
+                  {s.label ? ` — ${s.label}` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+
+        {selectedIds.size > 0 && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center mt-3 rounded-md border bg-muted/40 p-3">
+            <span className="text-sm font-medium">{selectedIds.size} selected</span>
+            <Select value={bulkSectionId} onValueChange={setBulkSectionId}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SECTION_UNASSIGNED}>Unassigned (clear section)</SelectItem>
+                {sections.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.section_number}
+                    {s.label ? ` — ${s.label}` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button size="sm" onClick={handleBulkAssign} disabled={isAssigning}>
+              {isAssigning && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Assign
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+              <X className="h-4 w-4 mr-1" />
+              Clear selection
+            </Button>
+          </div>
+        )}
       </CardHeader>
 
       <CardContent>
@@ -577,9 +712,17 @@ export function ProspectiveStudentsManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={allVisibleSelected}
+                      onCheckedChange={(v) => toggleSelectAll(!!v)}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
                   <TableHead>Full Name</TableHead>
                   <TableHead>Student ID</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Section</TableHead>
                   <TableHead>Track Number</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Weeks 1-15</TableHead>
@@ -589,10 +732,24 @@ export function ProspectiveStudentsManagement() {
               </TableHeader>
               <TableBody>
                 {filteredRecords.map((record) => (
-                  <TableRow key={record.id}>
+                  <TableRow key={record.id} data-state={selectedIds.has(record.id) ? 'selected' : undefined}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(record.id)}
+                        onCheckedChange={() => toggleSelect(record.id)}
+                        aria-label={`Select ${record.full_name}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium min-w-[150px]">{record.full_name}</TableCell>
                     <TableCell>{record.student_id}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{record.email || '-'}</TableCell>
+                    <TableCell>
+                      {record.section_id ? (
+                        <Badge variant="outline">{sectionNumberById.get(record.section_id) || '—'}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>{record.track_number || '-'}</TableCell>
                     <TableCell>
                       <Badge variant={STATUS_BADGE_VARIANTS[record.status] || 'secondary'}>
@@ -718,6 +875,23 @@ export function ProspectiveStudentsManagement() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label>Section</Label>
+                <Select value={formSectionId} onValueChange={setFormSectionId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SECTION_UNASSIGNED}>Unassigned</SelectItem>
+                    {sections.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.section_number}
+                        {s.label ? ` — ${s.label}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -794,6 +968,87 @@ export function ProspectiveStudentsManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Manage Sections Dialog */}
+      <Dialog open={isSectionsDialogOpen} onOpenChange={setIsSectionsDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Manage Sections</DialogTitle>
+            <DialogDescription>
+              Create the sections students can be assigned to. Deleting a section leaves its students unassigned.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                placeholder="Section number (e.g., 6490)"
+                value={newSectionNumber}
+                onChange={(e) => setNewSectionNumber(e.target.value)}
+              />
+              <Input
+                placeholder="Label (optional)"
+                value={newSectionLabel}
+                onChange={(e) => setNewSectionLabel(e.target.value)}
+              />
+              <Button onClick={handleAddSection} disabled={!newSectionNumber.trim()}>
+                <Plus className="h-4 w-4 mr-1" />
+                Add
+              </Button>
+            </div>
+
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {sections.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No sections yet</p>
+              ) : (
+                sections.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between rounded-md border p-2">
+                    <div>
+                      <span className="font-medium">{s.section_number}</span>
+                      {s.label && <span className="text-muted-foreground text-sm ml-2">{s.label}</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">
+                        {records.filter((r) => r.section_id === s.id).length} students
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => setSectionToDelete(s)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Section Confirmation */}
+      <AlertDialog open={!!sectionToDelete} onOpenChange={(open) => !open && setSectionToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Section</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete section <strong>{sectionToDelete?.section_number}</strong>? Students in it will become unassigned; no student records are deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSectionToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSection}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </Card>
   );
 }
