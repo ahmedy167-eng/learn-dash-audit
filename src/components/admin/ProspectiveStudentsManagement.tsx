@@ -541,6 +541,10 @@ export function ProspectiveStudentsManagement() {
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
               Refresh
             </Button>
+            <Button variant="outline" size="sm" onClick={() => setIsSectionsDialogOpen(true)}>
+              <Layers className="h-4 w-4 mr-1" />
+              Sections
+            </Button>
             <Button size="sm" onClick={openAddDialog} disabled={!user}>
               <Plus className="h-4 w-4 mr-1" />
               Add Student
@@ -548,15 +552,60 @@ export function ProspectiveStudentsManagement() {
           </div>
         </div>
 
-        <div className="relative max-w-sm mt-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, ID, or track number..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center mt-4">
+          <div className="relative max-w-sm w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, ID, or track number..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Select value={sectionFilter} onValueChange={setSectionFilter}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={SECTION_ALL}>All sections</SelectItem>
+              <SelectItem value={SECTION_UNASSIGNED}>Unassigned</SelectItem>
+              {sections.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.section_number}
+                  {s.label ? ` — ${s.label}` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+
+        {selectedIds.size > 0 && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center mt-3 rounded-md border bg-muted/40 p-3">
+            <span className="text-sm font-medium">{selectedIds.size} selected</span>
+            <Select value={bulkSectionId} onValueChange={setBulkSectionId}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SECTION_UNASSIGNED}>Unassigned (clear section)</SelectItem>
+                {sections.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.section_number}
+                    {s.label ? ` — ${s.label}` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button size="sm" onClick={handleBulkAssign} disabled={isAssigning}>
+              {isAssigning && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+              Assign
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())}>
+              <X className="h-4 w-4 mr-1" />
+              Clear selection
+            </Button>
+          </div>
+        )}
       </CardHeader>
 
       <CardContent>
