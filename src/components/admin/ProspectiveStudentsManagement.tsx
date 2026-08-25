@@ -577,9 +577,17 @@ export function ProspectiveStudentsManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={allVisibleSelected}
+                      onCheckedChange={(v) => toggleSelectAll(!!v)}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
                   <TableHead>Full Name</TableHead>
                   <TableHead>Student ID</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Section</TableHead>
                   <TableHead>Track Number</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Weeks 1-15</TableHead>
@@ -589,10 +597,24 @@ export function ProspectiveStudentsManagement() {
               </TableHeader>
               <TableBody>
                 {filteredRecords.map((record) => (
-                  <TableRow key={record.id}>
+                  <TableRow key={record.id} data-state={selectedIds.has(record.id) ? 'selected' : undefined}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(record.id)}
+                        onCheckedChange={() => toggleSelect(record.id)}
+                        aria-label={`Select ${record.full_name}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium min-w-[150px]">{record.full_name}</TableCell>
                     <TableCell>{record.student_id}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{record.email || '-'}</TableCell>
+                    <TableCell>
+                      {record.section_id ? (
+                        <Badge variant="outline">{sectionNumberById.get(record.section_id) || '—'}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>{record.track_number || '-'}</TableCell>
                     <TableCell>
                       <Badge variant={STATUS_BADGE_VARIANTS[record.status] || 'secondary'}>
