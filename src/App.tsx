@@ -9,8 +9,30 @@ import { StudentAuthProvider } from "@/hooks/useStudentAuth";
 import { GuestAuthProvider } from "@/hooks/useGuestAuth";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
-// Lazy load all route components for code splitting
-const Index = lazy(() => import("./pages/Index"));
+// Lazy load all route components for code splitting.
+// Retries once (and reloads on stale deploys) when a chunk fails to fetch.
+function lazyWithRetry<T extends { default: React.ComponentType<any> }>(
+  factory: () => Promise<T>
+) {
+  return lazy(async () => {
+    try {
+      return await factory();
+    } catch (err) {
+      const key = "chunk-reload-" + String(err);
+      if (!sessionStorage.getItem(key)) {
+        sessionStorage.setItem(key, "1");
+        window.location.reload();
+        return new Promise<T>(() => {});
+      }
+      throw err;
+    }
+  });
+}
+
+const lazy_ = lazyWithRetry;
+
+const Index = lazy_(() => import("./pages/Index"));
+
 const Auth = lazy(() => import("./pages/Auth"));
 const TeacherSignup = lazy(() => import("./pages/TeacherSignup"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
